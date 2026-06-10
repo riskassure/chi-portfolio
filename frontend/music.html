@@ -24,17 +24,51 @@
         <h2>My Classical Music Catalog</h2>
         <p>A sortable, filterable archive of favorite pieces, genres, and modal studies.</p>
 
+        <div style="margin-bottom: 20px; padding: 15px; background-color: #f4f6f7; border-radius: 5px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <strong>Filters:</strong>
+            
+            <label>Genre:
+                <select id="filter-genre" class="table-filter">
+                    <option value="all">All Genres</option>
+                    <option value="Classical">Classical</option>
+                </select>
+            </label>
+
+            <label>Period:
+                <select id="filter-period" class="table-filter">
+                    <option value="all">All Periods</option>
+                    <option value="19th Century">19th Century</option>
+                    <option value="Early 20th Century">Early 20th Century</option>
+                    <option value="Mid 20th Century">Mid 20th Century</option>
+                </select>
+            </label>
+
+            <label>Type:
+                <select id="filter-type" class="table-filter">
+                    <option value="all">All Types</option>
+                    <option value="Orchestral">Orchestral</option>
+                    <option value="Chamber">Chamber</option>
+                    <option value="Vocal">Vocal</option>
+                </select>
+            </label>
+
+            <button id="reset-filters" style="padding: 5px 10px; background-color: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">Clear All</button>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table id="music-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+
         <div style="overflow-x: auto; margin-top: 20px;">
             <table id="music-table" style="width: 100%; border-collapse: collapse; text-align: left;">
                 <thead>
                     <tr style="background-color: #34495e; color: white;">
-                        <th style="padding: 12px; border: 1px solid #34495e;">Genre</th>
-                        <th style="padding: 12px; border: 1px solid #34495e;">Period</th>
-                        <th style="padding: 12px; border: 1px solid #34495e;">Type</th>
-                        <th style="padding: 12px; border: 1px solid #34495e;">Subtype</th>
-                        <th style="padding: 12px; border: 1px solid #34495e;">Piece Name</th>
-                        <th style="padding: 12px; border: 1px solid #34495e;">Composer</th>
-                        <th style="padding: 12px; border: 1px solid #34495e;">Performer(s)</th>
+                        <th class="sortable-header" data-column="genre" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Genre <span class="sort-icon">↕</span></th>
+                        <th class="sortable-header" data-column="period" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Period <span class="sort-icon">↕</span></th>
+                        <th class="sortable-header" data-column="type" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Type <span class="sort-icon">↕</span></th>
+                        <th class="sortable-header" data-column="subtype" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Subtype <span class="sort-icon">↕</span></th>
+                        <th class="sortable-header" data-column="piece" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Piece Name <span class="sort-icon">↕</span></th>
+                        <th class="sortable-header" data-column="composer" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Composer <span class="sort-icon">↕</span></th>
+                        <th class="sortable-header" data-column="performer" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Performer(s) <span class="sort-icon">↕</span></th>
                         <th style="padding: 12px; border: 1px solid #34495e;">Listen</th>
                     </tr>
                 </thead>

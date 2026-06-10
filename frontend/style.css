@@ -69,3 +69,21 @@
 .spotify-link:hover {
     text-decoration: underline;
 }
+
+/* Filters & Interactive Headers */
+.table-filter {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    margin-left: 5px;
+}
+
+.sortable-header:hover {
+    background-color: #2c3e50;
+}
+
+.sort-icon {
+    font-size: 0.8em;
+    margin-left: 5px;
+    color: #bdc3c7;
+}

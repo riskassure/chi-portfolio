@@ -18,5 +18,45 @@
         "composer": "Ronald Binge",
         "performer": "Ronald Binge Orchestra",
         "spotify": "https://open.spotify.com"
+    },
+    {
+        "genre": "Classical",
+        "period": "Early 20th Century",
+        "type": "Orchestral",
+        "subtype": "British Light Music",
+        "piece": "In a Persian Market",
+        "composer": "Albert Ketèlbey",
+        "performer": "John Lanchbery, Philharmonia Orchestra",
+        "spotify": "https://open.spotify.com"
+    },
+    {
+        "genre": "Classical",
+        "period": "Mid 20th Century",
+        "type": "Orchestral",
+        "subtype": "British Light Music",
+        "piece": "Sailing By",
+        "composer": "Ronald Binge",
+        "performer": "The BBC Concert Orchestra",
+        "spotify": "https://open.spotify.com"
+    },
+    {
+        "genre": "Classical",
+        "period": "19th Century",
+        "type": "Chamber",
+        "subtype": "String Quartet",
+        "piece": "String Quartet No. 14 in D minor (Death and the Maiden)",
+        "composer": "Franz Schubert",
+        "performer": "Alban Berg Quartett",
+        "spotify": "https://open.spotify.com"
+    },
+    {
+        "genre": "Classical",
+        "period": "19th Century",
+        "type": "Orchestral",
+        "subtype": "Symphonic",
+        "piece": "Symphony No. 5 in C minor",
+        "composer": "Ludwig van Beethoven",
+        "performer": "Vienna Philharmonic, Carlos Kleiber",
+        "spotify": "https://open.spotify.com"
     }
 ]
