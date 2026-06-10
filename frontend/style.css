@@ -41,3 +41,31 @@
 .nav-links a:hover {
     color: #3498db;                 /* Changes text to a crisp sky blue on hover */
 }
+
+/* ==========================================================================
+   MUSIC CATALOG DATA TABLE STYLING
+   ========================================================================== */
+#music-table th, #music-table td {
+    padding: 12px;
+    border: 1px solid #ddd; /* Clean, light grey grid lines */
+}
+
+/* Zebra striping - automatically turns every even row light grey */
+#music-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+/* Subtle highlight effect when hovering over a single row */
+#music-table tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* Style for the Spotify links */
+.spotify-link {
+    color: #1ed760; /* Spotify Green */
+    text-decoration: none;
+    font-weight: bold;
+}
+.spotify-link:hover {
+    text-decoration: underline;
+}

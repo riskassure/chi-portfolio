@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Classical Music Catalog | Chi-Chih Woo</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
     <nav class="navbar">
         <div class="nav-brand">Chi-Chih Woo</div>
         <ul class="nav-links">
@@ -19,6 +20,29 @@
         </ul>
     </nav>
 
-    <h1>British Light Music Collection</h1>
+    <main style="padding: 40px; font-family: Arial, sans-serif;">
+        <h2>My Classical Music Catalog</h2>
+        <p>A sortable, filterable archive of favorite pieces, genres, and modal studies.</p>
+
+        <div style="overflow-x: auto; margin-top: 20px;">
+            <table id="music-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                    <tr style="background-color: #34495e; color: white;">
+                        <th style="padding: 12px; border: 1px solid #34495e;">Genre</th>
+                        <th style="padding: 12px; border: 1px solid #34495e;">Period</th>
+                        <th style="padding: 12px; border: 1px solid #34495e;">Type</th>
+                        <th style="padding: 12px; border: 1px solid #34495e;">Subtype</th>
+                        <th style="padding: 12px; border: 1px solid #34495e;">Piece Name</th>
+                        <th style="padding: 12px; border: 1px solid #34495e;">Composer</th>
+                        <th style="padding: 12px; border: 1px solid #34495e;">Performer(s)</th>
+                        <th style="padding: 12px; border: 1px solid #34495e;">Listen</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+</main>
+
+    <script src="music-loader.js"></script>
 </body>
 </html>
