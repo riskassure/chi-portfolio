@@ -23,7 +23,8 @@
         "Liveness": "0.0364",
         "Valence": "0.0364",
         "Tempo": "138.6",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:6Tr8kQcv5sekRL414sY36h",
@@ -49,7 +50,8 @@
         "Liveness": "0.0758",
         "Valence": "0.0364",
         "Tempo": "76.215",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:7r4sT3bFZpiLgEii8Z52Wq",
@@ -75,7 +77,8 @@
         "Liveness": "0.0576",
         "Valence": "0.0361",
         "Tempo": "119.624",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:70ziEYVckqUKai0jfTspFY",
@@ -101,7 +104,8 @@
         "Liveness": "0.0893",
         "Valence": "0.0355",
         "Tempo": "72.554",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:7Ako68bQ1FkQ5OVqKqasDg",
@@ -127,7 +131,8 @@
         "Liveness": "0.151",
         "Valence": "0.0931",
         "Tempo": "177.245",
-        "Time Signature": "3"
+        "Time Signature": "3",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:6Pb0l75FXzSY7XIG3SdEXv",
@@ -153,7 +158,8 @@
         "Liveness": "0.0817",
         "Valence": "0.0394",
         "Tempo": "104.402",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:0iMIli3Bx1kUEVCeLqFOnx",
@@ -179,7 +185,8 @@
         "Liveness": "0.198",
         "Valence": "0.0453",
         "Tempo": "115.113",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:0piFpYxEjUS5e5Y6gyDUVR",
@@ -205,7 +212,8 @@
         "Liveness": "0.0838",
         "Valence": "0.0316",
         "Tempo": "75.464",
-        "Time Signature": "3"
+        "Time Signature": "3",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:75OjdNO58EEAzzOB6ClbaT",
@@ -231,7 +239,8 @@
         "Liveness": "0.0456",
         "Valence": "0.082",
         "Tempo": "81.29",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:2GgavRUmKqCBtkPWJfqzY5",
@@ -257,7 +266,8 @@
         "Liveness": "0.239",
         "Valence": "0.0396",
         "Tempo": "64.433",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:0uTs3P1FOzYVwOeGGcAd7A",
@@ -283,7 +293,8 @@
         "Liveness": "0.391",
         "Valence": "0.035",
         "Tempo": "71.395",
-        "Time Signature": "3"
+        "Time Signature": "3",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:2KHYT34yca0u5rIaoyxjic",
@@ -309,7 +320,8 @@
         "Liveness": "0.146",
         "Valence": "0.0307",
         "Tempo": "65.809",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:4Wzej5KUotPmMGyRAHUyDf",
@@ -335,7 +347,8 @@
         "Liveness": "0.115",
         "Valence": "0.0552",
         "Tempo": "72.834",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:4axp8iq6WghTaxWRmBUdZi",
@@ -361,7 +374,8 @@
         "Liveness": "0.164",
         "Valence": "0.0396",
         "Tempo": "95.044",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:34qm4JP7PISDOfqzSMiXqo",
@@ -387,7 +401,8 @@
         "Liveness": "0.0655",
         "Valence": "0.0335",
         "Tempo": "79.017",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:1XWwq1KSnTfocpfMdgBTge",
@@ -413,7 +428,8 @@
         "Liveness": "0.078",
         "Valence": "0.055",
         "Tempo": "110.661",
-        "Time Signature": "3"
+        "Time Signature": "3",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:2kHCzads2usEgte5cxyf22",
@@ -439,7 +455,8 @@
         "Liveness": "0.111",
         "Valence": "0.0311",
         "Tempo": "72.437",
-        "Time Signature": "3"
+        "Time Signature": "3",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:13e1ZYOJljcqHClKddhqxQ",
@@ -465,7 +482,8 @@
         "Liveness": "0.0963",
         "Valence": "0.0355",
         "Tempo": "84.361",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:0USX9D0IsUTQUJHBhbEHvz",
@@ -491,7 +509,8 @@
         "Liveness": "0.0818",
         "Valence": "0.0354",
         "Tempo": "69.448",
-        "Time Signature": "3"
+        "Time Signature": "3",
+        "Spotify Playlist": "Symphonies"
     },
     {
         "Track URI": "spotify:track:75BBXJ8QbJlM8kv3KgQEQI",
@@ -517,6 +536,7 @@
         "Liveness": "0.102",
         "Valence": "0.0717",
         "Tempo": "92.996",
-        "Time Signature": "4"
+        "Time Signature": "4",
+        "Spotify Playlist": "Symphonies"
     }
 ]
