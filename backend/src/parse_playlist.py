@@ -8,43 +8,50 @@ def get_all_csv_files(raw_data_dir: Path):
     return list(raw_data_dir.glob("*.csv"))
 
 
-def convert_single_csv_to_json(csv_path: Path, processed_dir: Path, top_n=20):
+def extract_tracks_from_csv(csv_path: Path, top_n=20):
     """
-    Job 2: Parse a single CSV, inject the playlist tag, 
-    AND save it as an individual JSON file for future DB use.
+    Job 2: Parse a single CSV, clean it, inject the playlist tag,
+    SORT all tracks by global Popularity, and return the top N.
     """
-    json_filename = f"{csv_path.stem}.json"
-    json_path = processed_dir / json_filename
-    
     playlist_tag = re.sub(r'[-_]', ' ', csv_path.stem).title()
-    tracks_list = []
+    all_playlist_tracks = []
     
     try:
         with csv_path.open(mode='r', encoding='utf-8-sig') as csv_file:
             csv_reader = csv.DictReader(csv_file)
-            for index, row in enumerate(csv_reader):
-                if index >= top_n:
-                    break
+            
+            for row in csv_reader:
                 track_data = dict(row)
                 track_data["Spotify Playlist"] = playlist_tag
-                tracks_list.append(track_data)
                 
-        # Write individual file (Great for future DB ingestion!)
-        with json_path.open(mode='w', encoding='utf-8') as json_file:
-            json.dump(tracks_list, json_file, indent=4, ensure_ascii=False)
-            
-        print(f"📄 Saved individual file: {json_filename} ({len(tracks_list)} tracks)")
-        return tracks_list # Return the data so the orchestrator can collect it
+                # Convert popularity string to an integer safely (default to 0 if missing)
+                try:
+                    track_data["Popularity"] = int(track_data.get("Popularity", 0))
+                except ValueError:
+                    track_data["Popularity"] = 0
+                    
+                all_playlist_tracks.append(track_data)
+        
+        # DATA ENGINEERING SORT: Sort the list in place
+        # key=lambda x: x["Popularity"] tells Python to look at the popularity score
+        # reverse=True ensures it sorts descending (Highest Popularity first!)
+        all_playlist_tracks.sort(key=lambda x: x["Popularity"], reverse=True)
+        
+        # Now slice out just the top N most popular tracks
+        top_tracks = all_playlist_tracks[:top_n]
+        
+        print(f"🔥 Extracted Top {len(top_tracks)} MOST POPULAR tracks from: {csv_path.name}")
+        return top_tracks
         
     except Exception as e:
-        print(f"❌ Error processing {csv_path.name}: {e}")
+        print(f"❌ Error reading {csv_path.name}: {e}")
         return []
 
 
 def run_pipeline(top_n_tracks=20):
     """
-    The Orchestrator: Saves individual files for the future DB,
-    and aggregates them into one master file for today's frontend.
+    The Orchestrator: Saves individual files and compiles the 
+    consolidated master file, both now sorted by track popularity.
     """
     script_dir = Path(__file__).resolve().parent
     raw_dir = script_dir.parent / "data" / "raw"
@@ -56,24 +63,31 @@ def run_pipeline(top_n_tracks=20):
         print(f"⚠️ No CSV files discovered inside: {raw_dir}")
         return
         
-    print(f"📂 Pipeline found {len(csv_files)} playlist(s) to process.\n")
+    print(f"📂 Pipeline running Popularity Sort across {len(csv_files)} playlist(s).\n")
     
     master_tracks_list = []
     
-    # 1. Process individual files and accumulate master list simultaneously
     for file_path in csv_files:
-        playlist_tracks = convert_single_csv_to_json(file_path, processed_dir, top_n=top_n_tracks)
+        # 1. Extract the top 20 most popular tracks for this specific playlist
+        playlist_tracks = extract_tracks_from_csv(file_path, top_n=top_n_tracks)
         master_tracks_list.extend(playlist_tracks)
         
-    # 2. Write out the master file for the frontend search/scroll engine
+        # 2. Save individual JSON file for future DB ingestion
+        json_filename = f"{file_path.stem}.json"
+        try:
+            with (processed_dir / json_filename).open(mode='w', encoding='utf-8') as ind_file:
+                json.dump(playlist_tracks, ind_file, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"❌ Error writing individual JSON {json_filename}: {e}")
+        
+    # 3. Write out the master file for today's frontend search/scroll engine
     master_json_path = processed_dir / "all_playlists.json"
-    
     try:
         with master_json_path.open(mode='w', encoding='utf-8') as json_file:
             json.dump(master_tracks_list, json_file, indent=4, ensure_ascii=False)
             
-        print(f"\n🚀 Master file compiled successfully: {master_json_path.name}")
-        print(f"🏁 Complete! {len(master_tracks_list)} total tracks processed across both architectures.")
+        print(f"\n🚀 Popularity-sorted Master file compiled: {master_json_path.name}")
+        print(f"🏁 Complete! {len(master_tracks_list)} total tracks processed.")
     except Exception as e:
         print(f"❌ Error writing master JSON file: {e}")
 
