@@ -1,36 +1,47 @@
 ===================================================================
-                  GIT & GITHUB REFERENCE GUIDE
+             DEVELOPER REFERENCE GUIDE & CHEAT SHEET
 ===================================================================
 
-1. TERMINAL NAVIGATION
+1. TERMINAL NAVIGATION & FILE CLEANUP
 -------------------------------------------------------------------
-cd C:\Development\chi-portfolio   <- Move into your project folder
-cd                                 <- Print current folder path
+cd C:\Development\chi-portfolio   <- Move into your project folder [cite: 1]
+cd                                 <- Print current folder path [cite: 1]
+
+# Windows PowerShell Wrecking Ball (Use when rebuilding database files)
+Remove-Item backend/portfolio.db -Force -ErrorAction SilentlyContinue
+
+# Mac / Linux / Git Bash equivalent
+rm -f backend/portfolio.db
 
 2. LOCAL GIT WORKFLOW (THE HOLY TRINITY)
 -------------------------------------------------------------------
-git status                         <- See what changed or is unsaved
-git add .                          <- Stage ALL changes/new files
-git commit -m "Your Description"   <- Save snapshot to local history
+git status                         <- See what changed or is unsaved [cite: 2]
+git add .                          <- Stage ALL changes/new files [cite: 3]
+git add path/to/file.py            <- Stage an isolated file precisely
+git commit -m "Your Description"   <- Save snapshot to local history [cite: 3]
 
-3. BRANCHING & SANDBOXING
+3. RUNNING THE LOCAL PORTFOLIO ENGINE
 -------------------------------------------------------------------
-git branch                         <- List all existing branches
-git checkout -b branch-name        <- CREATE and SWITCH to a new branch
-git checkout branch-name           <- Switch to an existing branch
-git merge branch-name              <- Pull changes into current branch
-git branch -d branch-name          <- Delete a merged branch
+python backend/src/init_db.py      <- Rebuild database schema/tables
+python backend/src/load_to_db.py    <- Execute ETL merge pipeline
 
-4. CLOUD SYNCING (GITHUB)
+4. BRANCHING & SANDBOXING
 -------------------------------------------------------------------
-ssh -T git@github.com              <- Test connection to GitHub
-git push                           <- Upload local history to cloud
-===================================================================
+git branch                         <- List all existing branches [cite: 4]
+git checkout -b branch-name        <- CREATE and SWITCH to a new branch [cite: 4]
+git checkout branch-name           <- Switch to an existing branch [cite: 4]
+git merge branch-name              <- Pull changes into current branch [cite: 4]
+git branch -d branch-name          <- Delete a merged branch [cite: 4]
 
-5. TIME TRAVEL & SAFETY NETS (THE UNDO BUTTONS)
+5. CLOUD SYNCING (GITHUB)
 -------------------------------------------------------------------
-git log --oneline                  <- View past milestones and their 7-character IDs
-git checkout [commit-id]           <- Temporarily warp files back to an old snapshot
-git checkout main                  <- Jump back to your latest modern-day work
-git reset --hard HEAD              <- NUCLEAR OPTION: Erase all changes since last commit
+ssh -T git@github.com              <- Test connection to GitHub [cite: 4]
+git push                           <- Upload local history to cloud [cite: 4]
+
+6. TIME TRAVEL & SAFETY NETS (THE UNDO BUTTONS)
+-------------------------------------------------------------------
+git log --oneline                  <- View past milestones and their 7-character IDs [cite: 5]
+git checkout [commit-id]           <- Temporarily warp files back to an old snapshot [cite: 5]
+git checkout main                  <- Jump back to your latest modern-day work [cite: 5]
+git reset --hard HEAD              <- NUCLEAR OPTION: Erase all changes since last commit [cite: 5]
 ===================================================================

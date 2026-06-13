@@ -24,59 +24,41 @@
         <h2>My Classical Music Catalog</h2>
         <p>A sortable, filterable archive of favorite pieces, genres, and modal studies.</p>
 
-        <div style="margin-bottom: 20px; padding: 15px; background-color: #f4f6f7; border-radius: 5px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-            <strong>Filters:</strong>
-            
-            <label>Genre:
-                <select id="filter-genre" class="table-filter">
-                    <option value="all">All Genres</option>
-                    <option value="Classical">Classical</option>
-                </select>
-            </label>
+        <div style="margin-bottom: 20px; padding: 20px; background-color: #f4f6f7; border-radius: 5px; display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                <strong>Controls:</strong>
+                <label>Search:
+                    <input type="text" id="search-bar" placeholder="Type to filter grid..." style="padding: 5px; border: 1px solid #ccc; border-radius: 3px; width: 220px;">
+                </label>
 
-            <label>Period:
-                <select id="filter-period" class="table-filter">
-                    <option value="all">All Periods</option>
-                    <option value="19th Century">19th Century</option>
-                    <option value="Early 20th Century">Early 20th Century</option>
-                    <option value="Mid 20th Century">Mid 20th Century</option>
-                </select>
-            </label>
+                <label>Playlist:
+                    <select id="filter-playlist">
+                        <option value="all">All Playlists</option>
+                    </select>
+                </label>
 
-            <label>Type:
-                <select id="filter-type" class="table-filter">
-                    <option value="all">All Types</option>
-                    <option value="Orchestral">Orchestral</option>
-                    <option value="Chamber">Chamber</option>
-                    <option value="Vocal">Vocal</option>
-                </select>
-            </label>
+                <button id="reset-filters" style="padding: 5px 10px; background-color: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">Reset View</button>
+            </div>
 
-            <button id="reset-filters" style="padding: 5px 10px; background-color: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">Clear All</button>
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border-top: 1px solid #ddd; padding-top: 12px; font-size: 0.9em;">
+                <strong>Optional Metrics:</strong>
+                <div id="column-checkboxes" style="display: flex; gap: 15px; align-items: center;"></div>
+            </div>
         </div>
-
-        <div style="overflow-x: auto;">
-            <table id="music-table" style="width: 100%; border-collapse: collapse; text-align: left;">
 
         <div style="overflow-x: auto; margin-top: 20px;">
             <table id="music-table" style="width: 100%; border-collapse: collapse; text-align: left;">
                 <thead>
-                    <tr style="background-color: #34495e; color: white;">
-                        <th class="sortable-header" data-column="genre" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Genre <span class="sort-icon">↕</span></th>
-                        <th class="sortable-header" data-column="period" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Period <span class="sort-icon">↕</span></th>
-                        <th class="sortable-header" data-column="type" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Type <span class="sort-icon">↕</span></th>
-                        <th class="sortable-header" data-column="subtype" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Subtype <span class="sort-icon">↕</span></th>
-                        <th class="sortable-header" data-column="piece" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Piece Name <span class="sort-icon">↕</span></th>
-                        <th class="sortable-header" data-column="composer" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Composer <span class="sort-icon">↕</span></th>
-                        <th class="sortable-header" data-column="performer" style="padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;">Performer(s) <span class="sort-icon">↕</span></th>
-                        <th style="padding: 12px; border: 1px solid #34495e;">Listen</th>
-                    </tr>
+                    <tr id="table-headers" style="background-color: #34495e; color: white;">
+                        </tr>
                 </thead>
                 <tbody id="table-body"></tbody>
             </table>
         </div>
-</main>
+    </main>
 
     <script src="music-loader.js"></script>
+    <div id="spotify-player-dock" style="position: fixed; bottom: -100px; right: 20px; width: 360px; height: 90px; z-index: 1000; transition: bottom 0.4s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border-radius: 12px; overflow: hidden;">
+    </div>
 </body>
 </html>
