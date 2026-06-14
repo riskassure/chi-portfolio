@@ -23,7 +23,8 @@ git commit -m "Your Description"   <- Save snapshot to local history [cite: 3]
 3. RUNNING THE LOCAL PORTFOLIO ENGINE
 -------------------------------------------------------------------
 python backend/src/init_db.py      <- Rebuild database schema/tables
-python backend/src/load_to_db.py    <- Execute ETL merge pipeline
+python backend/src/load_to_db.py   <- Execute ETL merge pipeline
+python backend/src/app.py          <- Launch local Flask API web server
 
 4. BRANCHING & SANDBOXING
 -------------------------------------------------------------------
@@ -35,13 +36,25 @@ git branch -d branch-name          <- Delete a merged branch [cite: 4]
 
 5. CLOUD SYNCING (GITHUB)
 -------------------------------------------------------------------
-ssh -T git@github.com              <- Test connection to GitHub [cite: 4]
-git push                           <- Upload local history to cloud [cite: 4]
+ssh -T git@github.com              <- Test connection to GitHub [cite: 5]
+git push                           <- Upload local history to cloud [cite: 5]
+git fetch                          <- Scouting Mission: Download cloud blueprints (No merge)
+git pull                           <- Ingestion: Download maps AND merge cloud code to local files
 
-6. TIME TRAVEL & SAFETY NETS (THE UNDO BUTTONS)
+6. MULTI-DEVICE SYNCING (ROAMING WORKFLOW)
 -------------------------------------------------------------------
-git log --oneline                  <- View past milestones and their 7-character IDs [cite: 5]
-git checkout [commit-id]           <- Temporarily warp files back to an old snapshot [cite: 5]
-git checkout main                  <- Jump back to your latest modern-day work [cite: 5]
-git reset --hard HEAD              <- NUCLEAR OPTION: Erase all changes since last commit [cite: 5]
+Workflow direction: [Travel Laptop] ==(push)==> [GitHub] ==(fetch/pull)==> [Home Laptop]
+
+THE TWO GOLDEN TRAVELER RULES:
+1. Leaving a Machine: Always run 'git push' so no code is left stranded locally.
+2. Opening a Machine: Look at VS Code bottom bar. If '↓' is visible, run 'git pull' FIRST.
+
+PRO TIP: Enable "Git: Autofetch" in VS Code Settings (Ctrl + ,) to automate scouting!
+
+7. TIME TRAVEL & SAFETY NETS (THE UNDO BUTTONS)
+-------------------------------------------------------------------
+git log --oneline                  <- View past milestones and their 7-character IDs [cite: 6]
+git checkout [commit-id]           <- Temporarily warp files back to an old snapshot [cite: 6]
+git checkout main                  <- Jump back to your latest modern-day work [cite: 6]
+git reset --hard HEAD              <- NUCLEAR OPTION: Erase all changes since last commit [cite: 6]
 ===================================================================
