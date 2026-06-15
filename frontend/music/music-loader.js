@@ -31,15 +31,22 @@ let activeFilters = {
 // Sequential Sorting Array Queue
 let sortSequence = [];
 
+// Global Session Tracking Flag
+let isAdmin = false;
+
 // Main Execution Initialization Hook
 document.addEventListener("DOMContentLoaded", () => {
     setupEventListeners();
-    loadMusicData(); // Kick off the data ingestion loop immediately on load
+    checkAdminSession(); // NEW: Probes the server for active login sessions
+    loadMusicData(); 
 });
 
 // Fetch live backend metrics
 function loadMusicData() {
-    fetch(`http://127.0.0.1:5000/api/music?page=${currentPage}&per_page=${recordsPerPage}`)
+    // NEW: Added the configurations object passed to fetch containing credentials tracking
+    fetch(`http://127.0.0.1:5000/api/music?page=${currentPage}&per_page=${recordsPerPage}`, {
+        credentials: "include"
+    })
         .then(response => response.json())
         .then(payload => {
             // Unpack our data rows from the envelope
@@ -210,7 +217,12 @@ function renderTableBody(dataList, fields) {
     }
 
     dataList.forEach(item => {
+        // CHANGED: We stamp the unique database track_id right on the row container
         const row = document.createElement("tr");
+        if (item.track_id) {
+            row.setAttribute("data-id", item.track_id);
+        }
+        
         let innerCellsHTML = "";
 
         fields.forEach(fieldKey => {
@@ -220,19 +232,20 @@ function renderTableBody(dataList, fields) {
                 cellValue = '<span style="color:#bbb;">--</span>';
             }
 
+            // CHANGED: Every individual <td> cell now explicitly announces its database column field name!
             if (fieldKey === 'composition_name') {
-                innerCellsHTML += `<td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>${cellValue}</strong> <small style="color:#7f8c8d;">${item.unit_name || ''}</small></td>`;
+                innerCellsHTML += `<td data-field="composition_name" style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>${cellValue}</strong> <small style="color:#7f8c8d;">${item.unit_name || ''}</small></td>`;
             } else if (fieldKey === 'spotify_playlist') {
-                innerCellsHTML += `<td style="padding: 10px; border-bottom: 1px solid #ddd; color: #7f8c8d; font-size: 0.9em;">${cellValue}</td>`;
+                innerCellsHTML += `<td data-field="spotify_playlist" style="padding: 10px; border-bottom: 1px solid #ddd; color: #7f8c8d; font-size: 0.9em;">${cellValue}</td>`;
             } else if (fieldKey === 'popularity' && typeof item[fieldKey] === 'number') {
                 innerCellsHTML += `
-                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                    <td data-field="popularity" style="padding: 10px; border-bottom: 1px solid #ddd;">
                         <div style="background: #eee; width: 50px; border-radius: 3px; overflow: hidden;">
                             <div style="background: #3498db; height: 6px; width: ${item[fieldKey]}%"></div>
                         </div>
                     </td>`;
             } else {
-                innerCellsHTML += `<td style="padding: 10px; border-bottom: 1px solid #ddd;">${cellValue}</td>`;
+                innerCellsHTML += `<td data-field="${fieldKey}" style="padding: 10px; border-bottom: 1px solid #ddd;">${cellValue}</td>`;
             }
         });
 
@@ -376,4 +389,212 @@ function renderPaginationButtons(totalPages, activePage) {
         nextBtn.onclick = () => { currentPage++; loadMusicData(); };
     }
     controlsContainer.appendChild(nextBtn);
+}
+
+// ==========================================================================
+// ADMINISTRATIVE INITIALIZATION & EVENT MANAGEMENT LOGIC
+// ==========================================================================
+
+function checkAdminSession() {
+    fetch("http://127.0.0.1:5000/api/session-check", { credentials: "include" })
+        .then(res => res.json())
+        .then(status => {
+            isAdmin = status.is_admin;
+            toggleAdminInterfaceUI();
+        })
+        .catch(err => console.error("Session verification checklist failed:", err));
+}
+
+function toggleAdminInterfaceUI() {
+    const dock = document.getElementById("admin-controls-dock");
+    const loginBtn = document.getElementById("admin-login-btn");
+    
+    if (!dock || !loginBtn) return;
+
+    if (isAdmin) {
+        dock.style.display = "flex";       
+        loginBtn.style.display = "none";    
+    } else {
+        dock.style.display = "none";       
+        loginBtn.style.display = "inline-block"; 
+        
+        document.getElementById("admin-edit-btn").style.display = "inline-block";
+        document.getElementById("admin-save-btn").style.display = "none";
+        document.getElementById("admin-cancel-btn").style.display = "none";
+    }
+}
+
+const originalSetupEventListeners = setupEventListeners;
+setupEventListeners = function() {
+    originalSetupEventListeners(); 
+    
+    // Wire up Admin Login Button trigger
+    document.getElementById("admin-login-btn")?.addEventListener("click", () => {
+        const password = prompt("Enter Administrative Access Password:");
+        if (!password) return;
+
+        fetch("http://127.0.0.1:5000/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password: password }),
+            credentials: "include"
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                fetch("http://127.0.0.1:5000/api/session-check", { credentials: "include" })
+                    .then(res => res.json())
+                    .then(status => {
+                        if (status.is_admin) {
+                            isAdmin = true;
+                            toggleAdminInterfaceUI();
+                        } else {
+                            alert("Security Error: Browser blocked the secure session cookie. Ensure cookies are enabled for third-party local ports.");
+                            isAdmin = false;
+                            toggleAdminInterfaceUI();
+                        }
+                    });
+            } else {
+                alert("Access Denied: " + data.message);
+                isAdmin = false;
+                toggleAdminInterfaceUI();
+            }
+        })
+        .catch(err => alert("Authentication system communication failure: " + err));
+    });
+
+    // Wire up Logout Button trigger
+    document.getElementById("admin-logout-btn")?.addEventListener("click", () => {
+        fetch("http://127.0.0.1:5000/api/logout", { method: "POST", credentials: "include" })
+        .then(() => {
+            isAdmin = false;
+            toggleAdminInterfaceUI();
+            processAndRenderTable(); 
+        });
+    });
+
+    // Wire up the Interactive Action Buttons
+    document.getElementById("admin-edit-btn")?.addEventListener("click", () => enterTableEditMode());
+    document.getElementById("admin-cancel-btn")?.addEventListener("click", () => exitTableEditMode(false));
+    document.getElementById("admin-save-btn")?.addEventListener("click", () => saveTableChanges());
+};
+
+
+// ==========================================================================
+// PHASE 2 & 3: TRANSFORMATION AND DATABASE COMMIT ENGINES
+// ==========================================================================
+
+let originalRowDataBackup = [];
+
+function enterTableEditMode() {
+    const tableBody = document.getElementById("table-body");
+    if (!tableBody) return;
+
+    document.getElementById("admin-edit-btn").style.display = "none";
+    document.getElementById("admin-save-btn").style.display = "inline-block";
+    document.getElementById("admin-cancel-btn").style.display = "inline-block";
+
+    originalRowDataBackup = [];
+    const editableColumns = ["genre", "composition_name", "track_name", "composer", "performer"];
+
+    const rows = tableBody.getElementsByTagName("tr");
+    for (let row of rows) {
+        const cells = row.getElementsByTagName("td");
+        
+        for (let cell of cells) {
+            const fieldName = cell.getAttribute("data-field");
+
+            if (editableColumns.includes(fieldName)) {
+                const currentText = cell.innerText.trim();
+
+                originalRowDataBackup.push({
+                    cellReference: cell,
+                    originalValue: currentText
+                });
+
+                cell.innerHTML = `
+                    <input type="text" 
+                           value="${currentText.replace(/"/g, '&quot;')}" 
+                           class="admin-table-input" 
+                           style="width: 100%; padding: 4px; border: 1px solid #3498db; border-radius: 3px; box-sizing: border-box; font-family: Arial, sans-serif; font-size: 0.95em;">
+                `;
+            }
+        }
+    }
+}
+
+function exitTableEditMode(shouldKeepChanges) {
+    document.getElementById("admin-edit-btn").style.display = "inline-block";
+    document.getElementById("admin-save-btn").style.display = "none";
+    document.getElementById("admin-cancel-btn").style.display = "none";
+
+    if (!shouldKeepChanges) {
+        originalRowDataBackup.forEach(item => {
+            item.cellReference.innerHTML = item.originalValue;
+        });
+    }
+    originalRowDataBackup = []; 
+}
+
+function saveTableChanges() {
+    const tableBody = document.getElementById("table-body");
+    if (!tableBody) return;
+
+    const changesToSubmit = [];
+    const rows = tableBody.getElementsByTagName("tr");
+    const editableColumns = ["genre", "composition_name", "track_name", "composer", "performer"];
+
+    for (let row of rows) {
+        const trackId = row.getAttribute("data-id");
+        const cells = row.getElementsByTagName("td");
+
+        for (let cell of cells) {
+            const fieldName = cell.getAttribute("data-field");
+
+            if (editableColumns.includes(fieldName)) {
+                const inputElement = cell.querySelector("input");
+                if (inputElement) {
+                    const newValue = inputElement.value.trim();
+                    const backupItem = originalRowDataBackup.find(item => item.cellReference === cell);
+                    const originalValue = backupItem ? backupItem.originalValue : "";
+
+                    if (newValue !== originalValue) {
+                        changesToSubmit.push({
+                            track_id: trackId,
+                            field: fieldName,
+                            value: newValue
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    if (changesToSubmit.length === 0) {
+        alert("No database mutations required. No values were modified.");
+        exitTableEditMode(true);
+        return;
+    }
+
+    fetch("http://127.0.0.1:5000/api/music/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changes: changesToSubmit }),
+        credentials: "include"
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            exitTableEditMode(true);
+            loadMusicData(); 
+        } else {
+            alert("Database update failed: " + data.message);
+            exitTableEditMode(false); 
+        }
+    })
+    .catch(err => {
+        alert("Communication network error during database commit: " + err);
+        exitTableEditMode(false);
+    });
 }
