@@ -156,6 +156,93 @@ def update_music_catalog():
         conn.close()
 
 
+@app.route('/api/photography/current', methods=['GET', 'OPTIONS'])
+def get_current_photos():
+    """
+    Fetches the photos currently marked for display from the database
+    and returns them as a JSON payload for the frontend slideshow/gallery.
+    """
+    if request.method == "OPTIONS":
+        return jsonify({"status": "CORS preflight ok"}), 200
+
+    if not DB_PATH.exists():
+        return jsonify({"status": "error", "message": "Database warehouse file not found."}), 404
+    
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row 
+        cursor = conn.cursor()
+        
+        # Query for the 3 photos currently active in the rotation
+        cursor.execute("""
+            SELECT image_id, file_path, title, location_name, latitude, longitude 
+            FROM photography_catalog 
+            WHERE is_currently_displayed = 1
+            LIMIT 3;
+        """)
+        
+        rows = cursor.fetchall()
+        photos = [dict(row) for row in rows]
+        
+        return jsonify({
+            "status": "success",
+            "count": len(photos),
+            "data": photos
+        }), 200
+
+    except sqlite3.Error as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Database transaction failed: {str(e)}"
+        }), 500
+    finally:
+        conn.close()
+    
+
+@app.route("/api/photography/update", methods=["POST", "OPTIONS"])
+def update_photography_catalog():
+    """Validates admin session and updates photography metadata (location, coordinates)."""
+    if request.method == "OPTIONS":
+        return jsonify({"status": "CORS preflight ok"}), 200
+
+    # 1. SECURITY GUARDRAIL: Verify encrypted session cookie
+    if not session.get("is_admin", False):
+        return jsonify({"success": False, "message": "Unauthorized access rejected. Admin rights required."}), 403
+
+    data = request.get_json() or {}
+    image_id = data.get("image_id")
+    location_name = data.get("location_name")
+    
+    # Handle numbers carefully, falling back to 0.0 if empty or invalid
+    try:
+        latitude = float(data.get("latitude", 0.0)) if data.get("latitude") else 0.0
+        longitude = float(data.get("longitude", 0.0)) if data.get("longitude") else 0.0
+    except ValueError:
+        return jsonify({"success": False, "message": "Invalid coordinate formatting."}), 400
+
+    if not image_id:
+        return jsonify({"success": False, "message": "Missing image_id identifier."}), 400
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Safely bind variables to prevent SQL Injection
+        cursor.execute("""
+            UPDATE photography_catalog 
+            SET location_name = ?, latitude = ?, longitude = ?
+            WHERE image_id = ?;
+        """, (location_name, latitude, longitude, image_id))
+        
+        conn.commit()
+        return jsonify({"success": True, "message": "Photography catalog metadata successfully updated."})
+
+    except sqlite3.Error as e:
+        return jsonify({"success": False, "error": f"Database modification failed: {str(e)}"}), 500
+    finally:
+        conn.close()
+        
+
 if __name__ == "__main__":
     print("\nStarting Local Web App Gateway Server with Security Guardrails...")
     print("API Endpoint listening at: http://127.0.0.1:5000/api/music")
