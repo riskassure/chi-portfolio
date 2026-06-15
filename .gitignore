@@ -9,3 +9,7 @@ backend/data/raw/*.csv
 # Optional: If you want your individual JSON files to stay local for future DB work, 
 # but keep the master file public for the frontend, you can ignore the specific ones:
 backend/data/processed/*_playlist.json
+
+# --- NEW: PHOTOGRAPHY ASSET GUARDRAILS ---
+# Ignore large, uncompressed raw photography source assets in the backend
+backend/data/photos/raw/
