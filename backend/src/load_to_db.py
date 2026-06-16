@@ -5,7 +5,7 @@ from pathlib import Path
 
 def run_etl_pipeline():
     script_dir = Path(__file__).resolve().parent
-    raw_dir = script_dir.parent / "data" / "raw"
+    raw_dir = script_dir.parent / "data" / "music" /"raw"
     db_path = script_dir.parent / "portfolio.db"
     
     csv_files = list(raw_dir.glob("*.csv"))

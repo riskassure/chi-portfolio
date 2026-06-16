@@ -54,8 +54,8 @@ def run_pipeline(top_n_tracks=20):
     consolidated master file, both now sorted by track popularity.
     """
     script_dir = Path(__file__).resolve().parent
-    raw_dir = script_dir.parent / "data" / "raw"
-    processed_dir = script_dir.parent / "data" / "processed"
+    raw_dir = script_dir.parent / "data" / "music" / "raw"
+    processed_dir = script_dir.parent / "data" / "music" / "processed"
     
     csv_files = get_all_csv_files(raw_dir)
     
