@@ -3,12 +3,12 @@ backend/portfolio.db
 *.db
 
 # Ignore all raw CSV files holding your original playlist downloads
-backend/data/raw/*.csv
+backend/data/music/raw/*.csv
 *.csv
 
 # Optional: If you want your individual JSON files to stay local for future DB work, 
 # but keep the master file public for the frontend, you can ignore the specific ones:
-backend/data/processed/*_playlist.json
+backend/data/music/processed/*_playlist.json
 
 # --- NEW: PHOTOGRAPHY ASSET GUARDRAILS ---
 # Ignore large, uncompressed raw photography source assets in the backend
