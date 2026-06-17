@@ -4,21 +4,22 @@
 
 function loadUniversalNavbar() {
     // 1. DYNAMIC DEPTH CALCULATOR
-    // We look at the URL path and see how many subfolders deep we are past the root dashboard.
     const pathName = window.location.pathname;
-    
-    // Split the path into segments and filter out empty strings
     const segments = pathName.split('/').filter(segment => segment.length > 0);
-    
-    // Find where "admin_dashboard.html" or "index.html" lives relative to your dev environment root.
-    // We count how many folders exist after your root repository name to determine the upward prefix.
+
     let prefix = '';
-    
-    // If we are using a local development server (like Live Server), we look for subfolders.
-    // If the path contains folders like /music/index.html, it will have more segments than the root index.html.
-    if (segments.length > 1 && !pathName.endsWith('admin_dashboard.html') && !pathName.endsWith('index.html')) {
-        // If the file is inside a folder (e.g., frontend/music/index.html), we need to climb up one level
+
+    // Check if we are currently sitting inside one of our sub-module directories
+    const isInsideSubfolder = segments.some(seg => 
+        ['music', 'math', 'photography', 'geography', 'images'].includes(seg)
+    );
+
+    if (isInsideSubfolder) {
+        // We are inside a sub-module folder, so climb UP one level to reach the frontend root
         prefix = '../';
+    } else {
+        // We are already at the top level of the frontend folder, no prefix needed!
+        prefix = '';
     }
     
     // For extreme safety: if you ever make deeply nested directories down the road (e.g., math/calculus/index.html)
@@ -52,7 +53,10 @@ function loadUniversalNavbar() {
 // 🟢 SECURITY ENGINE: Verify session token and reveal elements
 async function checkGlobalAdminStatus() {
     try {
-        const response = await fetch("http://127.0.0.1:5000/api/session-check");
+        // 🛠️ ADDED: credentials configuration block
+        const response = await fetch("http://127.0.0.1:5000/api/session-check", {
+            credentials: 'include'
+        });
         const session = await response.json();
         
         if (session.is_admin) {
@@ -61,7 +65,6 @@ async function checkGlobalAdminStatus() {
                 adminLink.style.display = 'block';
             }
             
-            // Fire page-specific admin layout configurations if they exist
             if (typeof unlockLocalPageControls === 'function') {
                 unlockLocalPageControls();
             }

@@ -273,7 +273,7 @@ function setupEventListeners() {
         processAndRenderTable();
     });
 
-    // Wire up Action Buttons directly
+    // Wire up Action Buttons safely with null guards (?.)
     document.getElementById("admin-edit-btn")?.addEventListener("click", enterTableEditMode);
     document.getElementById("admin-cancel-btn")?.addEventListener("click", () => exitTableEditMode(false));
     document.getElementById("admin-save-btn")?.addEventListener("click", saveTableChanges);
@@ -353,12 +353,118 @@ function enterTableEditMode() {
     const tableBody = document.getElementById("table-body");
     if (!tableBody) return;
 
-    document.getElementById("admin-edit-btn").style.display = "none";
-    document.getElementById("admin-save-btn").style.display = "inline-block";
-    document.getElementById("admin-cancel-btn").style.display = "inline-block";
+    const editBtn = document.getElementById("admin-edit-btn");
+    const saveBtn = document.getElementById("admin-save-btn");
+    const cancelBtn = document.getElementById("admin-cancel-btn");
+
+    if (editBtn) editBtn.style.display = "none";
+    if (saveBtn) saveBtn.style.display = "inline-block";
+    if (cancelBtn) cancelBtn.style.display = "inline-block";
 
     originalRowDataBackup = [];
     const editableColumns = ["genre", "composition_name", "track_name", "composer", "performer"];
 
     const rows = tableBody.getElementsByTagName("tr");
-    for (let row
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const trackId = row.getAttribute("data-id");
+        if (!trackId) continue;
+
+        const originalRecord = masterMusicData.find(item => item.track_id === trackId);
+        if (originalRecord) {
+            originalRowDataBackup.push(JSON.parse(JSON.stringify(originalRecord)));
+        }
+
+        editableColumns.forEach(fieldKey => {
+            const cell = row.querySelector(`[data-field="${fieldKey}"]`);
+            if (cell) {
+                const currentText = cell.innerText === '--' ? '' : cell.innerText;
+                cell.innerHTML = `<input type="text" value="${currentText}" style="width: 95%; padding: 4px; box-sizing: border-box;">`;
+            }
+        });
+    }
+}
+
+function exitTableEditMode(isRollback = false) {
+    const editBtn = document.getElementById("admin-edit-btn");
+    const saveBtn = document.getElementById("admin-save-btn");
+    const cancelBtn = document.getElementById("admin-cancel-btn");
+
+    if (editBtn) editBtn.style.display = "inline-block";
+    if (saveBtn) saveBtn.style.display = "none";
+    if (cancelBtn) cancelBtn.style.display = "none";
+
+    if (isRollback && originalRowDataBackup.length > 0) {
+        originalRowDataBackup.forEach(backupItem => {
+            const index = masterMusicData.findIndex(item => item.track_id === backupItem.track_id);
+            if (index !== -1) masterMusicData[index] = backupItem;
+        });
+    }
+    
+    processAndRenderTable();
+}
+
+async function saveTableChanges() {
+    const tableBody = document.getElementById("table-body");
+    if (!tableBody) return;
+
+    const rows = tableBody.getElementsByTagName("tr");
+    const updatesPayload = [];
+    const editableColumns = ["genre", "composition_name", "track_name", "composer", "performer"];
+
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const trackId = row.getAttribute("data-id");
+        if (!trackId) continue;
+
+        const dynamicChanges = {};
+        let rowHasChanges = false;
+
+        editableColumns.forEach(fieldKey => {
+            const cell = row.querySelector(`[data-field="${fieldKey}"]`);
+            const input = cell?.querySelector("input");
+            if (input) {
+                const newValue = input.value.trim();
+                const originalRecord = originalRowDataBackup.find(item => item.track_id === trackId);
+                const oldValue = originalRecord ? (originalRecord[fieldKey] || "") : "";
+
+                if (newValue !== oldValue) {
+                    dynamicChanges[fieldKey] = newValue;
+                    rowHasChanges = true;
+                }
+            }
+        });
+
+        if (rowHasChanges) {
+            dynamicChanges["track_id"] = trackId;
+            updatesPayload.push(dynamicChanges);
+        }
+    }
+
+    if (updatesPayload.length === 0) {
+        exitTableEditMode(false);
+        return;
+    }
+
+    try {
+        const response = await fetch("http://127.0.0.1:5000/api/music/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ updates: updatesPayload }),
+            credentials: "include"
+        });
+
+        if (response.ok) {
+            updatesPayload.forEach(update => {
+                const record = masterMusicData.find(item => item.track_id === update.track_id);
+                if (record) Object.assign(record, update);
+            });
+            exitTableEditMode(false);
+        } else {
+            alert("Database sync rejection. Verify schema constraints on the backend.");
+        }
+    } catch (err) {
+        console.error("Failed to commit tracking modifications:", err);
+        alert("Gateway communication lost during save request.");
+    }
+}
