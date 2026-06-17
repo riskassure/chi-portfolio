@@ -1,15 +1,36 @@
-# Ignore the local SQLite database file
+# ==========================================================================
+# 🗄️ DATABASE & STRUCTURED LOCAL ENVIRONMENT FILES
+# ==========================================================================
+# Block local runtime database engines
 backend/portfolio.db
-*.db
+backend/*.db
 
-# Ignore all raw CSV files holding your original playlist downloads
+# ==========================================================================
+# 🐍 PYTHON SYSTEM RUNTIMES & CACHE
+# ==========================================================================
+# Block local computer-compiled execution files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# ==========================================================================
+# 🎵 MUSIC MODULE DATA PIPELINES
+# ==========================================================================
+# Block raw tracker sheets and ALL processed JSON data dumps in this folder
 backend/data/music/raw/*.csv
-*.csv
+backend/data/music/processed/*.json
 
-# Optional: If you want your individual JSON files to stay local for future DB work, 
-# but keep the master file public for the frontend, you can ignore the specific ones:
-backend/data/music/processed/*_playlist.json
-
-# --- NEW: PHOTOGRAPHY ASSET GUARDRAILS ---
-# Ignore large, uncompressed raw photography source assets in the backend
+# ==========================================================================
+# 📸 PHOTOGRAPHY ASSET GUARDRAILS
+# ==========================================================================
+# Block heavy, uncompressed raw landscape source assets
 backend/data/photos/raw/
+
+# ==========================================================================
+# 💻 EDITOR & OPERATING SYSTEM JUNK
+# ==========================================================================
+.vscode/
+.DS_Store
+Thumbs.db
