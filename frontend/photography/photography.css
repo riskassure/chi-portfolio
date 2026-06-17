@@ -1,0 +1,103 @@
+/* ==========================================================================
+   PHOTOGRAPHY DYNAMIC GALLERY STRUCTURE - SINGLE ROW CINEMATIC VIEW
+   ========================================================================== */
+
+/* The outer grid array container */
+.gallery-grid {
+    display: grid;
+    /* 📸 ONE PICTURE PER ROW: Forces a strict single-column stream layout */
+    grid-template-columns: 1fr;
+    gap: 40px;
+    padding: 10px;               /* Reduced padding to maximize horizontal screen real estate */
+    box-sizing: border-box;
+    max-width: 1100px;           /* Sets a perfect wide-aspect reading column limit */
+    margin: 0 auto;
+}
+
+/* 🛠️ SLIMMED MUSEUM MAT BOUNDS
+   Reduced vertical and horizontal frame padding so the image dominates the card area */
+.photo-card {
+    background-color: #ffffff;
+    padding: 20px;               /* WAS 40px: Slimmed down to maximize photo real estate */
+    border: 1px solid #eaeaea; 
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+    overflow: hidden;
+    transition: opacity 0.6s ease-in-out, transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Interactive card hover lift */
+.photo-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+}
+
+/* 🛡️ IMAGE SCALE PROTECTOR CONTAINER 
+   Expanded to 550px high to allow majestic wide compositions to fill the frame */
+.photo-frame-wrapper {
+    width: 100%;
+    height: 550px;               /* 🔥 WAS 420px: Tall enough for powerful resolution presentation */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #fafafa;   
+    border: 1px solid #f1f1f1;
+    border-radius: 4px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* Force image pixel scaling interpolation bounds */
+.photo-card img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;           /* Keeps your frames seamlessly full edge-to-edge.
+                                    Switch to 'contain' if you want to preserve uncropped margins! */
+}
+
+/* Typography metadata array block */
+.photo-metadata {
+    margin-top: 16px;
+    text-align: left;            
+    width: 100%;                 
+    box-sizing: border-box;
+    padding: 0 4px;              /* Aligns the title nicely with the slimmed border bounds */
+}
+
+.photo-title {
+    font-size: 1.35rem;          /* Bold, clear presentation presence */
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;     
+}
+
+.photo-location {
+    font-size: 0.95rem;
+    color: #7f8c8d;
+    font-style: italic;
+    letter-spacing: 0.3px;
+    margin-top: 2px;
+}
+
+/* Admin panel elements scaled to match the single-row layout stretching */
+.admin-edit-panel {
+    width: 100% !important;
+    background: #f8fafc;
+    padding: 16px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+/* Interactive opacity animation state wrapper hook */
+.photo-gallery-fade-out {
+    opacity: 0 !important;
+    transform: scale(0.99);
+}
