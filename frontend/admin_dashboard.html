@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Management Terminal</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="admin_style.css">
+</head>
+<body>
+    <div class="gateway-viewport">
+        
+        <div id="login-card" class="auth-card">
+            <h2>🔑 System Gateway Identity</h2>
+            <div id="error-box" class="error-banner"></div>
+            
+            <div class="form-group">
+                <label for="password">Security Token</label>
+                <input type="password" id="password" placeholder="••••••••••••" onkeydown="if(event.key === 'Enter') attemptLogin()">
+            </div>
+            <button class="btn-auth" onclick="attemptLogin()">Verify Identity</button>
+        </div>
+
+        <div id="welcome-card" class="welcome-panel hidden">
+            <h1>🎛️ Session Hydrated Successfully</h1>
+            <p>Your global administrator token is active. Use the universal navigation panel above to visit your portfolio nodes; edit mode will unlock automatically upon arrival.</p>
+            <button class="btn-logout" onclick="attemptLogout()">Terminate Session</button>
+        </div>
+
+    </div>
+
+    <script src="navbar.js"></script> <script src="admin_app.js"></script> </body>
+</html>

@@ -1,15 +1,20 @@
 import os
+import sys
 from PIL import Image
 
-def batch_convert_to_webp(source_dir, target_dir, quality=80, max_width=1920):
+# Tell Python to look up one folder level (out of utils/ into src/) to find config.py
+sys.path.append(str(sys.path[0] + '/..'))
+from config import PHOTO_RAW_DIR, PHOTO_TARGET_DIR
+
+def batch_convert_to_webp(quality=80, max_width=1920):
     """
-    Scans a source directory for JPEGs, resizes them down to a clean monitor width 
+    Scans the configured raw source directory for JPEGs, resizes them down to a clean monitor width 
     if they are too large, and converts them to web-optimized .webp files.
     """
     # Create the target images directory if it doesn't exist yet
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
-        print(f"Created target directory: {target_dir}")
+    if not PHOTO_TARGET_DIR.exists():
+        PHOTO_TARGET_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"Created target directory: {PHOTO_TARGET_DIR}")
 
     # Supported source extensions
     valid_extensions = ('.jpg', '.jpeg', '.JPG', '.JPEG')
@@ -20,18 +25,19 @@ def batch_convert_to_webp(source_dir, target_dir, quality=80, max_width=1920):
     print("🚀 Starting bulk landscape optimization engine...")
     print("-" * 60)
 
-    for filename in os.listdir(source_dir):
+    # Read filenames out of the config path object
+    for filename in os.listdir(str(PHOTO_RAW_DIR)):
         if filename.endswith(valid_extensions):
-            source_path = os.path.join(source_dir, filename)
+            source_path = PHOTO_RAW_DIR / filename
             
             # Create a clean lowercase filename using underscores instead of spaces
-            clean_base_name = os.path.splitext(filename)[0].lower().replace(" ", "_")
+            clean_base_name = source_path.stem.lower().replace(" ", "_")
             target_filename = f"{clean_base_name}.webp"
-            target_path = os.path.join(target_dir, target_filename)
+            target_path = PHOTO_TARGET_DIR / target_filename
 
             try:
-                with Image.open(source_path) as img:
-                    original_size_mb = os.path.getsize(source_path) / (1024 * 1024)
+                with Image.open(str(source_path)) as img:
+                    original_size_mb = source_path.stat().st_size / (1024 * 1024)
                     
                     # 1. OPTIONAL RESIZING: Keep aspect ratio but scale down massive camera raw dimensions
                     if img.width > max_width:
@@ -40,9 +46,9 @@ def batch_convert_to_webp(source_dir, target_dir, quality=80, max_width=1920):
                         img = img.resize((max_width, h_size), Image.Resampling.LANCZOS)
                     
                     # 2. TRANSCODE TO WEBP: Strip metadata and compress to the sweet-spot quality
-                    img.save(target_path, "WEBP", quality=quality, optimize=True)
+                    img.save(str(target_path), "WEBP", quality=quality, optimize=True)
                     
-                    new_size_kb = os.path.getsize(target_path) / 1024
+                    new_size_kb = target_path.stat().st_size / 1024
                     print(f"✅ Optimized: {filename} ({original_size_mb:.2f} MB) ➡️ {target_filename} ({new_size_kb:.1f} KB)")
                     converted_count += 1
                     
@@ -54,8 +60,4 @@ def batch_convert_to_webp(source_dir, target_dir, quality=80, max_width=1920):
 
 # --- RUN EXECUTION ---
 if __name__ == "__main__":
-    # ".." jumps up out of src/ so Python can see the data and frontend folders
-    SOURCE_FOLDER = r"../data/photos/raw"
-    TARGET_FOLDER = r"../../frontend/images/photography"
-    
-    batch_convert_to_webp(SOURCE_FOLDER, TARGET_FOLDER, quality=80, max_width=1920)
+    batch_convert_to_webp(quality=80, max_width=1920)

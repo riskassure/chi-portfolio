@@ -1,20 +1,17 @@
 import csv
 import sqlite3
 import re
-from pathlib import Path
+import sys
+sys.path.append(str(sys.path[0] + '/..'))
+from config import DB_PATH, MUSIC_RAW_DIR
 
 def run_etl_pipeline():
-    script_dir = Path(__file__).resolve().parent
-    raw_dir = script_dir.parent / "data" / "music" /"raw"
-    db_path = script_dir.parent / "portfolio.db"
-    
-    csv_files = list(raw_dir.glob("*.csv"))
+    csv_files = list(MUSIC_RAW_DIR.glob("*.csv"))
     if not csv_files:
-        print(f"⚠️ No CSV source files discovered inside: {raw_dir}")
+        print(f"⚠️ No CSV source files discovered inside: {MUSIC_RAW_DIR}")
         return
         
-    print(f"Establishing connection to database file...")
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(str(DB_PATH))
     cursor = conn.cursor()
     
     try:
@@ -104,7 +101,6 @@ def run_etl_pipeline():
                 composition_name = title_parts[0].strip()
                 unit_name = title_parts[1].strip()
             else:
-                # Corrected Assignment Strategy:
                 composition_name = raw_track_name.strip()
                 unit_name = ""
 

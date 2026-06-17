@@ -1,10 +1,9 @@
 let currentPage = 1;
 const recordsPerPage = 25;
-let masterMusicData = []; // Moved to global scope so all helper functions can access it cleanly
+let masterMusicData = []; // Global scope for data access across helper functions
 
 // Unified Column Metadata Registry
 const FIELD_REGISTRY = {
-    // --- CORE COLUMNS (Permanently Frozen in Grid) ---
     spotify_playlist: { label: "Source Playlist", isCore: true,  type: "string" },
     genre:            { label: "Genre",           isCore: true,  type: "string" },
     composition_name: { label: "Composition",     isCore: true,  type: "string" },
@@ -13,50 +12,47 @@ const FIELD_REGISTRY = {
     performer:        { label: "Performer(s)",    isCore: true,  type: "string" },
     album_name:       { label: "Album Context",   isCore: true,  type: "string" },
     
-    // --- ANALYTICS COLUMNS (Toggleable by User) ---
     release_date:     { label: "Released",        isCore: false, type: "string", defaultOn: true },
     duration_string:  { label: "Length",          isCore: false, type: "string", defaultOn: true },
     popularity:       { label: "Popularity",      isCore: false, type: "number", defaultOn: false }
 };
 
-// Tracks which optional column keys are currently active
 let activeOptionalColumns = Object.keys(FIELD_REGISTRY).filter(key => !FIELD_REGISTRY[key].isCore && FIELD_REGISTRY[key].defaultOn);
 
-// Active Filters Matrix
 let activeFilters = {
     spotify_playlist: "all",
     searchQuery: ""
 };
 
-// Sequential Sorting Array Queue
 let sortSequence = [];
-
-// Global Session Tracking Flag
-let isAdmin = false;
+let isAdmin = false; // Managed dynamically via navbar.js hook
 
 // Main Execution Initialization Hook
 document.addEventListener("DOMContentLoaded", () => {
     setupEventListeners();
-    checkAdminSession(); // NEW: Probes the server for active login sessions
     loadMusicData(); 
 });
 
+// 🛠️ HOOK: Called automatically by navbar.js ONLY if authenticated!
+function unlockLocalPageControls() {
+    isAdmin = true;
+    const adminDock = document.getElementById('admin-controls-dock');
+    if (adminDock) {
+        adminDock.style.display = 'flex'; // Reveals inline admin interface panel
+    }
+}
+
 // Fetch live backend metrics
 function loadMusicData() {
-    // NEW: Added the configurations object passed to fetch containing credentials tracking
     fetch(`http://127.0.0.1:5000/api/music?page=${currentPage}&per_page=${recordsPerPage}`, {
         credentials: "include"
     })
         .then(response => response.json())
         .then(payload => {
-            // Unpack our data rows from the envelope
             masterMusicData = payload.data; 
-            
             buildColumnCheckboxes();
             populatePlaylistFilter(payload.data);
             processAndRenderTable();
-            
-            // Generate the [Prev] [1] [2]... [Next] buttons
             renderPaginationButtons(payload.total_pages, payload.page);
         })
         .catch(err => {
@@ -73,13 +69,10 @@ function buildColumnCheckboxes() {
 
     Object.keys(FIELD_REGISTRY).forEach(key => {
         const config = FIELD_REGISTRY[key];
-        if (config.isCore) return; // Skip core items
+        if (config.isCore) return;
 
         const labelEl = document.createElement("label");
-        labelEl.style.cursor = "pointer";
-        labelEl.style.display = "flex";
-        labelEl.style.alignItems = "center";
-        labelEl.style.gap = "5px";
+        labelEl.style.cssText = "cursor: pointer; display: flex; align-items: center; gap: 5px;";
 
         const chk = document.createElement("input");
         chk.type = "checkbox";
@@ -104,7 +97,7 @@ function buildColumnCheckboxes() {
 
 function populatePlaylistFilter(data) {
     const select = document.getElementById("filter-playlist");
-    if (!select || select.options.length > 1) return; // Prevent duplicating options on every page click
+    if (!select || select.options.length > 1) return; 
     
     const uniquePlaylists = [...new Set(data.map(item => item.spotify_playlist).filter(Boolean))];
     uniquePlaylists.sort().forEach(p => {
@@ -115,37 +108,31 @@ function populatePlaylistFilter(data) {
     });
 }
 
-// Return complete array mapping of active viewport columns
 function getActiveViewportColumns() {
     const coreKeys = Object.keys(FIELD_REGISTRY).filter(k => FIELD_REGISTRY[k].isCore);
     return [...coreKeys, ...activeOptionalColumns];
 }
 
-// The Core Pipeline Engine
-// Triggers local multi-layer search arrays without destroying pagination scope
 function processAndRenderTable() {
     const currentFields = getActiveViewportColumns();
 
-    // --- GENERALIZED STAGE 1: FILTER RUNNEL ---
+    // STAGE 1: FILTER RUNNEL
     let processedData = masterMusicData.filter(item => {
         if (activeFilters.spotify_playlist !== "all" && item.spotify_playlist !== activeFilters.spotify_playlist) {
             return false;
         }
-        
         if (activeFilters.searchQuery) {
             const query = activeFilters.searchQuery.toLowerCase();
-            
             const matchFound = currentFields.some(fieldKey => {
                 const val = item[fieldKey];
                 return val && val.toString().toLowerCase().includes(query);
             });
-            
             if (!matchFound) return false;
         }
         return true;
     });
 
-    // --- GENERALIZED STAGE 2: TYPE-AWARE SEQUENTIAL SORT ---
+    // STAGE 2: TYPE-AWARE SEQUENTIAL SORT
     if (sortSequence.length > 0) {
         processedData.sort((a, b) => {
             for (let sortRule of sortSequence) {
@@ -171,13 +158,12 @@ function processAndRenderTable() {
         });
     }
 
-    // --- STAGE 3: OUTPUT GENERATION ---
+    // STAGE 3: OUTPUT GENERATION
     generateTableHeaders(currentFields);
     renderTableBody(processedData, currentFields);
     updateSortUI();
 }
 
-// Dynamic Structural DOM Manipulation
 function generateTableHeaders(fields) {
     const headerRow = document.getElementById("table-headers");
     if (!headerRow) return;
@@ -188,10 +174,7 @@ function generateTableHeaders(fields) {
         const th = document.createElement("th");
         th.className = "sortable-header";
         th.setAttribute("data-column", fieldKey);
-        th.style.padding = "12px";
-        th.style.border = "1px solid #34495e";
-        th.style.cursor = "pointer";
-        th.style.userSelect = "none";
+        th.style.cssText = "padding: 12px; border: 1px solid #34495e; cursor: pointer; user-select: none;";
         th.innerHTML = `${config.label} <span class="sort-icon">↕</span>`;
         
         th.addEventListener("click", () => handleHeaderClick(fieldKey));
@@ -199,8 +182,7 @@ function generateTableHeaders(fields) {
     });
 
     const linkTh = document.createElement("th");
-    linkTh.style.padding = "12px";
-    linkTh.style.border = "1px solid #34495e";
+    linkTh.style.cssText = "padding: 12px; border: 1px solid #34495e;";
     linkTh.textContent = "Link";
     headerRow.appendChild(linkTh);
 }
@@ -217,22 +199,17 @@ function renderTableBody(dataList, fields) {
     }
 
     dataList.forEach(item => {
-        // CHANGED: We stamp the unique database track_id right on the row container
         const row = document.createElement("tr");
-        if (item.track_id) {
-            row.setAttribute("data-id", item.track_id);
-        }
+        if (item.track_id) row.setAttribute("data-id", item.track_id);
         
         let innerCellsHTML = "";
 
         fields.forEach(fieldKey => {
             let cellValue = item[fieldKey];
-            
             if (cellValue === null || cellValue === undefined || cellValue === "") {
                 cellValue = '<span style="color:#bbb;">--</span>';
             }
 
-            // CHANGED: Every individual <td> cell now explicitly announces its database column field name!
             if (fieldKey === 'composition_name') {
                 innerCellsHTML += `<td data-field="composition_name" style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>${cellValue}</strong> <small style="color:#7f8c8d;">${item.unit_name || ''}</small></td>`;
             } else if (fieldKey === 'spotify_playlist') {
@@ -250,7 +227,7 @@ function renderTableBody(dataList, fields) {
         });
 
         const linkTag = item.track_id 
-            ? `<button onclick="playTrackInline('${item.track_id}')" style="background: #1ed760; color: white; border: none; padding: 6px 12px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 0.85em; transition: transform 0.1s;">Load Player 🎧</button>` 
+            ? `<button onclick="playTrackInline('${item.track_id}')" style="background: #1ed760; color: white; border: none; padding: 6px 12px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 0.85em;">Load Player 🎧</button>` 
             : `<span style="color:#ccc;">Unavailable</span>`;
 
         innerCellsHTML += `<td style="padding: 10px; border-bottom: 1px solid #ddd;">${linkTag}</td>`;
@@ -261,7 +238,6 @@ function renderTableBody(dataList, fields) {
 
 function handleHeaderClick(column) {
     let existingIndex = sortSequence.findIndex(rule => rule.column === column);
-
     if (existingIndex === -1) {
         sortSequence.push({ column: column, direction: "asc" });
     } else if (sortSequence[existingIndex].direction === "asc") {
@@ -274,35 +250,33 @@ function handleHeaderClick(column) {
 
 function setupEventListeners() {
     const playlistFilter = document.getElementById("filter-playlist");
-    if (playlistFilter) {
-        playlistFilter.addEventListener("change", (e) => {
-            activeFilters.spotify_playlist = e.target.value;
-            processAndRenderTable();
-        });
-    }
+    playlistFilter?.addEventListener("change", (e) => {
+        activeFilters.spotify_playlist = e.target.value;
+        processAndRenderTable();
+    });
 
     const searchBar = document.getElementById("search-bar");
-    if (searchBar) {
-        searchBar.addEventListener("input", (e) => {
-            activeFilters.searchQuery = e.target.value;
-            processAndRenderTable();
-        });
-    }
+    searchBar?.addEventListener("input", (e) => {
+        activeFilters.searchQuery = e.target.value;
+        processAndRenderTable();
+    });
 
-    const resetBtn = document.getElementById("reset-filters");
-    if (resetBtn) {
-        resetBtn.addEventListener("click", () => {
-            activeFilters = { spotify_playlist: "all", searchQuery: "" };
-            sortSequence = [];
-            activeOptionalColumns = Object.keys(FIELD_REGISTRY).filter(key => !FIELD_REGISTRY[key].isCore && FIELD_REGISTRY[key].defaultOn);
-            
-            if (playlistFilter) playlistFilter.value = "all";
-            if (searchBar) searchBar.value = "";
-            
-            buildColumnCheckboxes();
-            processAndRenderTable();
-        });
-    }
+    document.getElementById("reset-filters")?.addEventListener("click", () => {
+        activeFilters = { spotify_playlist: "all", searchQuery: "" };
+        sortSequence = [];
+        activeOptionalColumns = Object.keys(FIELD_REGISTRY).filter(key => !FIELD_REGISTRY[key].isCore && FIELD_REGISTRY[key].defaultOn);
+        
+        if (playlistFilter) playlistFilter.value = "all";
+        if (searchBar) searchBar.value = "";
+        
+        buildColumnCheckboxes();
+        processAndRenderTable();
+    });
+
+    // Wire up Action Buttons directly
+    document.getElementById("admin-edit-btn")?.addEventListener("click", enterTableEditMode);
+    document.getElementById("admin-cancel-btn")?.addEventListener("click", () => exitTableEditMode(false));
+    document.getElementById("admin-save-btn")?.addEventListener("click", saveTableChanges);
 }
 
 function updateSortUI() {
@@ -312,64 +286,45 @@ function updateSortUI() {
         if (!iconSpan) return;
 
         let sequenceIndex = sortSequence.findIndex(rule => rule.column === column);
-
         if (sequenceIndex === -1) {
             iconSpan.innerHTML = "↕";
             header.style.color = "white";
         } else {
             const rule = sortSequence[sequenceIndex];
-            const arrow = rule.direction === "asc" ? "↑" : "↓";
-            iconSpan.innerHTML = `${arrow} <sub>(${sequenceIndex + 1})</sub>`;
+            iconSpan.innerHTML = `${rule.direction === "asc" ? "↑" : "↓"} <sub>(${sequenceIndex + 1})</sub>`;
             header.style.color = "#1ed760"; 
         }
     });
 }
 
-// Global execution function to swap tracks inside the sticky widget dock
 window.playTrackInline = function(trackId) {
     const dock = document.getElementById("spotify-player-dock");
     if (!dock) return;
     
-    const embedUrl = `https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`;
-    
     dock.innerHTML = `
-        <iframe 
-            src="${embedUrl}" 
-            width="100%" 
-            height="90" 
-            frameBorder="0" 
-            allowfullscreen="" 
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-            loading="lazy"
-            style="border-radius: 12px;">
-        </iframe>
-    `;
-    
+        <iframe src="https://open.spotify.com/embed/track/$${trackId}?utm_source=generator&theme=0" 
+                width="100%" height="90" frameBorder="0" allowfullscreen="" 
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"
+                style="border-radius: 12px;">
+        </iframe>`;
     dock.style.bottom = "20px";
 };
 
 function renderPaginationButtons(totalPages, activePage) {
     const controlsContainer = document.getElementById("pagination-controls");
     if (!controlsContainer) return;
-    
     controlsContainer.innerHTML = "";
     
-    // 1. Previous Button
     const prevBtn = document.createElement("button");
     prevBtn.innerText = "◀ Prev";
     prevBtn.disabled = activePage === 1;
     prevBtn.style.cssText = "padding: 6px 12px; font-weight: bold; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; background: white;";
-    if (!prevBtn.disabled) {
-        prevBtn.onclick = () => { currentPage--; loadMusicData(); };
-    }
+    if (!prevBtn.disabled) prevBtn.onclick = () => { currentPage--; loadMusicData(); };
     controlsContainer.appendChild(prevBtn);
     
-    // 2. Page Numbers
     let startPage = Math.max(1, activePage - 2);
     let endPage = Math.min(totalPages, startPage + 4);
-    if (endPage - startPage < 4) {
-        startPage = Math.max(1, endPage - 4);
-    }
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
 
     for (let i = startPage; i <= endPage; i++) {
         if (i < 1 || i > totalPages) continue;
@@ -380,108 +335,16 @@ function renderPaginationButtons(totalPages, activePage) {
         controlsContainer.appendChild(pageBtn);
     }
     
-    // 3. Next Button
     const nextBtn = document.createElement("button");
     nextBtn.innerText = "Next ▶";
     nextBtn.disabled = activePage === totalPages;
     nextBtn.style.cssText = "padding: 6px 12px; font-weight: bold; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; background: white;";
-    if (!nextBtn.disabled) {
-        nextBtn.onclick = () => { currentPage++; loadMusicData(); };
-    }
+    if (!nextBtn.disabled) nextBtn.onclick = () => { currentPage++; loadMusicData(); };
     controlsContainer.appendChild(nextBtn);
 }
 
 // ==========================================================================
-// ADMINISTRATIVE INITIALIZATION & EVENT MANAGEMENT LOGIC
-// ==========================================================================
-
-function checkAdminSession() {
-    fetch("http://127.0.0.1:5000/api/session-check", { credentials: "include" })
-        .then(res => res.json())
-        .then(status => {
-            isAdmin = status.is_admin;
-            toggleAdminInterfaceUI();
-        })
-        .catch(err => console.error("Session verification checklist failed:", err));
-}
-
-function toggleAdminInterfaceUI() {
-    const dock = document.getElementById("admin-controls-dock");
-    const loginBtn = document.getElementById("admin-login-btn");
-    
-    if (!dock || !loginBtn) return;
-
-    if (isAdmin) {
-        dock.style.display = "flex";       
-        loginBtn.style.display = "none";    
-    } else {
-        dock.style.display = "none";       
-        loginBtn.style.display = "inline-block"; 
-        
-        document.getElementById("admin-edit-btn").style.display = "inline-block";
-        document.getElementById("admin-save-btn").style.display = "none";
-        document.getElementById("admin-cancel-btn").style.display = "none";
-    }
-}
-
-const originalSetupEventListeners = setupEventListeners;
-setupEventListeners = function() {
-    originalSetupEventListeners(); 
-    
-    // Wire up Admin Login Button trigger
-    document.getElementById("admin-login-btn")?.addEventListener("click", () => {
-        const password = prompt("Enter Administrative Access Password:");
-        if (!password) return;
-
-        fetch("http://127.0.0.1:5000/api/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ password: password }),
-            credentials: "include"
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                fetch("http://127.0.0.1:5000/api/session-check", { credentials: "include" })
-                    .then(res => res.json())
-                    .then(status => {
-                        if (status.is_admin) {
-                            isAdmin = true;
-                            toggleAdminInterfaceUI();
-                        } else {
-                            alert("Security Error: Browser blocked the secure session cookie. Ensure cookies are enabled for third-party local ports.");
-                            isAdmin = false;
-                            toggleAdminInterfaceUI();
-                        }
-                    });
-            } else {
-                alert("Access Denied: " + data.message);
-                isAdmin = false;
-                toggleAdminInterfaceUI();
-            }
-        })
-        .catch(err => alert("Authentication system communication failure: " + err));
-    });
-
-    // Wire up Logout Button trigger
-    document.getElementById("admin-logout-btn")?.addEventListener("click", () => {
-        fetch("http://127.0.0.1:5000/api/logout", { method: "POST", credentials: "include" })
-        .then(() => {
-            isAdmin = false;
-            toggleAdminInterfaceUI();
-            processAndRenderTable(); 
-        });
-    });
-
-    // Wire up the Interactive Action Buttons
-    document.getElementById("admin-edit-btn")?.addEventListener("click", () => enterTableEditMode());
-    document.getElementById("admin-cancel-btn")?.addEventListener("click", () => exitTableEditMode(false));
-    document.getElementById("admin-save-btn")?.addEventListener("click", () => saveTableChanges());
-};
-
-
-// ==========================================================================
-// PHASE 2 & 3: TRANSFORMATION AND DATABASE COMMIT ENGINES
+// TRANSFORMATION AND DATABASE COMMIT ENGINES
 // ==========================================================================
 
 let originalRowDataBackup = [];
@@ -498,103 +361,4 @@ function enterTableEditMode() {
     const editableColumns = ["genre", "composition_name", "track_name", "composer", "performer"];
 
     const rows = tableBody.getElementsByTagName("tr");
-    for (let row of rows) {
-        const cells = row.getElementsByTagName("td");
-        
-        for (let cell of cells) {
-            const fieldName = cell.getAttribute("data-field");
-
-            if (editableColumns.includes(fieldName)) {
-                const currentText = cell.innerText.trim();
-
-                originalRowDataBackup.push({
-                    cellReference: cell,
-                    originalValue: currentText
-                });
-
-                cell.innerHTML = `
-                    <input type="text" 
-                           value="${currentText.replace(/"/g, '&quot;')}" 
-                           class="admin-table-input" 
-                           style="width: 100%; padding: 4px; border: 1px solid #3498db; border-radius: 3px; box-sizing: border-box; font-family: Arial, sans-serif; font-size: 0.95em;">
-                `;
-            }
-        }
-    }
-}
-
-function exitTableEditMode(shouldKeepChanges) {
-    document.getElementById("admin-edit-btn").style.display = "inline-block";
-    document.getElementById("admin-save-btn").style.display = "none";
-    document.getElementById("admin-cancel-btn").style.display = "none";
-
-    if (!shouldKeepChanges) {
-        originalRowDataBackup.forEach(item => {
-            item.cellReference.innerHTML = item.originalValue;
-        });
-    }
-    originalRowDataBackup = []; 
-}
-
-function saveTableChanges() {
-    const tableBody = document.getElementById("table-body");
-    if (!tableBody) return;
-
-    const changesToSubmit = [];
-    const rows = tableBody.getElementsByTagName("tr");
-    const editableColumns = ["genre", "composition_name", "track_name", "composer", "performer"];
-
-    for (let row of rows) {
-        const trackId = row.getAttribute("data-id");
-        const cells = row.getElementsByTagName("td");
-
-        for (let cell of cells) {
-            const fieldName = cell.getAttribute("data-field");
-
-            if (editableColumns.includes(fieldName)) {
-                const inputElement = cell.querySelector("input");
-                if (inputElement) {
-                    const newValue = inputElement.value.trim();
-                    const backupItem = originalRowDataBackup.find(item => item.cellReference === cell);
-                    const originalValue = backupItem ? backupItem.originalValue : "";
-
-                    if (newValue !== originalValue) {
-                        changesToSubmit.push({
-                            track_id: trackId,
-                            field: fieldName,
-                            value: newValue
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    if (changesToSubmit.length === 0) {
-        alert("No database mutations required. No values were modified.");
-        exitTableEditMode(true);
-        return;
-    }
-
-    fetch("http://127.0.0.1:5000/api/music/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ changes: changesToSubmit }),
-        credentials: "include"
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            exitTableEditMode(true);
-            loadMusicData(); 
-        } else {
-            alert("Database update failed: " + data.message);
-            exitTableEditMode(false); 
-        }
-    })
-    .catch(err => {
-        alert("Communication network error during database commit: " + err);
-        exitTableEditMode(false);
-    });
-}
+    for (let row

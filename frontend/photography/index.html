@@ -3,31 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Photography Gallery</title>
+    <title>Photography Gallery | Chi-Chih Woo</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="../style.css">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-brand">Chi-Chih Woo</div>
-        <ul class="nav-links">
-            <li><a href="../index.html">Home</a></li>
-            <li><a href="../bio.html">Biography</a></li>
-            <li><a href="../resume.html">Resume</a></li>
-            <li><a href="../music/index.html">Music</a></li>
-            <li><a href="../math/index.html">Mathematics</a></li>
-            <li><a href="index.html">Photography</a></li>
-        </ul>
-    </nav>
-
     <main style="padding: 40px; font-family: Arial, sans-serif;">
         <h1>My Photography Gallery</h1>
         <p>A collection of captured moments, landscapes, and visual studies.</p>
+
+        <div id="admin-controls-dock" style="display: none; margin-bottom: 20px; padding: 15px 20px; background-color: #f4f6f7; border-radius: 5px; align-items: center; gap: 15px;">
+            <strong style="color: #2563eb;">🛠️ Edit Mode Active:</strong>
+            <span style="font-size: 0.9em; color: #555;">You can now modify coordinate parameters and locations inline below.</span>
+            </div>
 
         <div id="photography-gallery" class="gallery-grid">
             <p class="loading-text" style="color: #666; font-style: italic;">Loading pristine landscape assets...</p>
         </div>
     </main>
 
-    <script src="gallery.js"></script>
-</body>
+    <script src="../navbar.js"></script> <script src="gallery.js"></script>    </body>
 </html>

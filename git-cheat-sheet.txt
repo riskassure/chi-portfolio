@@ -41,6 +41,15 @@ git push                           <- Upload local history to cloud [cite: 5]
 git fetch                          <- Scouting Mission: Download cloud blueprints (No merge)
 git pull                           <- Ingestion: Download maps AND merge cloud code to local files
 
+# THE ONE-TIME INITIALIZATION LINK (Run once per new project):
+git remote add origin <github-url>  <- Create a local shortcut named 'origin' pointing to GitHub
+
+# REMOTE ARCHITECTURE DECODER:
+# git push [remote-shortcut-alias] [branch-name]
+#  - "origin": The nickname your local machine uses to point to your specific GitHub repository URL.
+#  - "main"  : The primary branch timeline where your production code lives.
+#  - Shortening to just "git push" works because your local main is pre-linked to origin/main.
+
 6. MULTI-DEVICE SYNCING (ROAMING WORKFLOW)
 -------------------------------------------------------------------
 Workflow direction: [Travel Laptop] ==(push)==> [GitHub] ==(fetch/pull)==> [Home Laptop]

@@ -1,28 +1,27 @@
 // frontend/photography/gallery.js
 
 const API_URL = "http://127.0.0.1:5000/api/photography/current";
-const SESSION_URL = "http://127.0.0.1:5000/api/session-check";
 const UPDATE_URL = "http://127.0.0.1:5000/api/photography/update";
 const galleryContainer = document.getElementById("photography-gallery");
 
+// Flag defaults to false for normal visitors
 let isAdmin = false;
 
-// 1. Probe session tracking status
-async function checkAdminStatus() {
-    try {
-        const response = await fetch(SESSION_URL, { credentials: "include" });
-        if (response.ok) {
-            const data = await response.json();
-            isAdmin = data.is_admin;
-        }
-    } catch (err) {
-        console.warn("Session authentication probe down:", err);
+// 🛠️ HOOK: Called automatically by navbar.js ONLY if authenticated!
+function unlockLocalPageControls() {
+    isAdmin = true; // Flip the local layout state switch
+    
+    const adminDock = document.getElementById('admin-controls-dock');
+    if (adminDock) {
+        adminDock.style.display = 'flex'; // Reveal global editing banner
     }
 }
 
-// 2. Fetch and render cards dynamically
+// 1. Fetch and render cards dynamically
 async function loadActivePhotos() {
-    await checkAdminStatus();
+    // Crucial: Give navbar.js a brief millisecond to execute its check 
+    // and flip the global isAdmin state before we draw the cards.
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     try {
         const response = await fetch(API_URL, { method: "GET" });
@@ -41,6 +40,7 @@ async function loadActivePhotos() {
         photoList.forEach(photo => {
             const imageSourcePath = `../${photo.file_path}`;
             
+            // Evaluates state seamlessly on execution pass
             const locationMarkup = isAdmin 
                 ? `
                     <div class="admin-edit-panel" style="margin-top: 10px; background: #f9f9f9; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
@@ -85,7 +85,7 @@ async function loadActivePhotos() {
     }
 }
 
-// 3. Post updated values directly back to Flask
+// 2. Post updated values directly back to Flask
 async function savePhotoEdits(imageId) {
     const locationName = document.getElementById(`loc-${imageId}`).value;
     const latitude = document.getElementById(`lat-${imageId}`).value;
@@ -105,7 +105,7 @@ async function savePhotoEdits(imageId) {
                 latitude: latitude,
                 longitude: longitude
             }),
-            credentials: "include"
+            credentials: "include" // Keeps session active
         });
 
         const result = await response.json();
