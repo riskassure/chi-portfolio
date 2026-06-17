@@ -1,6 +1,6 @@
 let currentPage = 1;
-const recordsPerPage = 25;
-let masterMusicData = []; // Global scope for data access across helper functions
+let recordsPerPage = 25;
+let masterMusicData = [];
 
 // Unified Column Metadata Registry
 const FIELD_REGISTRY = {
@@ -37,9 +37,40 @@ document.addEventListener("DOMContentLoaded", () => {
 function unlockLocalPageControls() {
     isAdmin = true;
     const adminDock = document.getElementById('admin-controls-dock');
-    if (adminDock) {
-        adminDock.style.display = 'flex'; // Reveals inline admin interface panel
-    }
+    if (!adminDock) return;
+    
+    // Force the global bar to expand vertically to accommodate text elements easily
+    adminDock.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; min-height: 45px; background-color: #34495e;";
+
+    // Check if the page-size selector already exists to prevent duplicate injection
+    if (document.getElementById('admin-page-size-selector')) return;
+
+    // Create a wrapper container for our new control element
+    const controlWrapper = document.createElement('div');
+    controlWrapper.id = 'admin-page-size-selector';
+    
+    // Explicit flex structure with high padding background color to insulate text readability
+    controlWrapper.style.cssText = "display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-left: auto; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;";
+
+    // Using an inline block with explicit width parameters guarantees it cannot collapse to zero dimensions
+    controlWrapper.innerHTML = `
+        <span style="color: #ffffff !important; display: inline-block; white-space: nowrap; font-weight: bold; font-size: 14px;">Table Display Limit:</span>
+        <select id="row-size-select" style="padding: 6px 10px; border-radius: 4px; border: 1px solid #1abc9c; background: #2c3e50; color: white; cursor: pointer; font-weight: bold; font-size: 13px;">
+            <option value="10">10 Rows</option>
+            <option value="25" selected>25 Rows</option>
+            <option value="50">50 Rows</option>
+            <option value="100">100 Rows</option>
+        </select>
+    `;
+
+    adminDock.appendChild(controlWrapper);
+
+    // Wire up the change listener to update layout paging state immediately
+    document.getElementById('row-size-select').addEventListener('change', (e) => {
+        recordsPerPage = parseInt(e.target.value, 10);
+        currentPage = 1; // Snaps back to first page to avoid layout overflow bounds
+        loadMusicData(); // Fires fresh API fetch to retrieve targeted window slice
+    });
 }
 
 // Fetch live backend metrics

@@ -1,0 +1,79 @@
+/* ==========================================================================
+   MUSIC CATALOG DATA TABLE VISUALIZATION MODULE
+   ========================================================================== */
+
+/* 1. Ensure the outer table container handles scrolling elegantly */
+.table-container {
+    max-height: 70vh;          /* Caps the grid container's height dynamically */
+    overflow-y: auto;          /* Enables a clean local scrollbar right inside the container */
+    border: 1px solid #34495e; /* Standard framework border boundary wrapper */
+    position: relative;        /* Creates a strict anchoring boundary layout context for sticky children */
+    margin: 20px 0;
+}
+
+/* 2. Core Grid and Padding Dimensions */
+#music-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: Arial, sans-serif;
+}
+
+#music-table th, #music-table td {
+    padding: 12px;
+    border: 1px solid #ddd;   /* Clean, light grey grid lines */
+    text-align: left;
+}
+
+/* 3. Sticky Header Freezing Layout Context */
+#table-headers th {
+    position: sticky;
+    top: 0;
+    background-color: #2c3e50; /* Solid dark slate matches your header theme */
+    color: white;              /* Keeps text readable against the dark background */
+    z-index: 10;               /* Floats the header row safely above scrolling table rows */
+    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4); /* Clean shadow under the frozen row */
+}
+
+/* 4. Interactive Header & Sort Actions */
+.sortable-header {
+    transition: background-color 0.2s ease;
+}
+
+.sortable-header:hover {
+    background-color: #34495e !important;
+}
+
+.sort-icon {
+    font-size: 0.8em;
+    margin-left: 5px;
+    color: #bdc3c7;
+}
+
+/* 5. Data Manipulation Controls Filtering Row Elements */
+.table-filter {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    margin-left: 5px;
+}
+
+/* 6. Zebra Striping - Alternate row background coloring */
+#music-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+/* Subtle highlight effect when hovering over a single data row */
+#music-table tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* 7. Inline Dynamic Media Player Links */
+.spotify-link {
+    color: #1ed760; /* Spotify Green */
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.spotify-link:hover {
+    text-decoration: underline;
+}
