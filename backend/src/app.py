@@ -82,9 +82,11 @@ def check_session_status():
 # ==========================================================================
 from routes.admin_music import music_bp
 from routes.admin_photography import photography_bp
+from routes.admin_math import math_bp
 
 app.register_blueprint(music_bp)
 app.register_blueprint(photography_bp)
+app.register_blueprint(math_bp)
 
 
 # ==========================================================================
