@@ -10,12 +10,7 @@
     
     <script>
         window.MathJax = {
-            tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']]
-            },
-            options: {
-                processHtmlClass: 'concept-grid|card-title'
-            }
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
         };
     </script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
@@ -34,31 +29,21 @@
         </ul>
     </nav>
 
-    <div class="math-container">
+    <div style="max-width: 1200px; margin: 2.5rem auto; padding: 0 1.5rem;">
         
-        <aside class="math-sidebar">
-            <h3>Subject Classification</h3>
-            <ul id="mscList" class="msc-list">
-                <div class="msg-box">Loading indices...</div>
-            </ul>
-        </aside>
-
-        <main class="catalog-area">
+        <div style="margin-bottom: 2rem;">
+            <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: #0f172a;">Mathematics Library</h1>
+            <p style="color: #64748b; margin-bottom: 1.5rem;">Select a subject classification sector to explore related research notes, proofs, and concept breakdowns.</p>
             
             <div class="search-row">
-                <input type="text" id="archiveSearch" class="search-box" placeholder="Search proofs, axioms, and topological notes...">
+                <input type="text" id="classSearch" class="search-box" placeholder="Search subject classifications by code or name (e.g., 54C or Topology)...">
             </div>
+        </div>
 
-            <div id="filterBanner" class="filter-banner" style="display: none;">
-                <span id="filterLabel">Filtering by category</span>
-                <button id="clearFilter" class="clear-btn">Show All Concepts</button>
-            </div>
-
-            <div id="conceptGrid" class="concept-grid">
-                <div class="msg-box">Populating system catalog matrix...</div>
-            </div>
-            
-        </main>
+        <div id="classCardGrid" class="class-card-grid">
+            <div class="msg-box">Loading subject classification card index...</div>
+        </div>
+        
     </div>
 
     <script src="math_catalog.js"></script>

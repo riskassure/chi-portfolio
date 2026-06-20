@@ -85,6 +85,7 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     chunks = token_pattern.split(tex_content)
     processed_chunks = []
 
+    # Locate this block inside apply_math_autolinker() in backend/src/routes/admin_math.py
     for chunk in chunks:
         # If the block is math syntax or macro declarations, bypass processing entirely
         if chunk.startswith('$') or chunk.startswith('\\'):
@@ -94,9 +95,32 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
         # Otherwise, this chunk is safe descriptive text! Apply word boundaries
         for phrase in sorted_phrases:
             slug_target = active_targets[phrase]
-            pattern = re.compile(r'\b(' + re.escape(phrase) + r')\b', re.IGNORECASE)
-            link_replacement = rf'<a class="math-autolink" href="/math/concepts/{slug_target}">\1</a>'
-            chunk = pattern.sub(link_replacement, chunk)
+            
+            # 🌟 THE FIX: This pattern ensures we match the phrase ONLY if it is NOT:
+            # 1. Inside an href attribute: (?<!href=")(?<!slug=)
+            # 2. Already inside an existing HTML opening/closing tag property bracket: (?![^<>]*>)
+            # 3. Followed by a closing anchor tag without an opening one first: a negative lookahead
+            pattern = re.compile(
+                r'(?<!href=")(?<!slug=)\b(' + re.escape(phrase) + r')\b(?![^<>]*>)', 
+                re.IGNORECASE
+            )
+            
+            # Double-check to ensure we aren't wrapping text that is already inside an <a> tag block
+            # We use a custom lambda substitution to check what's behind our match position
+            def safe_sub(match):
+                matched_text = match.group(1)
+                full_chunk_so_far = chunk[:match.start()]
+                
+                # Count if we are currently sitting between an unclosed <a and </a>
+                last_open_a = full_chunk_so_far.rfind("<a")
+                last_close_a = full_chunk_so_far.rfind("</a>")
+                
+                if last_open_a > last_close_a:
+                    return matched_text # Inside an active link wrapper, leave it untouched!
+                    
+                return f'<a class="math-autolink" href="concept.html?slug={slug_target}">{matched_text}</a>'
+
+            chunk = pattern.sub(safe_sub, chunk)
             
         processed_chunks.append(chunk)
 

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subject Catalog - Chi-Chih Woo</title>
+    
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="math.css">
+    
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+            options: { processHtmlClass: 'concept-grid|card-title' }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-brand">Chi-Chih Woo</div>
+        <ul class="nav-links">
+            <li><a href="../index.html">Home</a></li>
+            <li><a href="../bio.html">Biography</a></li>
+            <li><a href="../resume.html">Resume</a></li>
+            <li><a href="../music/index.html">Music</a></li>
+            <li><a href="../math/index.html" class="active">Mathematics</a></li>
+            <li><a href="../photography/index.html">Photography</a></li>
+        </ul>
+    </nav>
+
+    <div style="max-width: 1200px; margin: 2.5rem auto; padding: 0 1.5rem;">
+        
+        <div style="margin-bottom: 2rem;">
+            <a href="index.html" style="color: #2563eb; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 1rem;">
+                ← Back to Subject Classifications
+            </a>
+            
+            <h1 id="listHeaderTitle" style="font-size: 2rem; color: #0f172a; margin-bottom: 0.25rem; font-weight: 800;">MSC Sector: --</h1>
+            
+            <div id="listHeaderSubName" style="font-size: 1.25rem; font-weight: 600; color: #2563eb; margin-bottom: 0.75rem; line-height: 1.4;"></div>
+            
+            <p id="listHeaderDesc" style="color: #64748b; margin-bottom: 1.5rem; font-size: 1rem;"></p>
+            
+            <div class="search-row">
+                <input type="text" id="conceptListSearch" class="search-box" placeholder="Filter concepts within this category by title...">
+            </div>
+        </div>
+
+        <div id="conceptListGrid" class="concept-grid">
+            <div class="msg-box">Querying relational database nodes...</div>
+        </div>
+
+        <div id="loadMoreContainer" style="text-align: center; margin-top: 2.5rem; display: none;">
+            <button id="loadMoreBtn" style="background: #ffffff; border: 1px solid #cbd5e1; padding: 0.75rem 2rem; border-radius: 6px; font-weight: 600; color: #334155; cursor: pointer; transition: background 0.15s;">
+                Show More Entries
+            </button>
+        </div>
+        
+    </div>
+
+    <script src="math_list.js"></script>
+</body>
+</html>

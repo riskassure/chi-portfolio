@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mathematical Concept Viewer</title>
+    <link rel="stylesheet" href="math.css?v=2.1">
+    
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            options: {
+                ignoreHtmlClass: 'tex2jax_ignore',
+                processHtmlClass: 'tex2jax_process'
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body class="tex2jax_ignore" style="font-family: system-ui, sans-serif; background-color: #f8fafc; margin: 0; padding: 2rem;">
+
+    <div style="max-width: 900px; margin: 0 auto; background: #ffffff; padding: 2.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        
+        <div class="nav-btn-row">
+            <button class="btn-secondary" onclick="history.back()">← Back to List</button>
+            <a href="index.html" class="btn-secondary">Main Directory Index 🏠</a>
+        </div>
+
+        <h1 id="conceptTitle" style="font-size: 2.5rem; color: #0f172a; margin-top: 0; margin-bottom: 1.5rem; font-weight: 800;">Loading Concept...</h1>
+
+        <div class="meta-section-top">
+            <div class="meta-row">
+                <div class="meta-label">Classifications:</div>
+                <div id="topClassifications" class="meta-value-list">--</div>
+            </div>
+            <div class="meta-row">
+                <div class="meta-label">Document Types:</div>
+                <div id="topTypes" class="meta-value-list">--</div>
+            </div>
+        </div>
+
+        <div id="mathContentCanvas" class="math-canvas-frame tex2jax_process">
+            Initializing LaTeX layout engine...
+        </div>
+
+        <div class="meta-section-bottom">
+            <div class="bottom-grid">
+                <div class="info-card">
+                    <h4>Synonyms</h4>
+                    <div id="bottomSynonyms">None listed</div>
+                </div>
+                <div class="info-card">
+                    <h4>Concepts Defined Here</h4>
+                    <div id="bottomDefinedHere">None listed</div>
+                </div>
+                <div class="info-card">
+                    <h4>Related Concepts</h4>
+                    <div id="bottomRelated">None listed</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #64748b; margin-top: 1rem; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
+                <div><strong>Created:</strong> <span id="metaCreated">--</span></div>
+                <div><strong>Last Modified:</strong> <span id="metaUpdated">--</span></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="math_concept.js?v=1.0"></script>
+</body>
+</html>
