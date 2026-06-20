@@ -45,12 +45,19 @@ async function renderConceptPage(concept) {
             document.getElementById("topTypes").innerText = "None";
         }
 
-        // 2. #3 Classifications
+        // 2. #3 Classifications (Now as clickable links)
         const classTarget = document.getElementById("topClassifications");
         const classArray = concept.classifications || [];
         if (classArray.length > 0) {
             classTarget.innerHTML = classArray.map(item => {
-                return `<span class="math-tag tag-msc" title="${item.text}">${item.code} (${item.text})</span>`;
+                // We create a link that points to list.html with a query parameter
+                const safeCode = encodeURIComponent(item.code);
+                return `<a href="list.html?classification=${safeCode}" 
+                        class="math-tag tag-msc" 
+                        title="${item.text}" 
+                        style="text-decoration: none; cursor: pointer;">
+                        ${item.code} (${item.text})
+                        </a>`;
             }).join(' ');
         } else {
             classTarget.innerText = "None assigned";
@@ -60,15 +67,11 @@ async function renderConceptPage(concept) {
         renderFooterArrays(concept);
 
         // 4. #1 & #2 Process TeX payload
-        let rawTexContent = concept.cleaned_tex || "No textual mathematical content saved.";
+        let rawTexContent = concept.display_tex || concept.rendered_tex || concept.cleaned_tex || "No textual mathematical content saved.";
         
-        // --- START FIX: Prevent crash from unsupported pspicture ---
-        // This strips out the pspicture blocks and places a placeholder instead
-        let preProcessedTex = rawTexContent.replace(
-            /\\begin\{pspicture\}.*?\\end\{pspicture\}/gs, 
-            '<div class="img-placeholder" style="border: 1px dashed #ccc; padding: 10px; color: #666;"><em>[Diagram: Convert to SVG]</em></div>'
-        );
-        // --- END FIX ---
+        let preProcessedTex = rawTexContent;
+
+        preProcessedTex = cleanLaTeXEnvironments(preProcessedTex);
 
         const canvas = document.getElementById("mathContentCanvas");
         canvas.innerHTML = preProcessedTex;
@@ -110,8 +113,34 @@ function cleanLaTeXEnvironments(tex) {
     clean = clean.replace(/\\textbf\{([^}]+)\}/gi, "<strong>$1</strong>");
 
     // 4. Convert \begin{thebibliography} layouts into dynamic bibliography wrappers
-    clean = clean.replace(/\\begin{thebibliography}{[\s\S]*?}/gi, "<div style='margin-top: 1.5rem; border-top: 1px dashed #cbd5e1; padding-top: 1rem;'><strong>References & Bibliography:</strong><ul style='list-style-type: square; padding-left: 1.5rem;'>");
-    clean = clean.replace(/\\end{thebibliography}/gi, "</ul></div>");
+    clean = clean.replace(/\\begin{bibliography}{[\s\S]*?}/gi, "<div style='margin-top: 1.5rem; border-top: 1px dashed #cbd5e1; padding-top: 1rem;'><strong>References & Bibliography:</strong><ul style='list-style-type: square; padding-left: 1.5rem;'>");
+    clean = clean.replace(/\\end{bibliography}/gi, "</ul></div>");
+
+    // 5. Tabular \begin{tabular} environments into HTML tables with basic styling
+    clean = clean.replace(/\\begin\{tabular\}\{[^}]*\}([\s\S]*?)\\end\{tabular\}/gi, function(_, body) {
+        let rows = body
+            .replace(/\\hline/g, "")
+            .trim()
+            .split(/\\\\/)
+            .map(row => row.trim())
+            .filter(row => row.length > 0);
+
+        let htmlRows = rows.map((row, rowIndex) => {
+            let cells = row.split("&").map(cell => cell.trim());
+
+            let tag = rowIndex === 0 ? "th" : "td";
+
+            return `<tr>` + cells.map(cell => 
+                `<${tag} style="border:1px solid #cbd5e1; padding:0.4rem 0.6rem;">${cell}</${tag}>`
+            ).join("") + `</tr>`;
+        }).join("");
+
+        return `
+            <table style="border-collapse:collapse; margin:1rem 0; width:100%;">
+                ${htmlRows}
+            </table>
+        `;
+    });
 
     return clean;
 }

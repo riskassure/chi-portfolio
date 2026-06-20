@@ -1,0 +1,173 @@
+# backend/src/utils/math/step2_build_diagrams.py
+
+import sys
+import re
+import sqlite3
+import hashlib
+import subprocess
+from pathlib import Path
+from datetime import datetime
+
+SRC_DIR = Path(__file__).resolve().parents[2]
+sys.path.append(str(SRC_DIR))
+
+from config import DB_PATH, MATH_DIAGRAM_DIR, MATH_TEMP_DIR
+
+
+PSPICTURE_RE = re.compile(
+    r"\\begin\{pspicture\}[\s\S]*?\\end\{pspicture\}",
+    re.MULTILINE
+)
+
+
+def hash_block(block: str) -> str:
+    return hashlib.sha256(block.encode("utf-8")).hexdigest()[:16]
+
+
+def wrap_pstricks_document(ps_block: str) -> str:
+    return rf"""
+\documentclass{{article}}
+\usepackage{{pstricks}}
+\usepackage{{pst-plot}}
+\usepackage{{pst-node}}
+\usepackage{{multido}}
+\pagestyle{{empty}}
+\begin{{document}}
+{ps_block}
+\end{{document}}
+"""
+
+
+def convert_pstricks_to_svg(ps_block: str, source_hash: str) -> Path | None:
+    tex_path = MATH_TEMP_DIR / f"{source_hash}.tex"
+    dvi_path = MATH_TEMP_DIR / f"{source_hash}.dvi"
+    svg_path = MATH_DIAGRAM_DIR / f"{source_hash}.svg"
+
+    if svg_path.exists():
+        return svg_path
+
+    tex_path.write_text(wrap_pstricks_document(ps_block), encoding="utf-8")
+
+    try:
+        subprocess.run(
+            ["latex", "-interaction=nonstopmode", tex_path.name],
+            cwd=MATH_TEMP_DIR,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+
+        subprocess.run(
+            ["dvisvgm", dvi_path.name, "-o", str(svg_path)],
+            cwd=MATH_TEMP_DIR,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+
+        return svg_path
+
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Failed converting PSTricks block {source_hash}")
+        print(e.stderr or e.stdout)
+        return None
+
+
+def make_img_tag(svg_filename: str) -> str:
+    return (
+        f'<div class="math-diagram-wrap">'
+        f'<img src="http://127.0.0.1:5000/api/math/diagrams/{svg_filename}" '
+        f'class="math-diagram" '
+        f'alt="Mathematical diagram">'
+        f'</div>'
+    )
+
+
+def build_math_diagrams():
+    print("[STEP 2] Building PSTricks SVG diagrams...")
+
+    MATH_DIAGRAM_DIR.mkdir(parents=True, exist_ok=True)
+    MATH_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    cursor.execute("DROP TABLE IF EXISTS math_concept_diagrams;")
+    cursor.execute("""
+        CREATE TABLE math_concept_diagrams (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            concept_id INTEGER NOT NULL,
+            source_hash TEXT NOT NULL,
+            source_tex TEXT NOT NULL,
+            svg_path TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(concept_id) REFERENCES math_concepts(id) ON DELETE CASCADE,
+            UNIQUE(concept_id, source_hash)
+        );
+    """)
+
+    cursor.execute("SELECT id, cleaned_tex FROM math_concepts;")
+    rows = cursor.fetchall()
+
+    concept_count = 0
+    diagram_count = 0
+    failed_count = 0
+
+    for concept_id, cleaned_tex in rows:
+        if not cleaned_tex or "\\begin{pspicture}" not in cleaned_tex:
+            cursor.execute(
+                "UPDATE math_concepts SET rendered_tex = ? WHERE id = ?;",
+                (cleaned_tex, concept_id)
+            )
+            continue
+
+        concept_count += 1
+        rendered_tex = cleaned_tex
+
+        for ps_block in PSPICTURE_RE.findall(cleaned_tex):
+            source_hash = hash_block(ps_block)
+            svg_path = convert_pstricks_to_svg(ps_block, source_hash)
+
+            if svg_path:
+                svg_filename = svg_path.name
+                svg_url_path = f"/api/math/diagrams/{svg_filename}"
+
+                cursor.execute("""
+                    INSERT OR IGNORE INTO math_concept_diagrams
+                    (concept_id, source_hash, source_tex, svg_path, created_at)
+                    VALUES (?, ?, ?, ?, ?);
+                """, (
+                    concept_id,
+                    source_hash,
+                    ps_block,
+                    svg_url_path,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ))
+
+                rendered_tex = rendered_tex.replace(ps_block, make_img_tag(svg_filename))
+                diagram_count += 1
+
+            else:
+                failed_count += 1
+                rendered_tex = rendered_tex.replace(
+                    ps_block,
+                    '<div class="img-placeholder"><em>[Diagram conversion failed]</em></div>'
+                )
+
+        cursor.execute(
+            "UPDATE math_concepts SET rendered_tex = ? WHERE id = ?;",
+            (rendered_tex, concept_id)
+        )
+
+    conn.commit()
+    conn.close()
+
+    print(f"✅ [STEP 2] Complete.")
+    print(f"   Concepts with PSTricks: {concept_count}")
+    print(f"   Diagrams converted: {diagram_count}")
+    print(f"   Failed conversions: {failed_count}")
+
+
+if __name__ == "__main__":
+    build_math_diagrams()

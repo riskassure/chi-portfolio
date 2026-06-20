@@ -20,6 +20,9 @@ PHOTO_RAW_DIR = BACKEND_DIR / "data" / "photos" / "raw"
 MATH_DATA_DIR = BACKEND_DIR / "data" / "math"
 SOURCE_CSV_PATH = MATH_DATA_DIR / "msc_master_source.csv"
 
+MATH_DIAGRAM_DIR = MATH_DATA_DIR / "diagrams"
+MATH_TEMP_DIR = MATH_DATA_DIR / "temp"
+
 # Frontend Asset Targets
 PHOTO_TARGET_DIR = PROJECT_ROOT / "frontend" / "images" / "photography"
 
@@ -30,7 +33,9 @@ def verify_system_directories():
         MUSIC_PROCESSED_DIR, 
         PHOTO_RAW_DIR, 
         PHOTO_TARGET_DIR,
-        MATH_DATA_DIR
+        MATH_DATA_DIR,
+        MATH_DIAGRAM_DIR,
+        MATH_TEMP_DIR
     ]
     for d in dirs:
         if not d.exists():

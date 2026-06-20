@@ -34,3 +34,10 @@ backend/data/photos/raw/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# ==========================================================================
+# 🧮 MATHEMATICS GENERATED ASSETS
+# ==========================================================================
+# Block generated PSTricks/SVG conversion outputs and temporary LaTeX build files
+backend/data/math/diagrams/
+backend/data/math/temp/

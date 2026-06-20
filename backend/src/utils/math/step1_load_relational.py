@@ -147,7 +147,8 @@ def build_relational_tables():
             updated_at TEXT,                     
             owner TEXT,
             cleaned_tex TEXT,
-            is_cleaned INTEGER DEFAULT 0         -- 🌟 NEW: Maintain flag state across seeds
+            rendered_tex TEXT,
+            is_cleaned INTEGER DEFAULT 0
         );
     """)
     
@@ -190,9 +191,20 @@ def build_relational_tables():
             
         # 🌟 UPDATED SEED INGESTION: Passes default unverified state flag (0) during ingestion
         cursor.execute("""
-            INSERT INTO math_concepts (canonical_name, slug, title, created_at, updated_at, owner, cleaned_tex, is_cleaned)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-        """, (item["canonical_name"], item["slug"], item["title"], item["created"], item["modified"], item["owner"], item["cleaned_tex"]))
+            INSERT INTO math_concepts (
+                canonical_name, slug, title, created_at, updated_at, owner,
+                cleaned_tex, rendered_tex, is_cleaned
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0)
+        """, (
+            item["canonical_name"],
+            item["slug"],
+            item["title"],
+            item["created"],
+            item["modified"],
+            item["owner"],
+            item["cleaned_tex"]
+        ))
         concept_id = cursor.lastrowid
         
         # Populate Meta Tables

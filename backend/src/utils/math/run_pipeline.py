@@ -4,6 +4,7 @@ import time
 from math_classification_lookup import migrate_and_populate_classifications
 from step0_ingest_and_harvest import run_ingest_and_harvest
 from step1_load_relational import build_relational_tables
+from step2_build_diagrams import build_math_diagrams
 
 def main():
     print("====================================================")
@@ -24,7 +25,12 @@ def main():
     # PHASE 3: Relate components using strong cross-references and foreign keys
     print("📌 [PHASE 3] Compiling Relational Core Structures...")
     build_relational_tables()
+    print("-" * 50)
     
+    # PHASE 4: Build mathematical diagrams from PSTricks code
+    print("📌 [PHASE 4] Building PSTricks SVG diagrams...")
+    build_math_diagrams()
+
     end_time = time.time()
     elapsed = end_time - start_time
     print("\n====================================================")

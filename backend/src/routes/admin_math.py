@@ -4,13 +4,17 @@ import sqlite3
 import sys
 import re
 from datetime import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_from_directory
 
 # Locate backend/src/ to grab the database configuration parameters
 sys.path.append(str(sys.path[0] + '/..'))
-from config import DB_PATH
+from config import DB_PATH, MATH_DIAGRAM_DIR
 
 math_bp = Blueprint('math_bp', __name__)
+
+@math_bp.route("/api/math/diagrams/<path:filename>", methods=["GET"])
+def serve_math_diagram(filename):
+    return send_from_directory(MATH_DIAGRAM_DIR, filename)
 
 def generate_slug(canonical_name):
     if not canonical_name: return None
@@ -267,7 +271,8 @@ def get_math_concept_detail(slug):
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT mc.id, mc.title, mc.slug, mc.owner, mc.created_at, mc.updated_at, mc.cleaned_tex
+            SELECT mc.id, mc.title, mc.slug, mc.owner, mc.created_at, mc.updated_at,
+                   mc.cleaned_tex, mc.rendered_tex
             FROM math_concepts mc
             WHERE mc.slug = ?;
         """, (slug,))
@@ -280,8 +285,8 @@ def get_math_concept_detail(slug):
         concept_data = dict(concept_row)
         concept_id = concept_data["id"]
         
-        raw_tex = concept_data["cleaned_tex"]
-        concept_data["cleaned_tex"] = apply_math_autolinker(concept_id, raw_tex, cursor)
+        display_tex = concept_data["rendered_tex"] or concept_data["cleaned_tex"]
+        concept_data["display_tex"] = apply_math_autolinker(concept_id, display_tex, cursor)
 
         # Grab assigned types
         cursor.execute("""

@@ -135,6 +135,18 @@
     border: 1px solid #e2e8f0;
 }
 
+/* Ensure classification tags look like badges even as links */
+.math-tag.tag-msc {
+    text-decoration: none !important;
+    color: inherit; /* or your specific text color */
+    display: inline-block;
+}
+
+.math-tag.tag-msc:hover {
+    filter: brightness(90%); /* Adds a slight hover effect */
+    text-decoration: none;
+}
+
 .tag-msc {
     background: #e0f2fe;
     color: #0369a1;
