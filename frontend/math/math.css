@@ -270,3 +270,76 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
+
+/* Container must be relative so absolute alignment locks underneath it */
+.search-box-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+#searchBarInput {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+}
+
+/* The floating dropdown container styles */
+#searchDropdownMenu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 320px;
+    overflow-y: auto;
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    z-index: 999;
+    display: none; /* Kept hidden until toggled by JS */
+}
+
+/* Row-by-Row layouts inside the search container */
+.dropdown-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    color: #1e293b;
+    border-bottom: 1px solid #f1f5f9;
+    font-family: sans-serif;
+}
+
+.dropdown-item-row:last-child {
+    border-bottom: none;
+}
+
+/* Highlight the item blue when the user hovers over it */
+.dropdown-item-row:hover {
+    background-color: #f0f7ff;
+    color: #1d4ed8;
+}
+
+.dropdown-row-title {
+    font-weight: 500;
+}
+
+.dropdown-row-meta {
+    font-size: 0.8rem;
+    background-color: #f1f5f9;
+    color: #64748b;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.dropdown-no-results {
+    padding: 1rem;
+    color: #64748b;
+    font-style: italic;
+    text-align: center;
+}

@@ -7,10 +7,12 @@
     
     <script>
         window.MathJax = {
+            loader: {load: ['[tex]/ams', '[tex]/noerrors', '[tex]/noundefined']},
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
                 displayMath: [['$$', '$$'], ['\\[', '\\]']],
-                processEscapes: true
+                processEscapes: true,
+                packages: {'[+]': ['ams', 'noerrors', 'noundefined']}
             },
             options: {
                 ignoreHtmlClass: 'tex2jax_ignore',

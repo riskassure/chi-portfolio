@@ -10,7 +10,7 @@
     
     <script>
         window.MathJax = {
-            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+            tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']] }
         };
     </script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
@@ -33,19 +33,20 @@
         
         <div style="margin-bottom: 2rem;">
             <h1 style="font-size: 2rem; margin-bottom: 0.5rem; color: #0f172a;">Mathematics Library</h1>
-            <p style="color: #64748b; margin-bottom: 1.5rem;">Select a subject classification sector to explore related research notes, proofs, and concept breakdowns.</p>
+            <p style="color: #64748b; margin-bottom: 1.5rem;">Search for concepts across the entire library instantly, or choose a category below to browse matching papers.</p>
             
-            <div class="search-row">
-                <input type="text" id="classSearch" class="search-box" placeholder="Search subject classifications by code or name (e.g., 54C or Topology)...">
+            <div class="search-box-wrapper" style="position: relative; max-width: 600px;">
+                <input type="text" id="classSearch" class="search-box" placeholder="Type 3+ characters to search concepts or codes (e.g., group or 20K)..." autocomplete="off" style="width: 100%;">
+                <div id="searchDropdownMenu"></div>
             </div>
         </div>
 
         <div id="classCardGrid" class="class-card-grid">
-            <div class="msg-box">Loading subject classification card index...</div>
+            <div class="msg-box">Querying index classifications node map...</div>
         </div>
         
     </div>
 
-    <script src="math_catalog.js"></script>
+    <script src="math_index.js?v=999"></script>
 </body>
 </html>

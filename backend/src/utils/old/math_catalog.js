@@ -1,11 +1,9 @@
 // frontend/math/math_catalog.js
 
 const API_ENDPOINT = "http://127.0.0.1:5000/api";
-let cachedClassifications = [];
 
 document.addEventListener("DOMContentLoaded", () => {
     bootClassificationHub();
-    setupClassificationSearch();
 });
 
 async function bootClassificationHub() {
@@ -16,8 +14,7 @@ async function bootClassificationHub() {
         
         if (json.status !== "success") throw new Error(json.message);
         
-        cachedClassifications = json.data;
-        renderClassificationCards(cachedClassifications);
+        renderClassificationCards(json.data);
     } catch (err) {
         grid.innerHTML = `<div class="msg-box">Error loading subject index deck: ${err.message}</div>`;
     }
@@ -33,10 +30,10 @@ function renderClassificationCards(categories) {
     }
 
     categories.forEach(item => {
-        // Generate classification card anchor linking out to the item list view
         const card = document.createElement("a");
         card.className = "classification-card";
-        card.href = `list.html?classification=${encodeURIComponent(item.code)}`;
+        // Clean URL parameter handoff
+        card.href = `list.html?classification=${encodeURIComponent(item.code.trim())}`;
 
         card.innerHTML = `
             <span class="class-card-code">${item.code}</span>
@@ -46,23 +43,7 @@ function renderClassificationCards(categories) {
         grid.appendChild(card);
     });
 
-    // Invoke MathJax in case any classification description text strings utilize TeX strings
     if (window.MathJax && typeof window.MathJax.typesetPromise === "function") {
         window.MathJax.typesetPromise();
     }
-}
-
-function setupClassificationSearch() {
-    const searchInput = document.getElementById("classSearch");
-    
-    searchInput.addEventListener("input", (e) => {
-        const query = e.target.value.toLowerCase().trim();
-        
-        const filtered = cachedClassifications.filter(item => {
-            return item.code.toLowerCase().includes(query) || 
-                   item.text.toLowerCase().includes(query);
-        });
-
-        renderClassificationCards(filtered);
-    });
 }

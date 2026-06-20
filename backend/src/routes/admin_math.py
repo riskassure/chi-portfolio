@@ -22,13 +22,16 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     """
     Tokenizes LaTeX content to safely apply anchor tags ONLY within standard
     descriptive text blocks, leaving math mode and structural layouts untouched.
+    Uses an absolute positional index scanner to completely avoid string offset 
+    drift errors during regex execution.
     """
     if not tex_content:
         return ""
 
     # 1. Gather this specific document's database link exclusions
     db_cursor.execute("SELECT word FROM math_link_exclusions WHERE concept_id = ?;", (concept_id,))
-    local_exclusions = {row["word"].lower().strip() for row in db_cursor.fetchall()}
+    # Use index lookups row[0] to maintain database scope safety independently of row_factory styles
+    local_exclusions = {row[0].lower().strip() for row in db_cursor.fetchall()}
 
     # 2. Parse inline explicit macro overrides (\PMlinkescapeword{word})
     escaped_macros = re.findall(r'\\PMlinkescapeword\{([^}]+)\}', tex_content)
@@ -44,7 +47,7 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     # Base concept titles
     db_cursor.execute("SELECT id, title, slug FROM math_concepts WHERE id != ?;", (concept_id,))
     for row in db_cursor.fetchall():
-        targets[row["title"].lower().strip()] = row["slug"]
+        targets[row[1].lower().strip()] = row[2]
 
     # Platform Synonyms
     db_cursor.execute("""
@@ -54,7 +57,7 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
         WHERE ms.concept_id != ?;
     """, (concept_id,))
     for row in db_cursor.fetchall():
-        targets[row["synonym_text"].lower().strip()] = row["slug"]
+        targets[row[0].lower().strip()] = row[1]
 
     # Platform Defined Terms
     db_cursor.execute("""
@@ -64,7 +67,7 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
         WHERE md.concept_id != ?;
     """, (concept_id,))
     for row in db_cursor.fetchall():
-        targets[row["defined_term"].lower().strip()] = row["slug"]
+        targets[row[0].lower().strip()] = row[1]
 
     # Filter out target dictionary terms that match our calculated exclusion arrays
     active_targets = {k: v for k, v in targets.items() if k not in local_exclusions and len(k) > 2}
@@ -75,8 +78,11 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     # Sort phrase dictionary keys by character length descending
     sorted_phrases = sorted(active_targets.keys(), key=len, reverse=True)
 
+    # Compile a SINGLE Master Alternation Pattern of all dictionary terms
+    master_pattern_str = r'\b(' + '|'.join(re.escape(phrase) for phrase in sorted_phrases) + r')\b'
+    master_regex = re.compile(master_pattern_str, re.IGNORECASE)
+
     # 4. TOKENIZE ENGINE: Split the TeX string into safe text blocks vs sensitive math blocks
-    # Captures: $$...$$, $...$, \begin{env}...\end{env}, and backslash commands like \alpha
     token_pattern = re.compile(
         r'(\$\$.*?\$\$|\$.*?\$|\\begin\{.*?\}.*?\\end\{.*?\}|\\\w+)', 
         re.DOTALL | re.IGNORECASE
@@ -85,44 +91,50 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     chunks = token_pattern.split(tex_content)
     processed_chunks = []
 
-    # Locate this block inside apply_math_autolinker() in backend/src/routes/admin_math.py
     for chunk in chunks:
         # If the block is math syntax or macro declarations, bypass processing entirely
         if chunk.startswith('$') or chunk.startswith('\\'):
             processed_chunks.append(chunk)
             continue
         
-        # Otherwise, this chunk is safe descriptive text! Apply word boundaries
-        for phrase in sorted_phrases:
-            slug_target = active_targets[phrase]
+        # Safe text chunk loop processing: tracks dynamic string expansions using scanner positions
+        cursor_pos = 0
+        built_chunk = ""
+        
+        for match in master_regex.finditer(chunk):
+            start, end = match.start(), match.end()
+            matched_text = match.group(1)
+            matched_lower = matched_text.lower().strip()
+            slug_target = active_targets.get(matched_lower)
             
-            # 🌟 THE FIX: This pattern ensures we match the phrase ONLY if it is NOT:
-            # 1. Inside an href attribute: (?<!href=")(?<!slug=)
-            # 2. Already inside an existing HTML opening/closing tag property bracket: (?![^<>]*>)
-            # 3. Followed by a closing anchor tag without an opening one first: a negative lookahead
-            pattern = re.compile(
-                r'(?<!href=")(?<!slug=)\b(' + re.escape(phrase) + r')\b(?![^<>]*>)', 
-                re.IGNORECASE
-            )
+            # Catch up text from last checked point to current match
+            built_chunk += chunk[cursor_pos:start]
+            cursor_pos = end
             
-            # Double-check to ensure we aren't wrapping text that is already inside an <a> tag block
-            # We use a custom lambda substitution to check what's behind our match position
-            def safe_sub(match):
-                matched_text = match.group(1)
-                full_chunk_so_far = chunk[:match.start()]
+            if not slug_target:
+                built_chunk += matched_text
+                continue
                 
-                # Count if we are currently sitting between an unclosed <a and </a>
-                last_open_a = full_chunk_so_far.rfind("<a")
-                last_close_a = full_chunk_so_far.rfind("</a>")
+            # Perform a structural barrier inspection on the context built up so far
+            # Checking built_chunk gives us the exact current HTML state, preventing link injection anomalies
+            last_open_bracket = built_chunk.rfind("<")
+            last_close_bracket = built_chunk.rfind(">")
+            if last_open_bracket > last_close_bracket:
+                built_chunk += matched_text
+                continue
                 
-                if last_open_a > last_close_a:
-                    return matched_text # Inside an active link wrapper, leave it untouched!
-                    
-                return f'<a class="math-autolink" href="concept.html?slug={slug_target}">{matched_text}</a>'
-
-            chunk = pattern.sub(safe_sub, chunk)
+            last_open_a = built_chunk.rfind("<a")
+            last_close_a = built_chunk.rfind("</a>")
+            if last_open_a > last_close_a:
+                built_chunk += matched_text
+                continue
+                
+            # Safe to insert structured link tag
+            built_chunk += f'<a class="math-autolink" href="concept.html?slug={slug_target}">{matched_text}</a>'
             
-        processed_chunks.append(chunk)
+        # Append any remaining characters left in the text sequence
+        built_chunk += chunk[cursor_pos:]
+        processed_chunks.append(built_chunk)
 
     return "".join(processed_chunks)
 
@@ -181,20 +193,22 @@ def search_classifications_typeahead():
 
 @math_bp.route("/api/math/concepts", methods=["GET", "OPTIONS"])
 def get_math_concepts():
-    """Public read route to populate standard UI layouts/cards or filter down by specific codes."""
+    """Public read route to populate standard UI layouts/cards, filtering by specific codes or keyword query."""
     if request.method == "OPTIONS":
         return jsonify({"status": "CORS preflight ok"}), 200
 
     try:
         class_filter = request.args.get('classification', default=None, type=str)
+        search_query = request.args.get('q', default=None, type=str)
 
         conn = sqlite3.connect(str(DB_PATH))
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
+        # 🌟 FIXED: Removed the unsupported explicit separator from DISTINCT aggregates
         query_base = """
             SELECT 
-                mc.id, mc.title, mc.slug, mc.owner, mc.created_at, mc.updated_at,
+                mc.id, mc.title, mc.slug, mc.owner, mc.created_at, mc.updated_at, mc.is_cleaned,
                 GROUP_CONCAT(DISTINCT mt.type_name) AS type_names,
                 GROUP_CONCAT(DISTINCT mcl.code) AS classification_codes
             FROM math_concepts mc
@@ -203,11 +217,21 @@ def get_math_concepts():
             LEFT JOIN math_concept_classifications mcc ON mc.id = mcc.concept_id
             LEFT JOIN math_classifications mcl ON mcc.classification_id = mcl.id
         """
+        conditions = []
         params = []
         
         if class_filter:
-            query_base += " WHERE mc.id IN (SELECT concept_id FROM math_concept_classifications WHERE classification_id = (SELECT id FROM math_classifications WHERE code = ?))"
-            params.append(class_filter.upper())
+            conditions.append("mc.id IN (SELECT concept_id FROM math_concept_classifications WHERE classification_id = (SELECT id FROM math_classifications WHERE code = ?))")
+            params.append(class_filter.upper().strip())
+            
+        if search_query:
+            search_query = search_query.strip()
+            conditions.append("(mc.title LIKE ? OR mc.slug LIKE ? OR mcl.code LIKE ?)")
+            like_param = f"%{search_query}%"
+            params.extend([like_param, like_param, like_param])
+
+        if conditions:
+            query_base += " WHERE " + " AND ".join(conditions)
             
         query_base += """
             GROUP BY mc.id
@@ -218,6 +242,7 @@ def get_math_concepts():
         concepts = []
         for row in cursor.fetchall():
             d = dict(row)
+            # 🌟 FIXED: Reverted back to parsing standard comma-delimited strings safely
             d["types"] = d["type_names"].split(",") if d["type_names"] else []
             d["classification_codes"] = d["classification_codes"].split(",") if d["classification_codes"] else []
             d.pop("type_names", None)
@@ -251,6 +276,7 @@ def get_math_concept_detail(slug):
         if not concept_row:
             return jsonify({"status": "error", "message": "Concept not found."}), 404
             
+        # 🌟 FIXED: Converted the immutable row object to a dictionary BEFORE mutations!
         concept_data = dict(concept_row)
         concept_id = concept_data["id"]
         
@@ -304,6 +330,7 @@ def update_math_metadata():
         types = data.get("types", [])
         synonyms = data.get("synonyms", [])
         definitions = data.get("definitions", [])
+        is_cleaned_flag = data.get("is_cleaned", 0)
 
         if not concept_id or not updated_title or not updated_tex:
             return jsonify({"success": False, "message": "Missing required operational field values."}), 400
@@ -318,9 +345,9 @@ def update_math_metadata():
             # 1. Update Core Records
             cursor.execute("""
                 UPDATE math_concepts 
-                SET title = ?, cleaned_tex = ?, updated_at = ?
+                SET title = ?, cleaned_tex = ?, updated_at = ?, is_cleaned = ?
                 WHERE id = ?;
-            """, (updated_title, updated_tex, uniform_timestamp, concept_id))
+            """, (updated_title, updated_tex, uniform_timestamp, is_cleaned_flag, concept_id))
             
             # 2. Rebuild Relational Bridges Clear-and-Insert Pattern
             cursor.execute("DELETE FROM math_concept_classifications WHERE concept_id = ?;", (concept_id,))
@@ -377,6 +404,7 @@ def create_new_math_concept():
         types = data.get("types", [])
         synonyms = data.get("synonyms", [])
         definitions = data.get("definitions", [])
+        is_cleaned_flag = data.get("is_cleaned", 0)
 
         if not title or not raw_tex:
             return jsonify({"success": False, "message": "Title and LaTeX body fields are strictly required."}), 400
@@ -392,9 +420,9 @@ def create_new_math_concept():
 
             # Insert Core Entity
             cursor.execute("""
-                INSERT INTO math_concepts (canonical_name, slug, title, created_at, updated_at, owner, cleaned_tex)
-                VALUES (?, ?, ?, ?, ?, ?, ?);
-            """, (canonical_name, slug, title, uniform_timestamp, uniform_timestamp, owner, raw_tex))
+                INSERT INTO math_concepts (canonical_name, slug, title, created_at, updated_at, owner, cleaned_tex, is_cleaned)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """, (canonical_name, slug, title, uniform_timestamp, uniform_timestamp, owner, raw_tex, is_cleaned_flag))
             concept_id = cursor.lastrowid
 
             # Attach Relational Meta Maps

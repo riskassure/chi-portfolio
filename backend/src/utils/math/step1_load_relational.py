@@ -141,12 +141,13 @@ def build_relational_tables():
         CREATE TABLE math_concepts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             canonical_name TEXT NOT NULL UNIQUE,
-            slug TEXT NOT NULL,                  -- 🌟 Removed UNIQUE constraint for Phase 2 flexibility
+            slug TEXT NOT NULL,                  
             title TEXT NOT NULL,
-            created_at TEXT,                     -- Strict deterministic ISO string format
-            updated_at TEXT,                     -- 🌟 New modification log column added
+            created_at TEXT,                     
+            updated_at TEXT,                     
             owner TEXT,
-            cleaned_tex TEXT
+            cleaned_tex TEXT,
+            is_cleaned INTEGER DEFAULT 0         -- 🌟 NEW: Maintain flag state across seeds
         );
     """)
     
@@ -187,10 +188,10 @@ def build_relational_tables():
         if not item or not item["canonical_name"]: 
             continue
             
-        # 🌟 UPDATED SEED INGESTION: Passes both 'created' and 'modified' ISO values safely
+        # 🌟 UPDATED SEED INGESTION: Passes default unverified state flag (0) during ingestion
         cursor.execute("""
-            INSERT INTO math_concepts (canonical_name, slug, title, created_at, updated_at, owner, cleaned_tex)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO math_concepts (canonical_name, slug, title, created_at, updated_at, owner, cleaned_tex, is_cleaned)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
         """, (item["canonical_name"], item["slug"], item["title"], item["created"], item["modified"], item["owner"], item["cleaned_tex"]))
         concept_id = cursor.lastrowid
         

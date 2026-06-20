@@ -45,7 +45,7 @@ async function renderConceptPage(concept) {
             document.getElementById("topTypes").innerText = "None";
         }
 
-        // 2. #3 Classifications (Pulled cleanly straight from your backend's join arrays!)
+        // 2. #3 Classifications
         const classTarget = document.getElementById("topClassifications");
         const classArray = concept.classifications || [];
         if (classArray.length > 0) {
@@ -59,21 +59,29 @@ async function renderConceptPage(concept) {
         // 3. #4 Render Footers layout
         renderFooterArrays(concept);
 
-        // 4. #1 & #2 Process TeX payload directly inside the border frame container
+        // 4. #1 & #2 Process TeX payload
         let rawTexContent = concept.cleaned_tex || "No textual mathematical content saved.";
-        let preProcessedTex = cleanLaTeXEnvironments(rawTexContent);
+        
+        // --- START FIX: Prevent crash from unsupported pspicture ---
+        // This strips out the pspicture blocks and places a placeholder instead
+        let preProcessedTex = rawTexContent.replace(
+            /\\begin\{pspicture\}.*?\\end\{pspicture\}/gs, 
+            '<div class="img-placeholder" style="border: 1px dashed #ccc; padding: 10px; color: #666;"><em>[Diagram: Convert to SVG]</em></div>'
+        );
+        // --- END FIX ---
 
         const canvas = document.getElementById("mathContentCanvas");
         canvas.innerHTML = preProcessedTex;
 
-        // Trigger asynchronous MathJax 3 rendering sweep
-        if (window.MathJax) {
+        // --- CRITICAL: Trigger asynchronous MathJax 3 rendering ---
+        if (window.MathJax && typeof window.MathJax.typesetPromise === "function") {
+            // Clear previous MathJax rendering for this canvas
             if (typeof window.MathJax.typesetClear === "function") {
                 window.MathJax.typesetClear([canvas]);
             }
-            window.MathJax.startup.promise = window.MathJax.startup.promise
-                .then(() => window.MathJax.typesetPromise([canvas]))
-                .catch(err => console.error("MathJax conversion halted:", err));
+            
+            // Typeset the new content
+            await window.MathJax.typesetPromise([canvas]);
         }
 
     } catch (renderError) {
