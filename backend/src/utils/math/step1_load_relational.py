@@ -4,6 +4,7 @@ import sys
 import re
 import sqlite3
 from pathlib import Path
+from datetime import datetime
 
 SRC_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(SRC_DIR))
@@ -15,12 +16,46 @@ def generate_slug(canonical_name):
     s2 = re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1)
     return s2.lower().replace('_', '-').replace('--', '-')
 
+def normalize_to_iso_datetime(date_string):
+    """
+    Normalizes mixed legacy date configurations from PlanetMath macro blocks
+    into a uniform 'YYYY-MM-DD HH:MM:SS' string format.
+    """
+    if not date_string:
+        return None
+        
+    # Strip literal double/single quotes, commas, or outer spaces
+    cleaned = date_string.strip().strip('"').strip("'").strip()
+    
+    # Try parsing: YYYY-MM-DD HH:MM:SS
+    try:
+        dt = datetime.strptime(cleaned, "%Y-%m-%d %H:%M:%S")
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        pass
+
+    # Try parsing shorter style: YYYY-MM-DD
+    try:
+        dt = datetime.strptime(cleaned, "%Y-%m-%d")
+        return dt.strftime("%Y-%m-%d 00:00:00")
+    except ValueError:
+        pass
+
+    # Fallback to python-dateutil smart parsing if arbitrary text strings are hit
+    try:
+        from dateutil import parser
+        dt = parser.parse(cleaned)
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        # Final fallback: return current clock string if completely unparsable
+        return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
 def transform_latex_content(raw_content):
     """Processes a raw LaTeX string and extracts its semantic layers."""
     metadata = {
         "canonical_name": None, "slug": None, "title": None, "created": None,
-        "owner": None, "types": [], "defines": [], "synonyms": [],
-        "classifications": [], "escaped_words": []
+        "modified": None, "owner": None, "types": [], "defines": [], 
+        "synonyms": [], "classifications": [], "escaped_words": []
     }
     try:
         header_match = re.search(r'\\documentclass.*\\endmetadata', raw_content, re.DOTALL)
@@ -32,10 +67,23 @@ def transform_latex_content(raw_content):
         owner_match = re.search(r'\\pmowner\{([^}]+)\}', header_block) or re.search(r'\\pmauthor\{([^}]+)\}', header_block)
         created_match = re.search(r'\\pmcreated\{([^}]+)\}', header_block)
         
+        # 🌟 NEW ELEMENT EXTRACTION: Capture the updated modification macro
+        modified_match = re.search(r'\\pmmodified\{([^}]+)\}', header_block)
+        
         if canon_match: metadata["canonical_name"] = canon_match.group(1).strip()
         if title_match: metadata["title"] = title_match.group(1).strip()
         if owner_match: metadata["owner"] = owner_match.group(1).strip()
-        if created_match: metadata["created"] = created_match.group(1).strip()
+        
+        # Normalize timelines into strict ISO layout formats right during extraction
+        if created_match: 
+            metadata["created"] = normalize_to_iso_datetime(created_match.group(1))
+            
+        if modified_match:
+            metadata["modified"] = normalize_to_iso_datetime(modified_match.group(1))
+        else:
+            # Fallback policy: if no explicit modification tag is found, synchronize with creation
+            metadata["modified"] = metadata["created"]
+            
         metadata["slug"] = generate_slug(metadata["canonical_name"])
         
         # 1. Multi-Type Extract: Find all \pmtype{...} entries (e.g., Theorem, Proof)
@@ -44,14 +92,17 @@ def transform_latex_content(raw_content):
             
         # 2. Multi-Classification Extract: Handle exact \pmclassification{msc}{CODE} syntax
         for cl_type, cl_code in re.findall(r'\\pmclassification\{([^}]+)\}\s*\{([^}]+)\}', header_block):
-            clean_code = cl_code.strip().upper()
+            # 🌟 CLEAN FIX: Strip literal quote quotes out of classification keys
+            clean_code = cl_code.strip().replace('"', '').replace("'", "").upper()
             if clean_code:
                 metadata["classifications"].append(clean_code)
 
         # Fallback Check: Handle alternative legacy \pmclass block variants if present
         for cl_block in re.findall(r'\\pmclass\{([^}]+)\}', header_block):
             for raw_code in cl_block.split(','):
-                clean_code = re.sub(r'^(msc|msc2000|msc2010):', '', raw_code.strip(), flags=re.IGNORECASE)
+                # 🌟 CLEAN FIX: Strip literal quote codes out here too
+                stripped_code = raw_code.strip().replace('"', '').replace("'", "")
+                clean_code = re.sub(r'^(msc|msc2000|msc2010):', '', stripped_code, flags=re.IGNORECASE)
                 if clean_code:
                     metadata["classifications"].append(clean_code.upper())
 
@@ -85,14 +136,15 @@ def build_relational_tables():
     cursor.execute("DROP TABLE IF EXISTS math_link_exclusions;")
     cursor.execute("DROP TABLE IF EXISTS math_concepts;")
     
-    # 1. Primary Concept Table
+    # 1. Primary Concept Table (Upgraded for Phase 2 tracking)
     cursor.execute("""
         CREATE TABLE math_concepts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             canonical_name TEXT NOT NULL UNIQUE,
-            slug TEXT NOT NULL UNIQUE,
+            slug TEXT NOT NULL,                  -- 🌟 Removed UNIQUE constraint for Phase 2 flexibility
             title TEXT NOT NULL,
-            created_at TEXT,
+            created_at TEXT,                     -- Strict deterministic ISO string format
+            updated_at TEXT,                     -- 🌟 New modification log column added
             owner TEXT,
             cleaned_tex TEXT
         );
@@ -135,10 +187,11 @@ def build_relational_tables():
         if not item or not item["canonical_name"]: 
             continue
             
+        # 🌟 UPDATED SEED INGESTION: Passes both 'created' and 'modified' ISO values safely
         cursor.execute("""
-            INSERT INTO math_concepts (canonical_name, slug, title, created_at, owner, cleaned_tex)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (item["canonical_name"], item["slug"], item["title"], item["created"], item["owner"], item["cleaned_tex"]))
+            INSERT INTO math_concepts (canonical_name, slug, title, created_at, updated_at, owner, cleaned_tex)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (item["canonical_name"], item["slug"], item["title"], item["created"], item["modified"], item["owner"], item["cleaned_tex"]))
         concept_id = cursor.lastrowid
         
         # Populate Meta Tables

@@ -3,10 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Mathematics Archive - Chi-Chih Woo</title>
+    
     <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="math.css">
+    
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            },
+            options: {
+                processHtmlClass: 'concept-grid|card-title'
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
 </head>
 <body>
+
     <nav class="navbar">
         <div class="nav-brand">Chi-Chih Woo</div>
         <ul class="nav-links">
@@ -14,12 +29,38 @@
             <li><a href="../bio.html">Biography</a></li>
             <li><a href="../resume.html">Resume</a></li>
             <li><a href="../music/index.html">Music</a></li>
-            <li><a href="../math/index.html">Mathematics</a></li>
+            <li><a href="../math/index.html" class="active">Mathematics</a></li>
             <li><a href="../photography/index.html">Photography</a></li>
         </ul>
     </nav>
 
-    <h1>Mathematics Library</h1>
-    <p>This section will host research, notes, and LaTeX proofs for abstract algebra, topology, and logic.</p>
+    <div class="math-container">
+        
+        <aside class="math-sidebar">
+            <h3>Subject Classification</h3>
+            <ul id="mscList" class="msc-list">
+                <div class="msg-box">Loading indices...</div>
+            </ul>
+        </aside>
+
+        <main class="catalog-area">
+            
+            <div class="search-row">
+                <input type="text" id="archiveSearch" class="search-box" placeholder="Search proofs, axioms, and topological notes...">
+            </div>
+
+            <div id="filterBanner" class="filter-banner" style="display: none;">
+                <span id="filterLabel">Filtering by category</span>
+                <button id="clearFilter" class="clear-btn">Show All Concepts</button>
+            </div>
+
+            <div id="conceptGrid" class="concept-grid">
+                <div class="msg-box">Populating system catalog matrix...</div>
+            </div>
+            
+        </main>
+    </div>
+
+    <script src="math_catalog.js"></script>
 </body>
 </html>

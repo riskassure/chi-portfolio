@@ -1,0 +1,207 @@
+/* frontend/math/math.css */
+
+/* Panel Grid Layout to drop directly underneath your navbar layout */
+.math-container {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 2rem;
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
+
+/* Sidebar Styling */
+.math-sidebar {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+}
+
+.math-sidebar h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 0.5rem;
+}
+
+.msc-list { 
+    list-style: none; 
+    padding: 0; 
+}
+
+.msc-item {
+    padding: 0.6rem 0.75rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    gap: 0.5rem;
+    color: #334155;
+    transition: background 0.2s, color 0.2s;
+}
+
+.msc-item:hover { 
+    background: #f1f5f9; 
+    color: #2563eb; 
+}
+
+.msc-item.active { 
+    background: #eff6ff; 
+    color: #2563eb; 
+    font-weight: 600; 
+}
+
+.msc-code { 
+    font-family: monospace; 
+    font-weight: 600; 
+    color: #0f172a; 
+}
+
+/* Content Catalog Area */
+.catalog-area { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 1.5rem; 
+}
+
+.search-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+}
+
+.search-box {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    outline: none;
+    font-size: 0.95rem;
+}
+
+.search-box:focus { 
+    border-color: #2563eb; 
+}
+
+.filter-banner {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.clear-btn {
+    background: none;
+    border: none;
+    color: #2563eb;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.clear-btn:hover { 
+    text-decoration: underline; 
+}
+
+/* Concept Card Framework */
+.concept-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.concept-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.concept-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border-color: #cbd5e1;
+}
+
+.card-title { 
+    font-size: 1.15rem; 
+    font-weight: 600; 
+    margin-bottom: 0.5rem; 
+    color: #0f172a; 
+}
+
+.card-tags { 
+    display: flex; 
+    gap: 0.4rem; 
+    flex-wrap: wrap; 
+    margin-bottom: 1rem; 
+}
+
+.math-tag { 
+    font-size: 0.75rem; 
+    padding: 0.15rem 0.5rem; 
+    border-radius: 4px; 
+    font-weight: 500; 
+}
+
+.tag-type { 
+    background: #f1f5f9; 
+    color: #475569; 
+}
+
+.tag-msc { 
+    background: #e0f2fe; 
+    color: #0369a1; 
+    font-family: monospace; 
+}
+
+.card-meta {
+    font-size: 0.75rem;
+    color: #64748b;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+.msg-box { 
+    text-align: center; 
+    padding: 3rem; 
+    color: #64748b; 
+    font-size: 1rem; 
+    grid-column: 1 / -1; 
+}
+
+/* ⚡ Math Autolink styling used by the backend tokenizer engine */
+.math-autolink {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px dashed rgba(37, 99, 235, 0.4);
+    transition: color 0.1s, border-bottom-color 0.1s;
+}
+
+.math-autolink:hover {
+    color: #1d4ed8;
+    border-bottom-style: solid;
+    border-bottom-color: #1d4ed8;
+}
