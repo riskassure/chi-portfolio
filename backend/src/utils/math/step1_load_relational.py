@@ -54,7 +54,8 @@ def transform_latex_content(raw_content):
     """Processes a raw LaTeX string and extracts its semantic layers."""
     metadata = {
         "canonical_name": None, "slug": None, "title": None, "created": None,
-        "modified": None, "owner": None, "types": [], "defines": [], 
+        "modified": None, "owner": None, "types": [], "defines": [],
+        "related": [],
         "synonyms": [], "classifications": [], "escaped_words": []
     }
     try:
@@ -109,6 +110,8 @@ def transform_latex_content(raw_content):
         # Collect side arrays
         for d in re.findall(r'\\pmdefines\{([^}]+)\}', header_block):
             metadata["defines"].append(d.strip())
+        for r in re.findall(r'\\pmrelated\{([^}]+)\}', header_block):
+            metadata["related"].append(r.strip())
         for s in re.findall(r'\\pmsynonym\{([^}]+)\}', header_block):
             metadata["synonyms"].append(s.strip())
         for esc in re.findall(r'\\pmnolink\{([^}]+)\}', header_block):
@@ -135,6 +138,7 @@ def build_relational_tables():
     cursor.execute("DROP TABLE IF EXISTS math_definitions;")
     cursor.execute("DROP TABLE IF EXISTS math_link_exclusions;")
     cursor.execute("DROP TABLE IF EXISTS math_concepts;")
+    cursor.execute("DROP TABLE IF EXISTS math_related_concepts;")
     
     # 1. Primary Concept Table (Upgraded for Phase 2 tracking)
     cursor.execute("""
@@ -179,6 +183,21 @@ def build_relational_tables():
     cursor.execute("CREATE TABLE math_definitions (id INTEGER PRIMARY KEY, concept_id INTEGER, defined_term TEXT, FOREIGN KEY(concept_id) REFERENCES math_concepts(id) ON DELETE CASCADE);")
     cursor.execute("CREATE TABLE math_link_exclusions (id INTEGER PRIMARY KEY, concept_id INTEGER, word TEXT, FOREIGN KEY(concept_id) REFERENCES math_concepts(id) ON DELETE CASCADE);")
     
+    cursor.execute("""
+        CREATE TABLE math_related_concepts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            concept_id INTEGER NOT NULL,
+            related_canonical_name TEXT NOT NULL,
+            related_concept_id INTEGER,
+            FOREIGN KEY(concept_id)
+                REFERENCES math_concepts(id)
+                ON DELETE CASCADE,
+            FOREIGN KEY(related_concept_id)
+                REFERENCES math_concepts(id)
+                ON DELETE SET NULL
+        );
+    """)
+    
     # Process staging items
     cursor.execute("SELECT file_name, raw_content FROM stg_math_import;")
     staged_rows = cursor.fetchall()
@@ -214,6 +233,15 @@ def build_relational_tables():
             cursor.execute("INSERT INTO math_definitions (concept_id, defined_term) VALUES (?, ?)", (concept_id, d_term))
         for word in item["escaped_words"]:
             cursor.execute("INSERT INTO math_link_exclusions (concept_id, word) VALUES (?, ?)", (concept_id, word))
+
+        for rel in item["related"]:
+            cursor.execute("""
+                INSERT INTO math_related_concepts (
+                    concept_id,
+                    related_canonical_name
+                )
+                VALUES (?, ?)
+            """, (concept_id, rel))
             
         # Map Multiple Document Types via Bridge Table using Step 0's on-the-fly master table
         for t_name in item["types"]:
@@ -241,6 +269,31 @@ def build_relational_tables():
                 """, (concept_id, row[0]))
                 
         processed_count += 1
+
+        cursor.execute("""
+            UPDATE math_related_concepts
+            SET related_concept_id =
+                (
+                    SELECT mc.id
+                        FROM math_concepts mc
+                        WHERE mc.canonical_name =
+                            math_related_concepts.related_canonical_name
+                )
+            WHERE related_concept_id IS NULL;
+        """)
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM math_related_concepts
+            WHERE related_concept_id IS NULL
+        """)
+
+        unresolved = cursor.fetchone()[0]
+
+        print(
+            f"✅ Related concept links resolved. "
+            f"Unresolved references: {unresolved}"
+        )
 
     conn.commit()
     conn.close()

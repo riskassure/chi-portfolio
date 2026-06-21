@@ -308,6 +308,22 @@ def get_math_concept_detail(slug):
         
         cursor.execute("SELECT defined_term FROM math_definitions WHERE concept_id = ?;", (concept_id,))
         concept_data["definitions"] = [r["defined_term"] for r in cursor.fetchall()]
+
+        # Grab related concepts that exist in this local database
+        cursor.execute("""
+            SELECT
+                rc.related_concept_id AS id,
+                mc.title,
+                mc.canonical_name,
+                mc.slug
+            FROM math_related_concepts rc
+            JOIN math_concepts mc
+                ON mc.id = rc.related_concept_id
+            WHERE rc.concept_id = ?
+            ORDER BY mc.title ASC;
+        """, (concept_id,))
+
+        concept_data["related_concepts"] = [dict(r) for r in cursor.fetchall()]
         
         return jsonify({"status": "success", "data": concept_data}), 200
     except sqlite3.Error as e:
