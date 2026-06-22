@@ -355,3 +355,21 @@
     font-style: italic;
     text-align: center;
 }
+
+.editor-label {
+    display: block;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 0.35rem;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 950px) {
+    #mathEditorForm [style*="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    #mathEditorForm [style*="grid-template-columns: repeat(2"] {
+        grid-template-columns: 1fr !important;
+    }
+}

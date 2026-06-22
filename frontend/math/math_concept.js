@@ -87,6 +87,8 @@ async function renderConceptPage(concept) {
             await window.MathJax.typesetPromise([canvas]);
         }
 
+        await hydrateConceptAdminControls(concept);
+
     } catch (renderError) {
         console.error("Crash during DOM parsing:", renderError);
         document.getElementById("mathContentCanvas").innerHTML = `Parsing Error: ${renderError.message}`;
@@ -171,5 +173,34 @@ function renderFooterArrays(concept) {
             }).join('');
     } else {
         document.getElementById("bottomRelated").innerText = "None";
+    }
+}
+
+async function hydrateConceptAdminControls(concept) {
+    const adminControls = document.getElementById("conceptAdminControls");
+    const editBtn = document.getElementById("editConceptBtn");
+
+    if (!adminControls || !editBtn || !concept || !concept.id) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_ENDPOINT}/admin/math/concepts/${encodeURIComponent(concept.id)}`, {
+            credentials: "include"
+        });
+
+        const json = await response.json();
+
+        if (!response.ok || json.status !== "success") {
+            adminControls.style.display = "none";
+            return;
+        }
+
+        editBtn.href = `edit.html?id=${encodeURIComponent(concept.id)}`;
+        adminControls.style.display = "flex";
+
+    } catch (err) {
+        console.warn("Admin controls unavailable:", err);
+        adminControls.style.display = "none";
     }
 }

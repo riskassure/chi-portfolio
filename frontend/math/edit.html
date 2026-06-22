@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Mathematical Concept</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="math.css?v=2.2">
+
+    <script>
+        window.MathJax = {
+            loader: {load: ['[tex]/ams', '[tex]/noerrors', '[tex]/noundefined', '[tex]/textmacros']},
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                packages: {'[+]': ['ams', 'noerrors', 'noundefined', 'textmacros']}
+            },
+            options: {
+                ignoreHtmlClass: 'tex2jax_ignore',
+                processHtmlClass: 'tex2jax_process'
+            }
+        };
+    </script>
+
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body
+    class="tex2jax_ignore"
+    data-editor-mode="edit"
+    style="font-family: system-ui, sans-serif; background-color: #f8fafc; margin: 0; padding: 2rem;"
+>
+
+    <div style="max-width: 1500px; margin: 0 auto;">
+        <div class="nav-btn-row" style="margin-bottom: 1rem;">
+            <button class="btn-secondary" id="cancelEditorBtn" type="button">← Back</button>
+            <a href="index.html" class="btn-secondary">Main Directory Index 🏠</a>
+        </div>
+
+        <h1 id="editorPageTitle" style="font-size: 2rem; color: #0f172a; margin: 0 0 0.5rem 0; font-weight: 800;">
+            Edit Math Concept
+        </h1>
+
+        <div id="editorMetadata" style="font-size: 0.9rem; color: #64748b; margin-bottom: 1rem;"></div>
+
+        <div id="editorStatus" style="display: none;"></div>
+
+        <form id="mathEditorForm">
+            <input type="hidden" id="conceptIdInput">
+
+            <section style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 2px rgba(15,23,42,0.06); margin-bottom: 1.25rem;">
+                <h2 style="margin: 0 0 1rem 0; color: #0f172a; font-size: 1.25rem;">Metadata</h2>
+
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 1rem;">
+                    <div>
+                        <label class="editor-label" for="conceptTitleInput">Title</label>
+                        <input id="conceptTitleInput" class="search-box" type="text" style="width: 100%;">
+                    </div>
+
+                    <div>
+                        <label class="editor-label" for="ownerInput">Owner</label>
+                        <input id="ownerInput" class="search-box" type="text" style="width: 100%;">
+                    </div>
+
+                    <div>
+                        <label class="editor-label" for="classificationsInput">Classifications, comma-separated</label>
+                        <input
+                            id="classificationsInput"
+                            class="search-box"
+                            type="text"
+                            list="classificationOptions"
+                            placeholder="20K25, 54C30"
+                            style="width: 100%;"
+                        >
+                        <datalist id="classificationOptions"></datalist>
+                    </div>
+
+                    <div>
+                        <label class="editor-label" for="typesInput">Document Types, comma-separated</label>
+                        <input
+                            id="typesInput"
+                            class="search-box"
+                            type="text"
+                            list="typeOptions"
+                            placeholder="Definition, Theorem, Proof"
+                            style="width: 100%;"
+                        >
+                        <datalist id="typeOptions"></datalist>
+                    </div>
+
+                    <div>
+                        <label class="editor-label" for="synonymsInput">Synonyms, comma-separated</label>
+                        <input id="synonymsInput" class="search-box" type="text" style="width: 100%;">
+                    </div>
+
+                    <div>
+                        <label class="editor-label" for="definitionsInput">Other Concepts Defined Here, comma-separated</label>
+                        <input id="definitionsInput" class="search-box" type="text" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label class="editor-label" for="relatedConceptsInput">Related Concepts, comma-separated canonical names</label>
+                        <input
+                            id="relatedConceptsInput"
+                            class="search-box"
+                            type="text"
+                            placeholder="Group, TopologicalSpace, MetricSpace"
+                            style="width: 100%;"
+                        >
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-top: 1rem; flex-wrap: wrap;">
+                    <div style="font-size: 0.85rem; color: #64748b;">
+                        <strong>Slug:</strong> <span id="slugPreview">--</span>
+                    </div>
+
+                    <label style="display: flex; align-items: center; gap: 0.5rem; color: #334155; font-weight: 600;">
+                        <input id="isCleanedInput" type="checkbox">
+                        Mark as cleaned/reviewed
+                    </label>
+                </div>
+            </section>
+
+            <section style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 2px rgba(15,23,42,0.06); margin-bottom: 1.25rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 0.8rem; flex-wrap: wrap;">
+                    <div>
+                        <h2 style="margin: 0; color: #0f172a; font-size: 1.25rem;">
+                            Source Comparison
+                        </h2>
+
+                        <div style="font-size: 0.82rem; color: #64748b; margin-top: 0.25rem;">
+                            <strong>Original file:</strong> <span id="sourceFileName">--</span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                        <button
+                            type="button"
+                            data-reference-source="raw"
+                            style="border: 1px solid #cbd5e1; background: #ffffff; color: #334155; border-radius: 6px; padding: 0.45rem 0.7rem; font-weight: 700; cursor: pointer;"
+                        >
+                            Raw TeX
+                        </button>
+
+                        <button
+                            type="button"
+                            data-reference-source="rendered"
+                            style="border: 1px solid #cbd5e1; background: #ffffff; color: #334155; border-radius: 6px; padding: 0.45rem 0.7rem; font-weight: 700; cursor: pointer;"
+                        >
+                            Rendered TeX
+                        </button>
+
+                        <button
+                            type="button"
+                            data-reference-source="diagnostics"
+                            style="display: none; border: 1px solid #cbd5e1; background: #ffffff; color: #334155; border-radius: 6px; padding: 0.45rem 0.7rem; font-weight: 700; cursor: pointer;"
+                        >
+                            Diagram Diagnostics
+                        </button>
+
+                        <button
+                            type="button"
+                            id="copyReferenceBtn"
+                            style="border: 1px solid #cbd5e1; background: #f8fafc; color: #334155; border-radius: 6px; padding: 0.45rem 0.7rem; font-weight: 700; cursor: pointer;"
+                        >
+                            Copy Reference
+                        </button>
+                    </div>
+                </div>
+
+                <div id="diagramFailureSummary" style="margin-bottom: 1rem;"></div>
+
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem;">
+                    <div>
+                        <label class="editor-label" for="cleanedTexInput">
+                            Cleaned TeX — editable
+                        </label>
+
+                        <textarea
+                            id="cleanedTexInput"
+                            style="width: 100%; min-height: 620px; font-family: Consolas, 'Courier New', monospace; font-size: 0.95rem; line-height: 1.45; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.9rem;"
+                        ></textarea>
+                    </div>
+
+                    <div>
+                        <label class="editor-label" for="referenceTexViewer">
+                            <span id="referenceTexLabel">Raw TeX Source</span> — read only
+                        </label>
+
+                        <textarea
+                            id="referenceTexViewer"
+                            readonly
+                            style="width: 100%; min-height: 620px; font-family: Consolas, 'Courier New', monospace; font-size: 0.95rem; line-height: 1.45; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.9rem; background: #f8fafc; color: #334155;"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem;">
+                    <button
+                        id="saveEditorBtn"
+                        type="submit"
+                        style="background: #2563eb; color: #ffffff; border: none; border-radius: 6px; padding: 0.75rem 1.2rem; font-weight: 700; cursor: pointer;"
+                    >
+                        Save Changes
+                    </button>
+                </div>
+            </section>
+
+            <section style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 2px rgba(15,23,42,0.06);">
+                <h2 style="margin: 0 0 1rem 0; color: #0f172a; font-size: 1.25rem;">Live Preview</h2>
+
+                <div
+                    id="editorPreviewCanvas"
+                    class="math-canvas-frame tex2jax_process"
+                    style="min-height: 360px; overflow: auto;"
+                >
+                    Preview loading...
+                </div>
+            </section>
+        </form>
+    </div>
+
+    <script src="../navbar.js"></script>
+    <script src="math_editor.js?v=1.1"></script>
+</body>
+</html>

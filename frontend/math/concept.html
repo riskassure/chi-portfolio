@@ -28,9 +28,30 @@
 
     <div style="max-width: 900px; margin: 0 auto; background: #ffffff; padding: 2.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
         
-        <div class="nav-btn-row">
-            <button class="btn-secondary" onclick="history.back()">← Back to List</button>
-            <a href="index.html" class="btn-secondary">Main Directory Index 🏠</a>
+        <div class="nav-btn-row" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button class="btn-secondary" onclick="history.back()">← Back to List</button>
+                <a href="index.html" class="btn-secondary">Main Directory Index 🏠</a>
+            </div>
+
+            <div id="conceptAdminControls" style="display: none; gap: 0.5rem; flex-wrap: wrap;">
+                <a
+                    id="editConceptBtn"
+                    href="#"
+                    class="btn-secondary"
+                    style="background: #2563eb; color: #ffffff; border-color: #2563eb;"
+                >
+                    Edit Concept
+                </a>
+
+                <a
+                    href="create.html"
+                    class="btn-secondary"
+                    style="background: #ffffff; color: #2563eb; border-color: #93c5fd;"
+                >
+                    New Concept
+                </a>
+            </div>
         </div>
 
         <h1 id="conceptTitle" style="font-size: 2.5rem; color: #0f172a; margin-top: 0; margin-bottom: 1.5rem; font-weight: 800;">Loading Concept...</h1>
@@ -74,6 +95,6 @@
 
     </div>
 
-    <script src="../navbar.js"></script><script src="math_concept.js?v=1.0"></script>
+    <script src="../navbar.js"></script><script src="math_concept.js?v=1.1"></script>
 </body>
 </html>
