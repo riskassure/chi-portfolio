@@ -364,6 +364,102 @@
     font-size: 0.9rem;
 }
 
+.chip-picker {
+    position: relative;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.35rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.chip-picker:focus-within {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.chip-remove {
+    border: none;
+    background: transparent;
+    color: #1d4ed8;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+}
+
+.chip-input {
+    min-width: 12rem;
+    flex: 1;
+    border: none;
+    outline: none;
+    padding: 0.35rem;
+    font-size: 0.95rem;
+}
+
+.chip-suggestions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 0.25rem);
+    z-index: 50;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+    max-height: 16rem;
+    overflow-y: auto;
+    display: none;
+}
+
+.chip-suggestion {
+    padding: 0.6rem 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.chip-suggestion:last-child {
+    border-bottom: none;
+}
+
+.chip-suggestion:hover,
+.chip-suggestion.active {
+    background: #eff6ff;
+}
+
+.chip-suggestion-main {
+    font-weight: 800;
+    color: #1e293b;
+}
+
+.chip-suggestion-sub {
+    margin-top: 0.15rem;
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
 @media (max-width: 950px) {
     #mathEditorForm [style*="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)"] {
         grid-template-columns: 1fr !important;

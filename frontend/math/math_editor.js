@@ -13,11 +13,19 @@ let currentRenderedTex = "";
 let currentDiagramFailures = [];
 let currentReferenceMode = "raw";
 
+let classificationChipPicker = null;
+let typeChipPicker = null;
+
+let classificationOptions = [];
+let typeOptions = [];
+
 document.addEventListener("DOMContentLoaded", () => {
     bootMathEditor();
 });
 
 async function bootMathEditor() {
+    initializeChipPickers();
+
     wireEditorEvents();
     await hydrateLookups();
 
@@ -87,51 +95,370 @@ function wireEditorEvents() {
     }
 }
 
-async function hydrateLookups() {
-    await Promise.allSettled([
-        hydrateTypeOptions(),
-        hydrateClassificationOptions()
-    ]);
+function initializeChipPickers() {
+    classificationChipPicker = createChipPicker({
+        inputId: "classificationChipInput",
+        chipListId: "classificationChipList",
+        suggestionsId: "classificationSuggestions",
+        hiddenInputId: "classificationsInput",
+        getOptions: () => classificationOptions
+    });
+
+    typeChipPicker = createChipPicker({
+        inputId: "typeChipInput",
+        chipListId: "typeChipList",
+        suggestionsId: "typeSuggestions",
+        hiddenInputId: "typesInput",
+        getOptions: () => typeOptions
+    });
 }
 
-async function hydrateTypeOptions() {
-    const datalist = document.getElementById("typeOptions");
-    if (!datalist) return;
+function normalizeClassificationOptions(raw) {
+    const rows = Array.isArray(raw)
+        ? raw
+        : raw.classifications || raw.results || raw.data || [];
 
-    try {
-        const response = await fetch(`${API_ENDPOINT}/admin/math/types`, {
-            credentials: "include"
+    return rows
+        .map(item => {
+            if (typeof item === "string") {
+                return {
+                    value: item,
+                    label: item,
+                    sublabel: ""
+                };
+            }
+
+            const code =
+                item.classification ||
+                item.classification_code ||
+                item.code ||
+                item.name ||
+                "";
+
+            const title =
+                item.classification_name ||
+                item.classification_title ||
+                item.title ||
+                item.text ||
+                item.description ||
+                "";
+
+            return {
+                value: code,
+                label: title ? `${code} — ${title}` : code,
+                sublabel: title
+            };
+        })
+        .filter(option => option.value);
+}
+
+
+function normalizeTypeOptions(raw) {
+    const rows = Array.isArray(raw)
+        ? raw
+        : raw.types || raw.results || raw.data || [];
+
+    return rows
+        .map(item => {
+            if (typeof item === "string") {
+                return {
+                    value: item,
+                    label: item,
+                    sublabel: ""
+                };
+            }
+
+            const value =
+                item.type_name ||
+                item.type ||
+                item.name ||
+                item.title ||
+                "";
+
+            return {
+                value,
+                label: value,
+                sublabel: item.description || ""
+            };
+        })
+        .filter(option => option.value);
+}
+
+function createChipPicker(config) {
+    const input = document.getElementById(config.inputId);
+    const chipList = document.getElementById(config.chipListId);
+    const suggestions = document.getElementById(config.suggestionsId);
+    const hiddenInput = document.getElementById(config.hiddenInputId);
+
+    let selectedValues = [];
+    let activeSuggestionIndex = -1;
+    let visibleSuggestions = [];
+
+    function normalizeValue(value) {
+        return String(value || "").trim();
+    }
+
+    function syncHiddenInput() {
+        if (hiddenInput) {
+            hiddenInput.value = selectedValues.join(", ");
+        }
+    }
+
+    function renderChips() {
+        chipList.innerHTML = "";
+
+        selectedValues.forEach(value => {
+            const chip = document.createElement("span");
+            chip.className = "chip";
+
+            const label = document.createElement("span");
+            label.textContent = value;
+
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.className = "chip-remove";
+            removeBtn.textContent = "×";
+            removeBtn.setAttribute("aria-label", `Remove ${value}`);
+
+            removeBtn.addEventListener("click", () => {
+                selectedValues = selectedValues.filter(v => v !== value);
+                renderChips();
+                syncHiddenInput();
+                input.focus();
+            });
+
+            chip.appendChild(label);
+            chip.appendChild(removeBtn);
+            chipList.appendChild(chip);
         });
 
-        const json = await response.json();
-
-        if (json.status !== "success") return;
-
-        datalist.innerHTML = json.data
-            .map(typeName => `<option value="${escapeHtml(typeName)}"></option>`)
-            .join("");
-
-    } catch (err) {
-        console.warn("Unable to load math type suggestions:", err);
+        chipList.appendChild(input);
+        syncHiddenInput();
     }
+
+    function addValue(value) {
+        const cleanValue = normalizeValue(value);
+
+        if (!cleanValue) {
+            return;
+        }
+
+        const alreadyExists = selectedValues.some(v => {
+            return v.toLowerCase() === cleanValue.toLowerCase();
+        });
+
+        if (!alreadyExists) {
+            selectedValues.push(cleanValue);
+        }
+
+        input.value = "";
+        hideSuggestions();
+        renderChips();
+    }
+
+    function hideSuggestions() {
+        suggestions.style.display = "none";
+        suggestions.innerHTML = "";
+        activeSuggestionIndex = -1;
+        visibleSuggestions = [];
+    }
+
+    function renderSuggestions() {
+        const query = input.value.trim().toLowerCase();
+
+        if (!query) {
+            hideSuggestions();
+            return;
+        }
+
+        const options = config.getOptions();
+
+        visibleSuggestions = options
+            .filter(option => {
+                const value = String(option.value || "").toLowerCase();
+                const label = String(option.label || "").toLowerCase();
+                const sublabel = String(option.sublabel || "").toLowerCase();
+
+                const alreadySelected = selectedValues.some(v => {
+                    return v.toLowerCase() === String(option.value || "").toLowerCase();
+                });
+
+                return !alreadySelected && (
+                    value.includes(query) ||
+                    label.includes(query) ||
+                    sublabel.includes(query)
+                );
+            })
+            .slice(0, 12);
+
+        if (visibleSuggestions.length === 0) {
+            hideSuggestions();
+            return;
+        }
+
+        suggestions.innerHTML = "";
+
+        visibleSuggestions.forEach((option, index) => {
+            const row = document.createElement("div");
+            row.className = "chip-suggestion";
+
+            if (index === activeSuggestionIndex) {
+                row.classList.add("active");
+            }
+
+            const main = document.createElement("div");
+            main.className = "chip-suggestion-main";
+            main.textContent = option.label || option.value;
+
+            row.appendChild(main);
+
+            if (option.sublabel) {
+                const sub = document.createElement("div");
+                sub.className = "chip-suggestion-sub";
+                sub.textContent = option.sublabel;
+                row.appendChild(sub);
+            }
+
+            row.addEventListener("mousedown", event => {
+                event.preventDefault();
+                addValue(option.value);
+            });
+
+            suggestions.appendChild(row);
+        });
+
+        suggestions.style.display = "block";
+    }
+
+    input.addEventListener("input", () => {
+        activeSuggestionIndex = -1;
+        renderSuggestions();
+    });
+
+    input.addEventListener("keydown", event => {
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+
+            if (visibleSuggestions.length > 0) {
+                activeSuggestionIndex =
+                    (activeSuggestionIndex + 1) % visibleSuggestions.length;
+                renderSuggestions();
+            }
+
+            return;
+        }
+
+        if (event.key === "ArrowUp") {
+            event.preventDefault();
+
+            if (visibleSuggestions.length > 0) {
+                activeSuggestionIndex =
+                    activeSuggestionIndex <= 0
+                        ? visibleSuggestions.length - 1
+                        : activeSuggestionIndex - 1;
+                renderSuggestions();
+            }
+
+            return;
+        }
+
+        if (event.key === "Enter") {
+            event.preventDefault();
+
+            if (
+                activeSuggestionIndex >= 0 &&
+                visibleSuggestions[activeSuggestionIndex]
+            ) {
+                addValue(visibleSuggestions[activeSuggestionIndex].value);
+            } else if (visibleSuggestions.length === 1) {
+                addValue(visibleSuggestions[0].value);
+            } else {
+                addValue(input.value);
+            }
+
+            return;
+        }
+
+        if (event.key === "," || event.key === "Tab") {
+            if (input.value.trim()) {
+                event.preventDefault();
+                addValue(input.value);
+            }
+
+            return;
+        }
+
+        if (
+            event.key === "Backspace" &&
+            !input.value &&
+            selectedValues.length > 0
+        ) {
+            selectedValues.pop();
+            renderChips();
+            syncHiddenInput();
+        }
+    });
+
+    input.addEventListener("blur", () => {
+        setTimeout(() => {
+            hideSuggestions();
+        }, 150);
+    });
+
+    return {
+        setValues(values) {
+            selectedValues = Array.from(new Set(
+                (values || [])
+                    .map(normalizeValue)
+                    .filter(Boolean)
+            ));
+
+            renderChips();
+        },
+
+        getValues() {
+            return [...selectedValues];
+        },
+
+        addValue,
+
+        clear() {
+            selectedValues = [];
+            input.value = "";
+            hideSuggestions();
+            renderChips();
+        }
+    };
 }
 
-async function hydrateClassificationOptions() {
-    const datalist = document.getElementById("classificationOptions");
-    if (!datalist) return;
-
+async function hydrateLookups() {
     try {
-        const response = await fetch(`${API_ENDPOINT}/math/classifications`);
-        const json = await response.json();
+        const [classificationResponse, typeResponse] = await Promise.all([
+            fetch(`${API_ENDPOINT}/math/classifications`),
+            fetch(`${API_ENDPOINT}/admin/math/types`, {
+                credentials: "include"
+            })
+        ]);
 
-        if (json.status !== "success") return;
+        const classificationJson = await classificationResponse.json();
+        const typeJson = await typeResponse.json();
 
-        datalist.innerHTML = json.data
-            .map(item => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.text)}</option>`)
-            .join("");
+        if (classificationJson.status === "success") {
+            classificationOptions = normalizeClassificationOptions(classificationJson);
+        } else {
+            classificationOptions = [];
+        }
+
+        if (typeJson.status === "success") {
+            typeOptions = normalizeTypeOptions(typeJson);
+        } else {
+            typeOptions = [];
+        }
 
     } catch (err) {
-        console.warn("Unable to load classification suggestions:", err);
+        console.warn("Unable to load chip picker suggestions:", err);
+        classificationOptions = [];
+        typeOptions = [];
     }
 }
 
@@ -149,6 +476,14 @@ function setDefaultCreateState() {
     currentRawTex = "";
     currentRenderedTex = "";
     currentDiagramFailures = [];
+
+    if (classificationChipPicker) {
+        classificationChipPicker.setValues([]);
+    }
+
+    if (typeChipPicker) {
+        typeChipPicker.setValues([]);
+    }
 
     updateSlugPreview();
     setReferenceView("raw");
@@ -182,11 +517,13 @@ async function hydrateConceptForEdit(id) {
         document.getElementById("cleanedTexInput").value = concept.cleaned_tex || "";
         document.getElementById("isCleanedInput").checked = Number(concept.is_cleaned || 0) === 1;
 
-        document.getElementById("classificationsInput").value = csvFromArray(
-            (concept.classifications || []).map(item => item.code)
+        classificationChipPicker.setValues(
+            (concept.classifications || []).map(item => {
+                return item.code || item.classification_code || item.classification || item;
+            })
         );
 
-        document.getElementById("typesInput").value = csvFromArray(concept.types || []);
+        typeChipPicker.setValues(concept.types || []);
         document.getElementById("synonymsInput").value = csvFromArray(concept.synonyms || []);
         document.getElementById("definitionsInput").value = csvFromArray(concept.definitions || []);
         document.getElementById("relatedConceptsInput").value = csvFromArray(
@@ -259,8 +596,8 @@ async function saveEditorPayload() {
         title,
         owner: document.getElementById("ownerInput").value.trim() || "CWoo",
         cleaned_tex: cleanedTex,
-        classifications: parseCsvInput("classificationsInput"),
-        types: parseCsvInput("typesInput"),
+        classifications: classificationChipPicker.getValues(),
+        types: typeChipPicker.getValues(),
         synonyms: parseCsvInput("synonymsInput"),
         definitions: parseCsvInput("definitionsInput"),
         related_concepts: parseCsvInput("relatedConceptsInput"),

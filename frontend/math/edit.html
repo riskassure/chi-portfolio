@@ -64,29 +64,43 @@
                     </div>
 
                     <div>
-                        <label class="editor-label" for="classificationsInput">Classifications, comma-separated</label>
-                        <input
-                            id="classificationsInput"
-                            class="search-box"
-                            type="text"
-                            list="classificationOptions"
-                            placeholder="20K25, 54C30"
-                            style="width: 100%;"
-                        >
-                        <datalist id="classificationOptions"></datalist>
+                        <label class="editor-label" for="classificationChipInput">Classifications</label>
+
+                        <div id="classificationChipPicker" class="chip-picker">
+                            <div id="classificationChipList" class="chip-list"></div>
+
+                            <input
+                                id="classificationChipInput"
+                                class="chip-input"
+                                type="text"
+                                placeholder="Type classification code or name..."
+                                autocomplete="off"
+                            >
+
+                            <div id="classificationSuggestions" class="chip-suggestions"></div>
+                        </div>
+
+                        <input id="classificationsInput" type="hidden">
                     </div>
 
                     <div>
-                        <label class="editor-label" for="typesInput">Document Types, comma-separated</label>
-                        <input
-                            id="typesInput"
-                            class="search-box"
-                            type="text"
-                            list="typeOptions"
-                            placeholder="Definition, Theorem, Proof"
-                            style="width: 100%;"
-                        >
-                        <datalist id="typeOptions"></datalist>
+                        <label class="editor-label" for="typeChipInput">Document Types</label>
+
+                        <div id="typeChipPicker" class="chip-picker">
+                            <div id="typeChipList" class="chip-list"></div>
+
+                            <input
+                                id="typeChipInput"
+                                class="chip-input"
+                                type="text"
+                                placeholder="Type concept type..."
+                                autocomplete="off"
+                            >
+
+                            <div id="typeSuggestions" class="chip-suggestions"></div>
+                        </div>
+
+                        <input id="typesInput" type="hidden">
                     </div>
 
                     <div>
@@ -222,6 +236,6 @@
     </div>
 
     <script src="../navbar.js"></script>
-    <script src="math_editor.js?v=1.1"></script>
+    <script src="math_editor.js?v=1.2"></script>
 </body>
 </html>
