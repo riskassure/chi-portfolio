@@ -3,6 +3,8 @@
 import sqlite3
 import sys
 import re
+import hashlib
+from collections import Counter
 from datetime import datetime
 from flask import Blueprint, jsonify, request, send_from_directory
 
@@ -51,6 +53,97 @@ def parse_csv_list(value):
         for x in value.split(",")
         if x and x.strip()
     ]
+
+
+PSPICTURE_RE = re.compile(
+    r"\\begin\{pspicture\}[\s\S]*?\\end\{pspicture\}",
+    re.MULTILINE
+)
+
+
+def normalize_tex_for_save_compare(tex: str) -> str:
+    """
+    Normalize enough to avoid false positives from trivial outer whitespace,
+    but do not aggressively rewrite the TeX.
+    """
+    return (tex or "").strip()
+
+
+def hash_pstricks_block(block: str) -> str:
+    return hashlib.sha256(block.encode("utf-8")).hexdigest()[:16]
+
+
+def extract_pstricks_blocks(tex: str) -> list[str]:
+    return PSPICTURE_RE.findall(tex or "")
+
+
+def extract_pstricks_hashes(tex: str) -> list[str]:
+    return [
+        hash_pstricks_block(block)
+        for block in extract_pstricks_blocks(tex)
+    ]
+
+
+def compare_pstricks_hashes(old_tex: str, new_tex: str) -> dict:
+    old_hashes = extract_pstricks_hashes(old_tex)
+    new_hashes = extract_pstricks_hashes(new_tex)
+
+    old_counter = Counter(old_hashes)
+    new_counter = Counter(new_hashes)
+
+    added_hashes = list((new_counter - old_counter).elements())
+    removed_hashes = list((old_counter - new_counter).elements())
+    unchanged_hashes = list((old_counter & new_counter).elements())
+
+    return {
+        "old_count": len(old_hashes),
+        "new_count": len(new_hashes),
+        "unchanged_count": len(unchanged_hashes),
+        "added_count": len(added_hashes),
+        "removed_count": len(removed_hashes),
+        "old_hashes": old_hashes,
+        "new_hashes": new_hashes,
+        "added_hashes": added_hashes,
+        "removed_hashes": removed_hashes,
+        "pstricks_changed": old_counter != new_counter
+    }
+
+
+def determine_smart_save_mode(old_tex: str, new_tex: str) -> dict:
+    old_clean = normalize_tex_for_save_compare(old_tex)
+    new_clean = normalize_tex_for_save_compare(new_tex)
+
+    tex_changed = old_clean != new_clean
+    diagram_compare = compare_pstricks_hashes(old_clean, new_clean)
+
+    if not tex_changed:
+        return {
+            "save_mode": "metadata_only",
+            "tex_changed": False,
+            "pstricks_changed": False,
+            "diagram_compare": diagram_compare,
+            "message": "Saved metadata only. TeX source was unchanged."
+        }
+
+    if not diagram_compare["pstricks_changed"]:
+        return {
+            "save_mode": "text_render_only",
+            "tex_changed": True,
+            "pstricks_changed": False,
+            "diagram_compare": diagram_compare,
+            "message": "Saved TeX changes. PSTricks diagram blocks were unchanged."
+        }
+
+    return {
+        "save_mode": "diagram_rebuild_needed",
+        "tex_changed": True,
+        "pstricks_changed": True,
+        "diagram_compare": diagram_compare,
+        "message": (
+            "Saved TeX changes. PSTricks diagram blocks changed; "
+            "diagram rebuild logic will handle this in the next Phase C step."
+        )
+    }
 
 
 def apply_math_autolinker(concept_id, tex_content, db_cursor):
@@ -309,6 +402,81 @@ def search_classifications_typeahead():
     finally:
         if conn:
             conn.close()
+
+
+@math_bp.route("/api/admin/math/concepts/search", methods=["GET"])
+def search_admin_math_concepts():
+    from app import admin_required
+
+    @admin_required
+    def process_search():
+        q = request.args.get("q", default="", type=str).strip()
+        exclude_id = request.args.get("exclude_id", default=None, type=int)
+
+        if len(q) < 2:
+            return jsonify({
+                "status": "success",
+                "data": []
+            }), 200
+
+        like_q = f"%{q}%"
+        conn = None
+
+        try:
+            conn = sqlite3.connect(str(DB_PATH))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT DISTINCT
+                    mc.id,
+                    mc.title,
+                    mc.canonical_name,
+                    mc.slug
+                FROM math_concepts mc
+                LEFT JOIN math_synonyms ms
+                    ON ms.concept_id = mc.id
+                LEFT JOIN math_definitions md
+                    ON md.concept_id = mc.id
+                WHERE
+                    (? IS NULL OR mc.id != ?)
+                    AND (
+                        mc.title LIKE ?
+                        OR mc.canonical_name LIKE ?
+                        OR mc.slug LIKE ?
+                        OR ms.synonym_text LIKE ?
+                        OR md.defined_term LIKE ?
+                    )
+                ORDER BY mc.title ASC
+                LIMIT 20;
+            """, (
+                exclude_id,
+                exclude_id,
+                like_q,
+                like_q,
+                like_q,
+                like_q,
+                like_q
+            ))
+
+            rows = [dict(row) for row in cursor.fetchall()]
+
+            return jsonify({
+                "status": "success",
+                "data": rows
+            }), 200
+
+        except sqlite3.Error as e:
+            return jsonify({
+                "status": "error",
+                "message": str(e)
+            }), 500
+
+        finally:
+            if conn:
+                conn.close()
+
+    return process_search()
 
 
 @math_bp.route("/api/admin/math/types", methods=["GET", "OPTIONS"])
@@ -1160,8 +1328,32 @@ def update_math_metadata():
             cursor = conn.cursor()
             cursor.execute("PRAGMA foreign_keys = ON;")
 
+            # Fetch existing TeX before updating so smart-save can compare old vs new.
+            cursor.execute("""
+                SELECT cleaned_tex
+                FROM math_concepts
+                WHERE id = ?;
+            """, (concept_id,))
+
+            existing_row = cursor.fetchone()
+
+            if not existing_row:
+                return jsonify({
+                    "success": False,
+                    "message": f"Concept id {concept_id} was not found."
+                }), 404
+
+            old_cleaned_tex = existing_row[0] or ""
+
+            smart_save = determine_smart_save_mode(
+                old_cleaned_tex,
+                updated_tex
+            )
+
             # Update core record.
-            # rendered_tex is intentionally cleared.
+            # Phase C1 note:
+            # We are still clearing rendered_tex for now.
+            # In the next Phase C slice, this will become conditional based on smart_save["save_mode"].
             cursor.execute("""
                 UPDATE math_concepts
                 SET
@@ -1307,7 +1499,11 @@ def update_math_metadata():
 
             return jsonify({
                 "success": True,
-                "message": "Mathematical asset modifications completely recorded."
+                "message": smart_save["message"],
+                "save_mode": smart_save["save_mode"],
+                "tex_changed": smart_save["tex_changed"],
+                "pstricks_changed": smart_save["pstricks_changed"],
+                "diagram_compare": smart_save["diagram_compare"]
             }), 200
 
         except sqlite3.Error as e:

@@ -15,6 +15,7 @@ let currentReferenceMode = "raw";
 
 let classificationChipPicker = null;
 let typeChipPicker = null;
+let relatedConceptChipPicker = null;
 
 let classificationOptions = [];
 let typeOptions = [];
@@ -46,16 +47,29 @@ async function bootMathEditor() {
 }
 
 function wireEditorEvents() {
-    const form = document.getElementById("mathEditorForm");
     const titleInput = document.getElementById("conceptTitleInput");
     const texInput = document.getElementById("cleanedTexInput");
     const cancelBtn = document.getElementById("cancelEditorBtn");
+    const saveBtn = document.getElementById("saveEditorBtn");
 
-    if (form) {
-        form.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            await saveEditorPayload();
+    if (saveBtn) {
+        saveBtn.addEventListener("click", async (e) => {
+            e.preventDefault(); 
+            // Optional: prevent bubbling just in case there are nested elements
+            e.stopPropagation(); 
+            
+            console.log("SAVE BUTTON CLICK FIRED");
+            
+            // Add a try-catch here to see if the error is failing silently!
+            try {
+                await saveEditorPayload();
+            } catch (err) {
+                console.error("Save failed:", err);
+                showStatus("Error saving: " + err.message, "error");
+            }
         });
+    } else {
+        console.warn("saveEditorBtn not found");
     }
 
     if (titleInput) {
@@ -110,6 +124,13 @@ function initializeChipPickers() {
         suggestionsId: "typeSuggestions",
         hiddenInputId: "typesInput",
         getOptions: () => typeOptions
+    });
+
+    relatedConceptChipPicker = createRelatedConceptChipPicker({
+        inputId: "relatedConceptChipInput",
+        chipListId: "relatedConceptChipList",
+        suggestionsId: "relatedConceptSuggestions",
+        hiddenInputId: "relatedConceptsInput"
     });
 }
 
@@ -431,6 +452,308 @@ function createChipPicker(config) {
     };
 }
 
+
+function createRelatedConceptChipPicker(config) {
+    const input = document.getElementById(config.inputId);
+    const chipList = document.getElementById(config.chipListId);
+    const suggestions = document.getElementById(config.suggestionsId);
+    const hiddenInput = document.getElementById(config.hiddenInputId);
+
+    let selectedItems = [];
+    let visibleSuggestions = [];
+    let activeSuggestionIndex = -1;
+    let searchTimer = null;
+
+    function normalizeItem(item) {
+        if (typeof item === "string") {
+            return {
+                id: null,
+                title: item,
+                canonical_name: item,
+                slug: ""
+            };
+        }
+
+        return {
+            id: item.id || item.related_concept_id || null,
+            title: item.title || item.related_canonical_name || item.canonical_name || "",
+            canonical_name: item.canonical_name || item.related_canonical_name || item.title || "",
+            slug: item.slug || ""
+        };
+    }
+
+    function itemKey(item) {
+        const normalized = normalizeItem(item);
+
+        if (normalized.id) {
+            return `id:${normalized.id}`;
+        }
+
+        return `name:${String(normalized.canonical_name || "").toLowerCase()}`;
+    }
+
+    function syncHiddenInput() {
+        if (!hiddenInput) return;
+
+        hiddenInput.value = selectedItems
+            .map(item => item.canonical_name)
+            .filter(Boolean)
+            .join(", ");
+    }
+
+    function hideSuggestions() {
+        suggestions.style.display = "none";
+        suggestions.innerHTML = "";
+        visibleSuggestions = [];
+        activeSuggestionIndex = -1;
+    }
+
+    function renderChips() {
+        chipList.innerHTML = "";
+
+        selectedItems.forEach(item => {
+            const chip = document.createElement("span");
+            chip.className = "chip";
+
+            const label = document.createElement("span");
+            label.textContent = item.title || item.canonical_name || item.slug || "Untitled concept";
+
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.className = "chip-remove";
+            removeBtn.textContent = "×";
+            removeBtn.setAttribute("aria-label", `Remove ${label.textContent}`);
+
+            removeBtn.addEventListener("click", () => {
+                selectedItems = selectedItems.filter(existing => {
+                    return itemKey(existing) !== itemKey(item);
+                });
+
+                renderChips();
+                syncHiddenInput();
+                input.focus();
+            });
+
+            chip.appendChild(label);
+            chip.appendChild(removeBtn);
+            chipList.appendChild(chip);
+        });
+
+        chipList.appendChild(input);
+        syncHiddenInput();
+    }
+
+    function addItem(item) {
+        const normalized = normalizeItem(item);
+
+        if (!normalized.canonical_name && !normalized.title) {
+            return;
+        }
+
+        const alreadyExists = selectedItems.some(existing => {
+            return itemKey(existing) === itemKey(normalized);
+        });
+
+        if (!alreadyExists) {
+            selectedItems.push(normalized);
+        }
+
+        input.value = "";
+        hideSuggestions();
+        renderChips();
+    }
+
+    async function fetchSuggestions(query) {
+        const excludeId = document.getElementById("conceptIdInput")?.value || conceptId || "";
+
+        const url =
+            `${API_ENDPOINT}/admin/math/concepts/search?q=${encodeURIComponent(query)}` +
+            `&exclude_id=${encodeURIComponent(excludeId)}`;
+
+        const response = await fetch(url, {
+            credentials: "include"
+        });
+
+        const json = await response.json();
+
+        if (json.status !== "success") {
+            return [];
+        }
+
+        return json.data || [];
+    }
+
+    async function renderSuggestions() {
+        const query = input.value.trim();
+
+        if (query.length < 2) {
+            hideSuggestions();
+            return;
+        }
+
+        try {
+            const rows = await fetchSuggestions(query);
+
+            const selectedKeys = new Set(selectedItems.map(itemKey));
+
+            visibleSuggestions = rows
+                .map(normalizeItem)
+                .filter(item => !selectedKeys.has(itemKey(item)))
+                .slice(0, 12);
+
+            if (visibleSuggestions.length === 0) {
+                hideSuggestions();
+                return;
+            }
+
+            suggestions.innerHTML = "";
+
+            visibleSuggestions.forEach((item, index) => {
+                const row = document.createElement("div");
+                row.className = "chip-suggestion";
+
+                if (index === activeSuggestionIndex) {
+                    row.classList.add("active");
+                }
+
+                const main = document.createElement("div");
+                main.className = "chip-suggestion-main";
+                main.textContent = item.title || item.canonical_name || "Untitled concept";
+
+                const sub = document.createElement("div");
+                sub.className = "chip-suggestion-sub";
+                sub.textContent = item.canonical_name
+                    ? `${item.canonical_name}${item.slug ? " · " + item.slug : ""}`
+                    : item.slug || "";
+
+                row.appendChild(main);
+
+                if (sub.textContent) {
+                    row.appendChild(sub);
+                }
+
+                row.addEventListener("mousedown", event => {
+                    event.preventDefault();
+                    addItem(item);
+                });
+
+                suggestions.appendChild(row);
+            });
+
+            suggestions.style.display = "block";
+
+        } catch (err) {
+            console.warn("Unable to search related concepts:", err);
+            hideSuggestions();
+        }
+    }
+
+    input.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+
+        activeSuggestionIndex = -1;
+
+        searchTimer = setTimeout(() => {
+            renderSuggestions();
+        }, 250);
+    });
+
+    input.addEventListener("keydown", event => {
+        if (event.key === "ArrowDown") {
+            event.preventDefault();
+
+            if (visibleSuggestions.length > 0) {
+                activeSuggestionIndex =
+                    (activeSuggestionIndex + 1) % visibleSuggestions.length;
+                renderSuggestions();
+            }
+
+            return;
+        }
+
+        if (event.key === "ArrowUp") {
+            event.preventDefault();
+
+            if (visibleSuggestions.length > 0) {
+                activeSuggestionIndex =
+                    activeSuggestionIndex <= 0
+                        ? visibleSuggestions.length - 1
+                        : activeSuggestionIndex - 1;
+                renderSuggestions();
+            }
+
+            return;
+        }
+
+        if (event.key === "Enter") {
+            event.preventDefault();
+
+            if (
+                activeSuggestionIndex >= 0 &&
+                visibleSuggestions[activeSuggestionIndex]
+            ) {
+                addItem(visibleSuggestions[activeSuggestionIndex]);
+            }
+
+            return;
+        }
+
+        if (
+            event.key === "Backspace" &&
+            !input.value &&
+            selectedItems.length > 0
+        ) {
+            selectedItems.pop();
+            renderChips();
+            syncHiddenInput();
+        }
+    });
+
+    input.addEventListener("blur", () => {
+        setTimeout(() => {
+            hideSuggestions();
+        }, 150);
+    });
+
+    return {
+        setValues(values) {
+            selectedItems = [];
+
+            (values || []).forEach(item => {
+                const normalized = normalizeItem(item);
+
+                const alreadyExists = selectedItems.some(existing => {
+                    return itemKey(existing) === itemKey(normalized);
+                });
+
+                if (!alreadyExists && (normalized.canonical_name || normalized.title)) {
+                    selectedItems.push(normalized);
+                }
+            });
+
+            renderChips();
+        },
+
+        getValues() {
+            return selectedItems
+                .map(item => item.canonical_name || item.title)
+                .filter(Boolean);
+        },
+
+        getItems() {
+            return [...selectedItems];
+        },
+
+        clear() {
+            selectedItems = [];
+            input.value = "";
+            hideSuggestions();
+            renderChips();
+        }
+    };
+}
+
+
 async function hydrateLookups() {
     try {
         const [classificationResponse, typeResponse] = await Promise.all([
@@ -485,6 +808,10 @@ function setDefaultCreateState() {
         typeChipPicker.setValues([]);
     }
 
+    if (relatedConceptChipPicker) {
+        relatedConceptChipPicker.setValues([]);
+    }
+
     updateSlugPreview();
     setReferenceView("raw");
     renderDiagramFailureSummary();
@@ -524,13 +851,11 @@ async function hydrateConceptForEdit(id) {
         );
 
         typeChipPicker.setValues(concept.types || []);
+
         document.getElementById("synonymsInput").value = csvFromArray(concept.synonyms || []);
         document.getElementById("definitionsInput").value = csvFromArray(concept.definitions || []);
-        document.getElementById("relatedConceptsInput").value = csvFromArray(
-            (concept.related_concepts || []).map(item => {
-                return item.related_canonical_name || item.canonical_name || item.title || "";
-            })
-        );
+
+        relatedConceptChipPicker.setValues(concept.related_concepts || []);
 
         currentRawTex = concept.raw_tex || "";
         currentRenderedTex = concept.rendered_tex || "";
@@ -579,6 +904,8 @@ async function hydrateConceptForEdit(id) {
 }
 
 async function saveEditorPayload() {
+    console.log("saveEditorPayload() reached");
+
     const title = document.getElementById("conceptTitleInput").value.trim();
     const cleanedTex = document.getElementById("cleanedTexInput").value.trim();
 
@@ -600,7 +927,7 @@ async function saveEditorPayload() {
         types: typeChipPicker.getValues(),
         synonyms: parseCsvInput("synonymsInput"),
         definitions: parseCsvInput("definitionsInput"),
-        related_concepts: parseCsvInput("relatedConceptsInput"),
+        related_concepts: relatedConceptChipPicker.getValues(),
         is_cleaned: document.getElementById("isCleanedInput").checked ? 1 : 0
     };
 
@@ -630,9 +957,21 @@ async function saveEditorPayload() {
             throw new Error(json.message || json.error || "Save failed.");
         }
 
-        showStatus(json.message || "Saved successfully.", "success");
+        let saveMessage = json.message || "Saved successfully.";
 
-        const targetSlug = json.slug;
+        if (json.save_mode) {
+            saveMessage += ` Save mode: ${json.save_mode}.`;
+        }
+
+        if (json.diagram_compare) {
+            saveMessage += ` Diagrams: ${json.diagram_compare.unchanged_count || 0} unchanged, ${json.diagram_compare.added_count || 0} added, ${json.diagram_compare.removed_count || 0} removed.`;
+        }
+
+        console.log("SAVE STATUS MESSAGE:", saveMessage);
+        
+        showStatus(saveMessage, "success");
+
+           const targetSlug = json.slug;
 
         if (editorMode === "create" && targetSlug) {
             setTimeout(() => {
@@ -920,13 +1259,23 @@ function generateSlug(canonicalName) {
 }
 
 function showStatus(message, type = "info") {
-    const statusBox = document.getElementById("editorStatus");
+    let statusBox = document.getElementById("editorStatus");
 
-    if (!statusBox) return;
+    if (!statusBox) {
+        statusBox = document.createElement("div");
+        statusBox.id = "editorStatus";
+        document.body.appendChild(statusBox);
+    }
 
-    if (!message || type === "clear") {
+    if (type === "clear") {
+        console.log("STATUS CLEAR REQUESTED");
+
         statusBox.innerHTML = "";
         statusBox.style.display = "none";
+        return;
+    }
+
+    if (!message) {
         return;
     }
 
@@ -951,14 +1300,23 @@ function showStatus(message, type = "info") {
     const palette = colors[type] || colors.info;
 
     statusBox.style.display = "block";
+    statusBox.style.position = "fixed";
+    statusBox.style.top = "5.25rem";
+    statusBox.style.right = "1.25rem";
+    statusBox.style.zIndex = "99999";
+    statusBox.style.maxWidth = "520px";
     statusBox.style.background = palette.bg;
     statusBox.style.border = `1px solid ${palette.border}`;
     statusBox.style.color = palette.text;
-    statusBox.style.padding = "0.75rem 1rem";
-    statusBox.style.borderRadius = "8px";
-    statusBox.style.marginBottom = "1rem";
-    statusBox.style.fontWeight = "600";
+    statusBox.style.padding = "0.85rem 1rem";
+    statusBox.style.borderRadius = "10px";
+    statusBox.style.boxShadow = "0 12px 30px rgba(15, 23, 42, 0.18)";
+    statusBox.style.fontWeight = "700";
+    statusBox.style.fontSize = "0.95rem";
+    statusBox.style.lineHeight = "1.45";
     statusBox.innerText = message;
+
+    console.log("STATUS SHOWN:", type, message);
 }
 
 function setSavingState(isSaving) {

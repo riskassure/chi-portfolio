@@ -46,7 +46,7 @@
 
         <div id="editorStatus" style="display: none;"></div>
 
-        <form id="mathEditorForm">
+        <div id="mathEditorForm">
             <input type="hidden" id="conceptIdInput">
 
             <section style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 2px rgba(15,23,42,0.06); margin-bottom: 1.25rem;">
@@ -112,16 +112,27 @@
                         <label class="editor-label" for="definitionsInput">Other Concepts Defined Here, comma-separated</label>
                         <input id="definitionsInput" class="search-box" type="text" style="width: 100%;">
                     </div>
+
                     <div>
-                        <label class="editor-label" for="relatedConceptsInput">Related Concepts, comma-separated canonical names</label>
-                        <input
-                            id="relatedConceptsInput"
-                            class="search-box"
-                            type="text"
-                            placeholder="Group, TopologicalSpace, MetricSpace"
-                            style="width: 100%;"
-                        >
+                        <label class="editor-label" for="relatedConceptChipInput">Related Concepts</label>
+
+                        <div id="relatedConceptChipPicker" class="chip-picker">
+                            <div id="relatedConceptChipList" class="chip-list"></div>
+
+                            <input
+                                id="relatedConceptChipInput"
+                                class="chip-input"
+                                type="text"
+                                placeholder="Type concept title or canonical name..."
+                                autocomplete="off"
+                            >
+
+                            <div id="relatedConceptSuggestions" class="chip-suggestions"></div>
+                        </div>
+
+                        <input id="relatedConceptsInput" type="hidden">
                     </div>
+                </div>
 
                 <div style="display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-top: 1rem; flex-wrap: wrap;">
                     <div style="font-size: 0.85rem; color: #64748b;">
@@ -148,7 +159,7 @@
                 <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem;">
                     <button
                         id="saveEditorBtn"
-                        type="submit"
+                        type="button"
                         style="background: #2563eb; color: #ffffff; border: none; border-radius: 6px; padding: 0.75rem 1.2rem; font-weight: 700; cursor: pointer;"
                     >
                         Create Concept
@@ -167,10 +178,10 @@
                     Preview loading...
                 </div>
             </section>
-        </form>
+        </div>
     </div>
 
     <script src="../navbar.js"></script>
-    <script src="math_editor.js?v=1.2"></script>
+    <script src="math_editor.js?v=1.10"></script>
 </body>
 </html>
