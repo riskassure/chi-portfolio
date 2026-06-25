@@ -50,6 +50,7 @@ function wireEditorEvents() {
     const titleInput = document.getElementById("conceptTitleInput");
     const texInput = document.getElementById("cleanedTexInput");
     const cancelBtn = document.getElementById("cancelEditorBtn");
+    const cancelBtnBottom = document.getElementById("cancelEditorBtnBottom");
     const saveBtn = document.getElementById("saveEditorBtn");
 
     if (saveBtn) {
@@ -85,14 +86,20 @@ function wireEditorEvents() {
         });
     }
 
+    function handleCancelEditor() {
+        if (editorMode === "edit") {
+            window.history.back();
+        } else {
+            window.location.href = "index.html";
+        }
+    }
+
     if (cancelBtn) {
-        cancelBtn.addEventListener("click", () => {
-            if (editorMode === "edit") {
-                window.history.back();
-            } else {
-                window.location.href = "index.html";
-            }
-        });
+        cancelBtn.addEventListener("click", handleCancelEditor);
+    }
+
+    if (cancelBtnBottom) {
+        cancelBtnBottom.addEventListener("click", handleCancelEditor);
     }
 
     document.querySelectorAll("[data-reference-source]").forEach(button => {

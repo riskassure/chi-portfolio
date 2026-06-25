@@ -460,6 +460,108 @@
     color: #64748b;
 }
 
+.editor-final-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding: 1.25rem;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+    flex-wrap: wrap;
+}
+
+.editor-action-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.editor-action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.editor-action-hint,
+.editor-help-text {
+    font-size: 0.85rem;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.editor-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.editor-action-buttons .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 150px;
+    height: 44px;
+    padding: 0 1.1rem;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    text-decoration: none;
+    box-sizing: border-box;
+    line-height: 1;
+}
+
+.editor-action-buttons .btn-primary {
+    background: #2563eb;
+    color: #ffffff;
+    border: 1px solid #2563eb;
+}
+
+.editor-action-buttons .btn-primary:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.editor-action-buttons .btn-secondary {
+    background: #ffffff;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+}
+
+.editor-action-buttons .btn-secondary:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+
+.editor-action-buttons .btn-preview {
+    background: #f8fafc;
+    color: #1e293b;
+    border: 1px solid #94a3b8;
+}
+
+.editor-action-buttons .btn-preview:hover {
+    background: #e2e8f0;
+    border-color: #64748b;
+    color: #0f172a;
+}
+
+.editor-action-buttons .btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+
 @media (max-width: 950px) {
     #mathEditorForm [style*="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)"] {
         grid-template-columns: 1fr !important;
