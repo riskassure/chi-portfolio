@@ -20,6 +20,13 @@ let relatedConceptChipPicker = null;
 let classificationOptions = [];
 let typeOptions = [];
 
+let latestRenderedPreview = {
+    isCurrent: false,
+    texHash: null,
+    previewToken: null,
+    hasPstricks: false
+};
+
 document.addEventListener("DOMContentLoaded", () => {
     bootMathEditor();
 });
@@ -49,19 +56,20 @@ async function bootMathEditor() {
 function wireEditorEvents() {
     const titleInput = document.getElementById("conceptTitleInput");
     const texInput = document.getElementById("cleanedTexInput");
+
+    const saveBtn = document.getElementById("saveEditorBtn");
+    const renderPreviewBtn = document.getElementById("renderPreviewBtn");
+
     const cancelBtn = document.getElementById("cancelEditorBtn");
     const cancelBtnBottom = document.getElementById("cancelEditorBtnBottom");
-    const saveBtn = document.getElementById("saveEditorBtn");
 
     if (saveBtn) {
         saveBtn.addEventListener("click", async (e) => {
-            e.preventDefault(); 
-            // Optional: prevent bubbling just in case there are nested elements
-            e.stopPropagation(); 
-            
+            e.preventDefault();
+            e.stopPropagation();
+
             console.log("SAVE BUTTON CLICK FIRED");
-            
-            // Add a try-catch here to see if the error is failing silently!
+
             try {
                 await saveEditorPayload();
             } catch (err) {
@@ -73,17 +81,22 @@ function wireEditorEvents() {
         console.warn("saveEditorBtn not found");
     }
 
-    if (titleInput) {
-        titleInput.addEventListener("input", () => {
-            updateSlugPreview();
-        });
-    }
+    if (renderPreviewBtn) {
+        renderPreviewBtn.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
 
-    if (texInput) {
-        texInput.addEventListener("input", () => {
-            clearTimeout(previewDebounceTimer);
-            previewDebounceTimer = setTimeout(updatePreview, 300);
+            console.log("RENDER PREVIEW CLICK FIRED");
+
+            try {
+                await renderEditorPreviewNow();
+            } catch (err) {
+                console.error("Render preview failed:", err);
+                showStatus("Render preview failed: " + err.message, "error");
+            }
         });
+    } else {
+        console.warn("renderPreviewBtn not found");
     }
 
     function handleCancelEditor() {
@@ -100,6 +113,21 @@ function wireEditorEvents() {
 
     if (cancelBtnBottom) {
         cancelBtnBottom.addEventListener("click", handleCancelEditor);
+    }
+
+    if (titleInput) {
+        titleInput.addEventListener("input", () => {
+            updateSlugPreview();
+        });
+    }
+
+    if (texInput) {
+        texInput.addEventListener("input", () => {
+            clearTimeout(previewDebounceTimer);
+            previewDebounceTimer = setTimeout(updatePreview, 300);
+
+            invalidateRenderedPreviewState();
+        });
     }
 
     document.querySelectorAll("[data-reference-source]").forEach(button => {
@@ -179,7 +207,6 @@ function normalizeClassificationOptions(raw) {
         })
         .filter(option => option.value);
 }
-
 
 function normalizeTypeOptions(raw) {
     const rows = Array.isArray(raw)
@@ -935,7 +962,11 @@ async function saveEditorPayload() {
         synonyms: parseCsvInput("synonymsInput"),
         definitions: parseCsvInput("definitionsInput"),
         related_concepts: relatedConceptChipPicker.getValues(),
-        is_cleaned: document.getElementById("isCleanedInput").checked ? 1 : 0
+        is_cleaned: document.getElementById("isCleanedInput").checked ? 1 : 0,
+        preview_token: latestRenderedPreview.previewToken,
+        preview_tex_hash: latestRenderedPreview.texHash,
+        preview_is_current: latestRenderedPreview.isCurrent,
+        preview_has_pstricks: latestRenderedPreview.hasPstricks
     };
 
     let url = `${API_ENDPOINT}/admin/math/create`;
@@ -978,13 +1009,47 @@ async function saveEditorPayload() {
         
         showStatus(saveMessage, "success");
 
-           const targetSlug = json.slug;
+        const conceptIdInputValue =
+            document.getElementById("conceptIdInput")?.value || null;
 
-        if (editorMode === "create" && targetSlug) {
-            setTimeout(() => {
-                window.location.href = `concept.html?slug=${encodeURIComponent(targetSlug)}`;
-            }, 600);
+        const fallbackConceptId =
+            typeof conceptId !== "undefined"
+                ? conceptId
+                : null;
+
+        const targetSlug =
+            json.slug ||
+            json.concept_slug ||
+            null;
+
+        const targetId =
+            json.concept_id ||
+            json.id ||
+            conceptIdInputValue ||
+            fallbackConceptId ||
+            null;
+
+        let redirectUrl = "index.html";
+
+        if (targetSlug) {
+            redirectUrl = `concept.html?slug=${encodeURIComponent(targetSlug)}&saved=1`;
+        } else if (targetId) {
+            redirectUrl = `concept.html?id=${encodeURIComponent(targetId)}&saved=1`;
         }
+
+        console.log("SAVE REDIRECT DATA:", {
+            editorMode,
+            targetSlug,
+            targetId,
+            redirectUrl,
+            json
+        });
+
+        showStatus(`${saveMessage} Redirecting to concept page...`, "success");
+
+        console.log("REDIRECTING NOW:", redirectUrl);
+        window.location.href = redirectUrl;
+        return;
 
     } catch (err) {
         console.error(err);
@@ -1045,6 +1110,77 @@ async function updatePreview() {
             console.warn("Preview MathJax render warning:", err);
         }
     }
+}
+
+function hasPstricksBlocks(tex) {
+    return /\\begin\{pspicture\}[\s\S]*?\\end\{pspicture\}/i.test(tex || "");
+}
+
+
+function simpleTextHash(text) {
+    let hash = 0;
+    const value = text || "";
+
+    for (let i = 0; i < value.length; i++) {
+        hash = ((hash << 5) - hash) + value.charCodeAt(i);
+        hash |= 0;
+    }
+
+    return String(hash);
+}
+
+
+function invalidateRenderedPreviewState() {
+    latestRenderedPreview = {
+        isCurrent: false,
+        texHash: null,
+        previewToken: null,
+        hasPstricks: false
+    };
+
+    const status = document.getElementById("renderPreviewStatus");
+    if (status) {
+        status.innerText = "Preview is out of date. Click Render Preview to refresh before saving diagram changes.";
+    }
+}
+
+
+async function renderEditorPreviewNow() {
+    const status = document.getElementById("renderPreviewStatus");
+    const texInput = document.getElementById("cleanedTexInput");
+
+    if (!texInput) {
+        throw new Error("TeX editor box was not found.");
+    }
+
+    const tex = texInput.value || "";
+    const texHash = simpleTextHash(tex);
+    const hasPstricks = hasPstricksBlocks(tex);
+
+    if (status) {
+        status.innerText = hasPstricks
+            ? "Rendering browser preview. PSTricks backend rendering will be connected next."
+            : "Rendering browser preview.";
+    }
+
+    showStatus("Rendering preview...", "info");
+
+    await updatePreview();
+
+    latestRenderedPreview = {
+        isCurrent: true,
+        texHash: texHash,
+        previewToken: null,
+        hasPstricks: hasPstricks
+    };
+
+    if (status) {
+        status.innerText = hasPstricks
+            ? "Preview updated. PSTricks blocks are not backend-rendered yet; backend rendering comes next."
+            : "Preview updated and current.";
+    }
+
+    showStatus("Preview updated. Review it, then save when ready.", "success");
 }
 
 function cleanEditorPreviewTex(tex) {

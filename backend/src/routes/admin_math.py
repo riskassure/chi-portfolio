@@ -1330,7 +1330,9 @@ def update_math_metadata():
 
             # Fetch existing TeX before updating so smart-save can compare old vs new.
             cursor.execute("""
-                SELECT cleaned_tex
+                SELECT
+                    cleaned_tex,
+                    slug
                 FROM math_concepts
                 WHERE id = ?;
             """, (concept_id,))
@@ -1344,6 +1346,7 @@ def update_math_metadata():
                 }), 404
 
             old_cleaned_tex = existing_row[0] or ""
+            current_slug = existing_row[1] or None
 
             smart_save = determine_smart_save_mode(
                 old_cleaned_tex,
@@ -1500,6 +1503,8 @@ def update_math_metadata():
             return jsonify({
                 "success": True,
                 "message": smart_save["message"],
+                "concept_id": concept_id,
+                "slug": current_slug,
                 "save_mode": smart_save["save_mode"],
                 "tex_changed": smart_save["tex_changed"],
                 "pstricks_changed": smart_save["pstricks_changed"],
@@ -1692,6 +1697,7 @@ def create_new_math_concept():
             return jsonify({
                 "success": True,
                 "message": "New concept generated successfully!",
+                "concept_id": concept_id,
                 "id": concept_id,
                 "slug": slug
             }), 201
