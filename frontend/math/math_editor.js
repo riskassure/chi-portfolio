@@ -1045,6 +1045,8 @@ async function saveEditorPayload() {
             json
         });
 
+        sessionStorage.setItem("mathConceptSaveNotice", saveMessage);
+        
         showStatus(`${saveMessage} Redirecting to concept page...`, "success");
 
         console.log("REDIRECTING NOW:", redirectUrl);

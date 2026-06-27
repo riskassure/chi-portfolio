@@ -8,6 +8,8 @@ const currentSlug = urlParams.get('slug');
 window.addEventListener("DOMContentLoaded", bootConceptView);
 
 async function bootConceptView() {
+    showConceptSaveNoticeIfNeeded();
+
     if (!currentId && !currentSlug) {
         document.getElementById("mathContentCanvas").innerHTML = "Error: No concept designated in query string parameters.";
         return;
@@ -72,6 +74,7 @@ async function renderConceptPage(concept) {
         let preProcessedTex = rawTexContent;
 
         preProcessedTex = cleanLaTeXEnvironments(preProcessedTex);
+        preProcessedTex = normalizeDiagramImageUrls(preProcessedTex);
 
         const canvas = document.getElementById("mathContentCanvas");
         canvas.innerHTML = preProcessedTex;
@@ -147,6 +150,17 @@ function cleanLaTeXEnvironments(tex) {
     return clean;
 }
 
+function normalizeDiagramImageUrls(html) {
+    if (!html) {
+        return "";
+    }
+
+    return html.replace(
+        /src=(["'])\/api\/math\/diagrams\//gi,
+        `src=$1${API_ENDPOINT}/math/diagrams/`
+    );
+}
+
 function renderFooterArrays(concept) {
     // 1. Synonyms Array Mapping
     const syns = concept.synonyms || [];
@@ -174,6 +188,38 @@ function renderFooterArrays(concept) {
     } else {
         document.getElementById("bottomRelated").innerText = "None";
     }
+}
+
+function showConceptSaveNoticeIfNeeded() {
+    const saveMessage = sessionStorage.getItem("mathConceptSaveNotice");
+
+    if (!saveMessage) {
+        return;
+    }
+
+    sessionStorage.removeItem("mathConceptSaveNotice");
+
+    const notice = document.createElement("div");
+    notice.id = "conceptSaveNotice";
+
+    notice.style.position = "fixed";
+    notice.style.top = "5.25rem";
+    notice.style.right = "1.25rem";
+    notice.style.zIndex = "99999";
+    notice.style.maxWidth = "560px";
+    notice.style.background = "#ecfdf5";
+    notice.style.border = "1px solid #bbf7d0";
+    notice.style.color = "#047857";
+    notice.style.padding = "0.85rem 1rem";
+    notice.style.borderRadius = "10px";
+    notice.style.boxShadow = "0 12px 30px rgba(15, 23, 42, 0.18)";
+    notice.style.fontWeight = "700";
+    notice.style.fontSize = "0.95rem";
+    notice.style.lineHeight = "1.45";
+
+    notice.innerText = saveMessage;
+
+    document.body.appendChild(notice);
 }
 
 async function hydrateConceptAdminControls(concept) {

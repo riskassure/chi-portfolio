@@ -305,6 +305,93 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     return "".join(processed_chunks)
 
 
+def get_svg_filename(svg_path: str) -> str | None:
+    """
+    Extract the SVG filename from either a filesystem path or API path.
+    """
+    if not svg_path:
+        return None
+
+    clean_path = str(svg_path).replace("\\", "/").rstrip("/")
+    return clean_path.split("/")[-1]
+
+
+def make_existing_diagram_img_tag(svg_path: str) -> str:
+    """
+    Build the HTML img tag used in rendered_tex for an existing generated diagram.
+
+    During local development, concept.html is served from Live Server on port 5500,
+    while SVG diagrams are served by Flask on port 5000. Therefore the image src
+    needs the full Flask API base URL.
+    """
+    svg_filename = get_svg_filename(svg_path)
+
+    if not svg_filename:
+        return '<div class="img-placeholder"><em>[Diagram path missing.]</em></div>'
+
+    return (
+        '<div class="math-diagram-wrap">'
+        f'<img src="http://127.0.0.1:5000/api/math/diagrams/{svg_filename}" '
+        'class="math-diagram" '
+        'alt="Mathematical diagram">'
+        '</div>'
+    )
+
+
+def render_tex_reusing_existing_diagrams(concept_id: int, cleaned_tex: str, cursor) -> str:
+    """
+    Rebuild rendered_tex without running LaTeX/dvisvgm.
+
+    For ordinary TeX:
+        return cleaned_tex.
+
+    For unchanged PSTricks blocks:
+        replace each pspicture block with its existing SVG image tag.
+
+    For missing diagram records:
+        leave a placeholder rather than showing raw PSTricks.
+    """
+    if not cleaned_tex:
+        return ""
+
+    ps_blocks = extract_pstricks_blocks(cleaned_tex)
+
+    if not ps_blocks:
+        return cleaned_tex
+
+    try:
+        cursor.execute("""
+            SELECT
+                source_hash,
+                svg_path
+            FROM math_concept_diagrams
+            WHERE concept_id = ?;
+        """, (concept_id,))
+
+        diagram_lookup = {
+            row[0]: row[1]
+            for row in cursor.fetchall()
+        }
+
+    except sqlite3.OperationalError:
+        diagram_lookup = {}
+
+    rendered_tex = cleaned_tex
+
+    for ps_block in ps_blocks:
+        source_hash = hash_pstricks_block(ps_block)
+        svg_path = diagram_lookup.get(source_hash)
+
+        if svg_path:
+            replacement = make_existing_diagram_img_tag(svg_path)
+        else:
+            replacement = '<div class="img-placeholder"><em>[Diagram unavailable.]</em></div>'
+
+        rendered_tex = rendered_tex.replace(ps_block, replacement, 1)
+
+    return rendered_tex
+
+
 @math_bp.route("/api/math/classifications", methods=["GET", "OPTIONS"])
 def get_active_classifications():
     """Public lookup route supplying active MSC classifications for directory hubs."""
@@ -1354,27 +1441,81 @@ def update_math_metadata():
             )
 
             # Update core record.
-            # Phase C1 note:
-            # We are still clearing rendered_tex for now.
-            # In the next Phase C slice, this will become conditional based on smart_save["save_mode"].
-            cursor.execute("""
-                UPDATE math_concepts
-                SET
-                    title = ?,
-                    owner = ?,
-                    cleaned_tex = ?,
-                    rendered_tex = NULL,
-                    updated_at = ?,
-                    is_cleaned = ?
-                WHERE id = ?;
-            """, (
-                updated_title,
-                updated_owner,
-                updated_tex,
-                uniform_timestamp,
-                is_cleaned_flag,
-                concept_id
-            ))
+            # Smart-save Phase C2:
+            # If TeX did not change, preserve rendered_tex exactly as-is.
+            # If TeX changed, rendered_tex is still cleared for now.
+            # The next slice will refresh rendered_tex for text-only changes.
+            if smart_save["save_mode"] == "metadata_only":
+                # TeX did not change. Preserve rendered_tex exactly as-is.
+                cursor.execute("""
+                    UPDATE math_concepts
+                    SET
+                        title = ?,
+                        owner = ?,
+                        cleaned_tex = ?,
+                        updated_at = ?,
+                        is_cleaned = ?
+                    WHERE id = ?;
+                """, (
+                    updated_title,
+                    updated_owner,
+                    updated_tex,
+                    uniform_timestamp,
+                    is_cleaned_flag,
+                    concept_id
+                ))
+
+            elif smart_save["save_mode"] == "text_render_only":
+                # TeX changed, but PSTricks blocks did not.
+                # Refresh rendered_tex safely without regenerating diagrams.
+                refreshed_rendered_tex = render_tex_reusing_existing_diagrams(
+                    concept_id=concept_id,
+                    cleaned_tex=updated_tex,
+                    cursor=cursor
+                )
+
+                cursor.execute("""
+                    UPDATE math_concepts
+                    SET
+                        title = ?,
+                        owner = ?,
+                        cleaned_tex = ?,
+                        rendered_tex = ?,
+                        updated_at = ?,
+                        is_cleaned = ?
+                    WHERE id = ?;
+                """, (
+                    updated_title,
+                    updated_owner,
+                    updated_tex,
+                    refreshed_rendered_tex,
+                    uniform_timestamp,
+                    is_cleaned_flag,
+                    concept_id
+                ))
+
+            else:
+                # PSTricks blocks changed.
+                # For now, do not attempt diagram generation in Save.
+                # The next phase will require Render Preview before Save.
+                cursor.execute("""
+                    UPDATE math_concepts
+                    SET
+                        title = ?,
+                        owner = ?,
+                        cleaned_tex = ?,
+                        rendered_tex = NULL,
+                        updated_at = ?,
+                        is_cleaned = ?
+                    WHERE id = ?;
+                """, (
+                    updated_title,
+                    updated_owner,
+                    updated_tex,
+                    uniform_timestamp,
+                    is_cleaned_flag,
+                    concept_id
+                ))
 
             # Rebuild classifications.
             cursor.execute("""
