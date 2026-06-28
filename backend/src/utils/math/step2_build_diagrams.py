@@ -31,6 +31,11 @@ def wrap_pstricks_document(ps_block: str) -> str:
 \usepackage{{pst-plot}}
 \usepackage{{pst-node}}
 \usepackage{{multido}}
+
+% Common color aliases used by imported PlanetMath pspicture diagrams.
+\definecolor{{lightblue}}{{RGB}}{{173,216,230}}
+\definecolor{{lightgray}}{{RGB}}{{211,211,211}}
+
 \pagestyle{{empty}}
 \begin{{document}}
 {ps_block}
