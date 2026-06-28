@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime
 
-SRC_DIR = Path(__file__).resolve().parents[2]
+SRC_DIR = Path(__file__).resolve().parents[3]
 sys.path.append(str(SRC_DIR))
 from config import DB_PATH
 

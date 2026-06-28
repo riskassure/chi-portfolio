@@ -1,10 +1,17 @@
 # backend/src/utils/math/run_pipeline.py
 
+import sys
 import time
-from math_classification_lookup import migrate_and_populate_classifications
-from step0_ingest_and_harvest import run_ingest_and_harvest
-from step1_load_relational import build_relational_tables
-from step2_build_diagrams import build_math_diagrams
+from pathlib import Path
+
+SRC_DIR = Path(__file__).resolve().parents[3]  # backend/src
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from database.math.pipeline.math_classification_lookup import migrate_and_populate_classifications
+from database.math.pipeline.step0_ingest_and_harvest import run_ingest_and_harvest
+from database.math.pipeline.step1_load_relational import build_relational_tables
+from database.math.pipeline.step2_build_diagrams import build_math_diagrams
 
 def main():
     print("====================================================")

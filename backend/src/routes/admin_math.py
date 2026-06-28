@@ -3,14 +3,26 @@
 import sqlite3
 import sys
 import re
-import hashlib
+from pathlib import Path
 from collections import Counter
 from datetime import datetime
 from flask import Blueprint, jsonify, request, send_from_directory
 
-# Locate backend/src/ to grab the database configuration parameters.
-sys.path.append(str(sys.path[0] + "/.."))
+SRC_DIR = Path(__file__).resolve().parents[1]  # backend/src
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
 from config import DB_PATH, MATH_DIAGRAM_DIR
+
+from services.math.render_helper import (
+    PSPICTURE_RE,
+    hash_pstricks_block,
+    extract_pstricks_blocks,
+    extract_pstricks_hashes,
+    get_svg_filename,
+    make_diagram_img_tag,
+    render_prose_latex_to_html,
+)
 
 math_bp = Blueprint("math_bp", __name__)
 
@@ -55,33 +67,12 @@ def parse_csv_list(value):
     ]
 
 
-PSPICTURE_RE = re.compile(
-    r"\\begin\{pspicture\}[\s\S]*?\\end\{pspicture\}",
-    re.MULTILINE
-)
-
-
 def normalize_tex_for_save_compare(tex: str) -> str:
     """
     Normalize enough to avoid false positives from trivial outer whitespace,
     but do not aggressively rewrite the TeX.
     """
     return (tex or "").strip()
-
-
-def hash_pstricks_block(block: str) -> str:
-    return hashlib.sha256(block.encode("utf-8")).hexdigest()[:16]
-
-
-def extract_pstricks_blocks(tex: str) -> list[str]:
-    return PSPICTURE_RE.findall(tex or "")
-
-
-def extract_pstricks_hashes(tex: str) -> list[str]:
-    return [
-        hash_pstricks_block(block)
-        for block in extract_pstricks_blocks(tex)
-    ]
 
 
 def compare_pstricks_hashes(old_tex: str, new_tex: str) -> dict:
@@ -249,7 +240,14 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
 
     # 4. Split TeX into safe text blocks vs sensitive math/command blocks.
     token_pattern = re.compile(
-        r"(\$\$.*?\$\$|\$.*?\$|\\begin\{.*?\}.*?\\end\{.*?\}|\\\w+)",
+        r"("
+        r'<span class="math-no-autolink">.*?</span>'
+        r"|<a\b.*?</a>"
+        r"|\$\$.*?\$\$"
+        r"|\$.*?\$"
+        r"|\\begin\{.*?\}.*?\\end\{.*?\}"
+        r"|\\\w+"
+        r")",
         re.DOTALL | re.IGNORECASE
     )
 
@@ -257,7 +255,12 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     processed_chunks = []
 
     for chunk in chunks:
-        if chunk.startswith("$") or chunk.startswith("\\"):
+        if (
+            chunk.startswith("$")
+            or chunk.startswith("\\")
+            or chunk.lower().startswith('<span class="math-no-autolink"')
+            or chunk.lower().startswith("<a")
+        ):
             processed_chunks.append(chunk)
             continue
 
@@ -305,48 +308,16 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     return "".join(processed_chunks)
 
 
-def get_svg_filename(svg_path: str) -> str | None:
-    """
-    Extract the SVG filename from either a filesystem path or API path.
-    """
-    if not svg_path:
-        return None
-
-    clean_path = str(svg_path).replace("\\", "/").rstrip("/")
-    return clean_path.split("/")[-1]
-
-
-def make_existing_diagram_img_tag(svg_path: str) -> str:
-    """
-    Build the HTML img tag used in rendered_tex for an existing generated diagram.
-
-    During local development, concept.html is served from Live Server on port 5500,
-    while SVG diagrams are served by Flask on port 5000. Therefore the image src
-    needs the full Flask API base URL.
-    """
-    svg_filename = get_svg_filename(svg_path)
-
-    if not svg_filename:
-        return '<div class="img-placeholder"><em>[Diagram path missing.]</em></div>'
-
-    return (
-        '<div class="math-diagram-wrap">'
-        f'<img src="http://127.0.0.1:5000/api/math/diagrams/{svg_filename}" '
-        'class="math-diagram" '
-        'alt="Mathematical diagram">'
-        '</div>'
-    )
-
-
 def render_tex_reusing_existing_diagrams(concept_id: int, cleaned_tex: str, cursor) -> str:
     """
     Rebuild rendered_tex without running LaTeX/dvisvgm.
 
     For ordinary TeX:
-        return cleaned_tex.
+        render prose using the shared render helper.
 
     For unchanged PSTricks blocks:
-        replace each pspicture block with its existing SVG image tag.
+        replace each pspicture block with its existing SVG image tag,
+        then render prose using the shared render helper.
 
     For missing diagram records:
         leave a placeholder rather than showing raw PSTricks.
@@ -357,7 +328,7 @@ def render_tex_reusing_existing_diagrams(concept_id: int, cleaned_tex: str, curs
     ps_blocks = extract_pstricks_blocks(cleaned_tex)
 
     if not ps_blocks:
-        return cleaned_tex
+        return render_prose_latex_to_html(cleaned_tex)
 
     try:
         cursor.execute("""
@@ -383,13 +354,14 @@ def render_tex_reusing_existing_diagrams(concept_id: int, cleaned_tex: str, curs
         svg_path = diagram_lookup.get(source_hash)
 
         if svg_path:
-            replacement = make_existing_diagram_img_tag(svg_path)
+            svg_filename = get_svg_filename(svg_path)
+            replacement = make_diagram_img_tag(svg_filename)
         else:
             replacement = '<div class="img-placeholder"><em>[Diagram unavailable.]</em></div>'
 
         rendered_tex = rendered_tex.replace(ps_block, replacement, 1)
 
-    return rendered_tex
+    return render_prose_latex_to_html(rendered_tex)
 
 
 @math_bp.route("/api/math/classifications", methods=["GET", "OPTIONS"])

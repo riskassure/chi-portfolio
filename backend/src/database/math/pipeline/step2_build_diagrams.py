@@ -1,27 +1,23 @@
 # backend/src/utils/math/step2_build_diagrams.py
 
 import sys
-import re
 import sqlite3
-import hashlib
 import subprocess
 from pathlib import Path
 from datetime import datetime
 
-SRC_DIR = Path(__file__).resolve().parents[2]
-sys.path.append(str(SRC_DIR))
+SRC_DIR = Path(__file__).resolve().parents[3]  # backend/src
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from config import DB_PATH, MATH_DIAGRAM_DIR, MATH_TEMP_DIR
 
-
-PSPICTURE_RE = re.compile(
-    r"\\begin\{pspicture\}[\s\S]*?\\end\{pspicture\}",
-    re.MULTILINE
+from services.math.render_helper import (
+    PSPICTURE_RE,
+    hash_pstricks_block,
+    make_diagram_img_tag,
+    render_prose_latex_to_html,
 )
-
-
-def hash_block(block: str) -> str:
-    return hashlib.sha256(block.encode("utf-8")).hexdigest()[:16]
 
 
 def wrap_pstricks_document(ps_block: str) -> str:
@@ -115,80 +111,6 @@ def convert_pstricks_to_svg(ps_block: str, source_hash: str) -> tuple[Path | Non
     return svg_path, "", None
 
 
-def render_prose_latex_to_html(tex: str) -> str:
-    if not tex:
-        return ""
-
-    html = tex.replace("\r\n", "\n").replace("\r", "\n")
-
-    # PlanetMath/link escaping macros.
-    html = re.sub(
-        r"\\PMlinkescapetext\{([^{}]*)\}",
-        r"\1",
-        html,
-        flags=re.DOTALL
-    )
-
-    # Common text formatting commands.
-    html = re.sub(
-        r"\\textbf\{([^{}]*)\}",
-        r"<strong>\1</strong>",
-        html,
-        flags=re.DOTALL
-    )
-
-    html = re.sub(
-        r"\\emph\{([^{}]*)\}",
-        r"<em>\1</em>",
-        html,
-        flags=re.DOTALL
-    )
-
-    # Old TeX style emphasis: {\em text}
-    html = re.sub(
-        r"\{\\em\s+([^{}]*)\}",
-        r"<em>\1</em>",
-        html,
-        flags=re.DOTALL
-    )
-
-    # Old TeX style bold: {\bf text}
-    html = re.sub(
-        r"\{\\bf\s+([^{}]*)\}",
-        r"<strong>\1</strong>",
-        html,
-        flags=re.DOTALL
-    )
-
-    # IMPORTANT:
-    # \\ followed by blank lines should become a paragraph break.
-    html = re.sub(r"\\\\[ \t]*(?:\n[ \t]*){2,}", "\n\n", html)
-
-    # Remaining \\ should become a line break.
-    html = re.sub(r"\\\\[ \t]*", "<br>\n", html)
-
-    # Preserve paragraph breaks.
-    parts = re.split(r"\n\s*\n+", html.strip())
-    paragraphs = []
-
-    for part in parts:
-        cleaned = part.strip()
-        if cleaned:
-            paragraphs.append(f"<p>{cleaned}</p>")
-
-    return "\n\n".join(paragraphs)
-
-
-def make_img_tag(svg_filename: str) -> str:
-    return (
-        f'<div class="math-diagram-wrap">'
-        f'<img src="http://127.0.0.1:5000/api/math/diagrams/{svg_filename}" '
-        f'class="math-diagram" '
-        f'alt="Mathematical diagram">'
-        f'</div>'
-    )
-
-
 def make_failed_diagram_placeholder(source_hash: str) -> str:
     return (
         '<div class="img-placeholder">'
@@ -275,7 +197,7 @@ def build_math_diagrams():
         rendered_tex = cleaned_tex
 
         for block_index, ps_block in enumerate(PSPICTURE_RE.findall(cleaned_tex), start=1):
-            source_hash = hash_block(ps_block)
+            source_hash = hash_pstricks_block(ps_block)
             svg_path, error_output, failure_stage = convert_pstricks_to_svg(
                 ps_block,
                 source_hash
@@ -306,7 +228,8 @@ def build_math_diagrams():
 
                 rendered_tex = rendered_tex.replace(
                     ps_block,
-                    make_img_tag(svg_filename)
+                    make_diagram_img_tag(svg_filename),
+                    1
                 )
 
                 diagram_count += 1
@@ -340,21 +263,22 @@ def build_math_diagrams():
 
                 rendered_tex = rendered_tex.replace(
                     ps_block,
-                    make_failed_diagram_placeholder(source_hash)
+                    make_failed_diagram_placeholder(source_hash),
+                    1
                 )
 
-                rendered_tex = render_prose_latex_to_html(rendered_tex)
+        rendered_tex = render_prose_latex_to_html(rendered_tex)
 
-                cursor.execute("""
-                    UPDATE math_concepts
-                    SET rendered_tex = ?
-                    WHERE id = ?;
-                """, (rendered_tex, concept_id))
+        cursor.execute("""
+            UPDATE math_concepts
+            SET rendered_tex = ?
+            WHERE id = ?;
+        """, (rendered_tex, concept_id))
 
     conn.commit()
     conn.close()
 
-    print("✅ [STEP 2] Complete.")
+    print("[STEP 2] Complete.")
     print(f"   Concepts with PSTricks: {concept_count}")
     print(f"   Diagrams converted: {diagram_count}")
     print(f"   Failed conversions: {failed_count}")

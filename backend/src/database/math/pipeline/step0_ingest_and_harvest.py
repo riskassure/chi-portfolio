@@ -5,12 +5,14 @@ import re
 import sqlite3
 from pathlib import Path
 
-SRC_DIR = Path(__file__).resolve().parents[2]
-sys.path.append(str(SRC_DIR))
-from config import DB_PATH
+SRC_DIR = Path(__file__).resolve().parents[3]  # backend/src
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-# Target math workspace external cache directory
-TARGET_DIR = Path(r"C:\Development\planetmath_data")
+from config import DB_PATH, PLANETMATH_CACHE_DIR
+from database.math.pipeline.math_data_manager import run_github_sync
+
+TARGET_DIR = PLANETMATH_CACHE_DIR
 
 # Handle folder crawler imports dynamically out of the current directory
 CURRENT_DIR = Path(__file__).resolve().parent

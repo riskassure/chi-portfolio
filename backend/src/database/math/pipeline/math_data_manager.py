@@ -3,10 +3,17 @@
 import json
 import urllib.request
 import subprocess
+import sys
 from pathlib import Path
 
-# Standardize path configurations via Pathlib
-TARGET_DIR = Path(r"C:\Development\planetmath_data")
+SRC_DIR = Path(__file__).resolve().parents[3]  # backend/src
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from config import PLANETMATH_CACHE_DIR
+
+
+TARGET_DIR = PLANETMATH_CACHE_DIR
 
 def get_repo_list():
     """Fetches relevant PlanetMath repo names from GitHub API."""

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 
-SRC_DIR = Path(__file__).resolve().parents[2]  # backend/src
+SRC_DIR = Path(__file__).resolve().parents[3]  # backend/src
 sys.path.append(str(SRC_DIR))
 
 from config import DB_PATH, MATH_DATA_DIR
@@ -140,10 +140,10 @@ def main() -> None:
         cleaned_tex = row["cleaned_tex"] or ""
         rendered_tex = row["rendered_tex"] or ""
         rendered_tex_for_diagnostics = remove_allowed_mathjax_environments(rendered_tex)
-        
-    for issue_type, patterns in ISSUE_PATTERNS.items():
-        for pattern in patterns:
-            if re.search(pattern, rendered_tex_for_diagnostics, flags=re.IGNORECASE):
+
+        for issue_type, patterns in ISSUE_PATTERNS.items():
+            for pattern in patterns:
+                if re.search(pattern, rendered_tex_for_diagnostics, flags=re.IGNORECASE):
                     findings.append(
                         {
                             "concept_id": concept_id,
