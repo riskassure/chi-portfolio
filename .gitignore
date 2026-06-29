@@ -41,3 +41,6 @@ Thumbs.db
 # Block generated PSTricks/SVG conversion outputs and temporary LaTeX build files
 backend/data/math/diagrams/
 backend/data/math/temp/
+
+# Block generated math diagnostics reports
+backend/data/math/rendered_tex_diagnostics.csv
