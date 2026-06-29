@@ -518,6 +518,72 @@ def render_latex_description_to_html(html: str) -> str:
     )
 
 
+def find_matching_latex_brace(text: str, open_brace_index: int) -> int:
+    """
+    Find the matching closing brace for a LaTeX command argument.
+
+    Returns:
+        The index of the matching closing brace, or -1 if no match is found.
+    """
+    depth = 0
+
+    for index in range(open_brace_index, len(text)):
+        char = text[index]
+
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+
+            if depth == 0:
+                return index
+
+    return -1
+
+
+def replace_latex_text_command(
+    html: str,
+    command_name: str,
+    open_tag: str,
+    close_tag: str,
+) -> str:
+    """
+    Replace a LaTeX text command with an HTML tag, while allowing nested braces.
+
+    Example:
+        \\emph{$\\mathcal{R}$-closed}
+
+    becomes:
+        <em>$\\mathcal{R}$-closed</em>
+    """
+    command_start = f"\\{command_name}" + "{"
+    search_start = 0
+    output_parts = []
+
+    while True:
+        start_index = html.find(command_start, search_start)
+
+        if start_index == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        open_brace_index = start_index + len(command_start) - 1
+        close_brace_index = find_matching_latex_brace(html, open_brace_index)
+
+        if close_brace_index == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        inner_text = html[open_brace_index + 1:close_brace_index]
+
+        output_parts.append(html[search_start:start_index])
+        output_parts.append(f"{open_tag}{inner_text}{close_tag}")
+
+        search_start = close_brace_index + 1
+
+    return "".join(output_parts)
+
+
 def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
         return ""
@@ -555,41 +621,20 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
-    # Convert LaTeX bold text:
-    #   \textbf{...}
-    # into semantic HTML bold text.
-    html = re.sub(
-        r"\\textbf\{([^{}]*)\}",
-        r"<strong>\1</strong>",
-        html,
-        flags=re.DOTALL,
-    )
-
-    # Convert LaTeX emphasized text:
-    #   \emph{...}
-    # into semantic HTML emphasis.
-    html = re.sub(
-        r"\\emph\{([^{}]*)\}",
-        r"<em>\1</em>",
-        html,
-        flags=re.DOTALL,
-    )
+    # Convert LaTeX text commands that use braced arguments.
+    # Use the balanced-brace helper instead of simple regex so nested content such as
+    #   \textbf{\emph{points}}
+    #   \emph{$\mathcal{R}$-closed}
+    # is handled correctly.
+    html = replace_latex_text_command(html, "textbf", "<strong>", "</strong>")
+    html = replace_latex_text_command(html, "emph", "<em>", "</em>")
+    html = replace_latex_text_command(html, "textit", "<em>", "</em>")
 
     # Convert older TeX-style emphasis:
     #   {\em ...}
     # into semantic HTML emphasis.
     html = re.sub(
         r"\{\\em\s+([^{}]*)\}",
-        r"<em>\1</em>",
-        html,
-        flags=re.DOTALL,
-    )
-
-    # Convert LaTeX italic text:
-    #   \textit{...}
-    # into semantic HTML emphasis.
-    html = re.sub(
-        r"\\textit\{([^{}]*)\}",
         r"<em>\1</em>",
         html,
         flags=re.DOTALL,
