@@ -1418,13 +1418,22 @@ def update_math_metadata():
             # If TeX changed, rendered_tex is still cleared for now.
             # The next slice will refresh rendered_tex for text-only changes.
             if smart_save["save_mode"] == "metadata_only":
-                # TeX did not change. Preserve rendered_tex exactly as-is.
+                # TeX did not change, but refresh rendered_tex using the current renderer.
+                # This is useful when render_helper.py has improved since rendered_tex
+                # was last generated.
+                refreshed_rendered_tex = render_tex_reusing_existing_diagrams(
+                    concept_id=concept_id,
+                    cleaned_tex=updated_tex,
+                    cursor=cursor
+                )
+
                 cursor.execute("""
                     UPDATE math_concepts
                     SET
                         title = ?,
                         owner = ?,
                         cleaned_tex = ?,
+                        rendered_tex = ?,
                         updated_at = ?,
                         is_cleaned = ?
                     WHERE id = ?;
@@ -1432,6 +1441,7 @@ def update_math_metadata():
                     updated_title,
                     updated_owner,
                     updated_tex,
+                    refreshed_rendered_tex,
                     uniform_timestamp,
                     is_cleaned_flag,
                     concept_id
