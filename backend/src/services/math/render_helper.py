@@ -615,6 +615,14 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Convert LaTeX paragraph headings into inline bold labels.
+    html = re.sub(
+        r"\\paragraph\*?\{([^{}]*)\}",
+        r"<strong>\1.</strong>",
+        html,
+        flags=re.DOTALL,
+    )
+
     # Convert LaTeX subsubsections into still-lower-level HTML headings.
     html = re.sub(
         r"\\subsubsection\*?\{([^{}]*)\}",
