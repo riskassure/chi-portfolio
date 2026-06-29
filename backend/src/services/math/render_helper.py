@@ -147,6 +147,193 @@ def remove_empty_html_list_items(html: str) -> str:
     )
 
 
+def render_latex_bibliography_block(match: re.Match) -> str:
+    """
+    Convert a LaTeX thebibliography block into an HTML references section.
+
+    Handles:
+        \\bibitem{key} Reference text
+        \\bibitem[Label]{key} Reference text
+
+    Fail-safe rule:
+        If parsing fails, return the original LaTeX block.
+    """
+    original_block = match.group(0)
+    body = match.group(1).strip()
+
+    if not body:
+        return original_block
+
+    bibitem_pattern = re.compile(
+        r"\\bibitem(?:\[[^\]]*\])?\{([^{}]*)\}\s*",
+        flags=re.IGNORECASE,
+    )
+
+    bibitem_matches = list(bibitem_pattern.finditer(body))
+
+    if not bibitem_matches:
+        return original_block
+
+    items = []
+
+    for index, bib_match in enumerate(bibitem_matches):
+        item_start = bib_match.end()
+
+        if index + 1 < len(bibitem_matches):
+            item_end = bibitem_matches[index + 1].start()
+        else:
+            item_end = len(body)
+
+        cleaned = body[item_start:item_end].strip()
+
+        if cleaned:
+            items.append(f"<li>{cleaned}</li>")
+
+    if not items:
+        return original_block
+
+    return (
+        '<section class="math-bibliography">\n'
+        '<h3>References</h3>\n'
+        '<ol>\n'
+        + "\n".join(items)
+        + "\n</ol>\n"
+        "</section>"
+    )
+
+
+def render_latex_bibliography_to_html(html: str) -> str:
+    """
+    Convert LaTeX thebibliography environments into an HTML references section.
+    """
+    return re.sub(
+        r"\\begin\{thebibliography\}(?:\{[^{}]*\})?([\s\S]*?)\\end\{thebibliography\}",
+        render_latex_bibliography_block,
+        html,
+        flags=re.IGNORECASE,
+    )
+
+
+SIMPLE_BLOCK_ENVIRONMENTS = {
+    "center": ("div", "math-center"),
+    "quote": ("blockquote", "math-quote"),
+}
+
+
+def render_simple_latex_block_environment(match: re.Match) -> str:
+    """
+    Convert simple display/block LaTeX environments into HTML wrappers.
+
+    Examples:
+        \\begin{center} ... \\end{center}
+        \\begin{quote} ... \\end{quote}
+    """
+    original_block = match.group(0)
+    env_name = match.group(1).lower()
+    body = match.group(2).strip()
+
+    if env_name not in SIMPLE_BLOCK_ENVIRONMENTS or not body:
+        return original_block
+
+    html_tag, css_class = SIMPLE_BLOCK_ENVIRONMENTS[env_name]
+
+    return (
+        f'<{html_tag} class="{css_class}">\n'
+        f'{body}\n'
+        f'</{html_tag}>'
+    )
+
+
+def render_simple_latex_block_environments_to_html(html: str) -> str:
+    """
+    Convert simple non-math LaTeX block environments into HTML.
+    """
+    env_names = "|".join(
+        re.escape(name)
+        for name in sorted(SIMPLE_BLOCK_ENVIRONMENTS.keys(), key=len, reverse=True)
+    )
+
+    pattern = re.compile(
+        rf"\\begin\{{({env_names})\}}([\s\S]*?)\\end\{{\1\}}",
+        flags=re.IGNORECASE,
+    )
+
+    return pattern.sub(render_simple_latex_block_environment, html)
+
+
+THEOREM_LIKE_ENVIRONMENTS = {
+    "proof": "Proof",
+    "prop": "Proposition",
+    "thm": "Theorem",
+    "thm*": "Theorem",
+    "theorem": "Theorem",
+    "lem": "Lemma",
+    "lemma": "Lemma",
+    "lemma*": "Lemma",
+    "cor": "Corollary",
+    "defn": "Definition",
+    "definition": "Definition",
+    "rem": "Remark",
+    "example": "Example",
+    "example*": "Example",
+}
+
+
+def render_latex_named_environment_block(match: re.Match) -> str:
+    """
+    Convert theorem/proof-like LaTeX environments into semantic HTML blocks.
+
+    Example:
+        \\begin{proof}
+        ...
+        \\end{proof}
+
+    becomes:
+        <section class="math-env math-env-proof">
+        <div class="math-env-label">Proof.</div>
+        <div class="math-env-body">...</div>
+        </section>
+    """
+    original_block = match.group(0)
+    env_name = match.group(1)
+    body = match.group(2).strip()
+
+    env_key = env_name.lower()
+    label = THEOREM_LIKE_ENVIRONMENTS.get(env_key)
+
+    if not label or not body:
+        return original_block
+
+    css_key = re.sub(r"[^a-z0-9]+", "-", env_key).strip("-")
+
+    return (
+        f'<section class="math-env math-env-{css_key}">\n'
+        f'<div class="math-env-label">{label}.</div>\n'
+        f'<div class="math-env-body">\n{body}\n</div>\n'
+        f'</section>'
+    )
+
+
+def render_latex_named_environments_to_html(html: str) -> str:
+    """
+    Convert theorem/proof-like LaTeX environments into HTML.
+
+    This intentionally does not touch MathJax environments like equation,
+    align, pmatrix, array, cases, etc.
+    """
+    env_names = "|".join(
+        re.escape(name)
+        for name in sorted(THEOREM_LIKE_ENVIRONMENTS.keys(), key=len, reverse=True)
+    )
+
+    pattern = re.compile(
+        rf"\\begin\{{({env_names})\}}([\s\S]*?)\\end\{{\1\}}",
+        flags=re.IGNORECASE,
+    )
+
+    return pattern.sub(render_latex_named_environment_block, html)
+
+
 def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
         return ""
@@ -154,6 +341,9 @@ def render_prose_latex_to_html(tex: str) -> str:
     html = tex.replace("\r\n", "\n").replace("\r", "\n")
 
     html = render_latex_lists_to_html(html)
+    html = render_latex_bibliography_to_html(html)
+    html = render_latex_named_environments_to_html(html)
+    html = render_simple_latex_block_environments_to_html(html)
 
     html = re.sub(
         r"\\PMlinkname\{([^{}]+)\}\{([^{}]+)\}",
@@ -185,6 +375,20 @@ def render_prose_latex_to_html(tex: str) -> str:
 
     html = re.sub(
         r"\{\\em\s+([^{}]*)\}",
+        r"<em>\1</em>",
+        html,
+        flags=re.DOTALL,
+    )
+
+    html = re.sub(
+        r"\\textit\{([^{}]*)\}",
+        r"<em>\1</em>",
+        html,
+        flags=re.DOTALL,
+    )
+
+    html = re.sub(
+        r"\{\\it\s+([^{}]*)\}",
         r"<em>\1</em>",
         html,
         flags=re.DOTALL,

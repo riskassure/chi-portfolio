@@ -571,3 +571,35 @@
         grid-template-columns: 1fr !important;
     }
 }
+
+.math-env {
+    margin: 1.25rem 0;
+    padding: 0.9rem 1rem;
+    border-left: 4px solid #ccc;
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.math-env-label {
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.math-env-body > p:first-child {
+    margin-top: 0;
+}
+
+.math-env-body > p:last-child {
+    margin-bottom: 0;
+}
+
+.math-center {
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.math-quote {
+    margin: 1rem 0;
+    padding-left: 1rem;
+    border-left: 4px solid #ccc;
+    font-style: italic;
+}
