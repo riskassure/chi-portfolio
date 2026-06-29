@@ -60,12 +60,17 @@ ISSUE_PATTERNS = {
 MATHJAX_ALLOWED_ENVIRONMENTS = {
     "align",
     "align*",
+    "alignat",
+    "alignat*",
     "equation",
     "equation*",
+    "eqnarray",
+    "eqnarray*",
     "gather",
     "gather*",
     "multline",
     "multline*",
+    "displaymath",
     "split",
     "cases",
     "matrix",
@@ -74,6 +79,7 @@ MATHJAX_ALLOWED_ENVIRONMENTS = {
     "Bmatrix",
     "vmatrix",
     "Vmatrix",
+    "smallmatrix",
     "array",
 }
 
