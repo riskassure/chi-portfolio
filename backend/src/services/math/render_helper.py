@@ -147,6 +147,62 @@ def remove_empty_html_list_items(html: str) -> str:
     )
 
 
+def render_latex_generic_list_block(match: re.Match) -> str:
+    """
+    Convert a generic LaTeX list environment into an HTML ordered list.
+
+    Example:
+        \\begin{list}{...}{}
+        \\item first
+        \\item second
+        \\end{list}
+
+    The list formatting arguments are ignored for now.
+    """
+    original_block = match.group(0)
+    body = match.group(1).strip()
+
+    if not body:
+        return original_block
+
+    raw_items = re.split(
+        r"\\item\b",
+        body,
+        flags=re.IGNORECASE,
+    )
+
+    items = []
+
+    for raw_item in raw_items:
+        cleaned = raw_item.strip()
+
+        if not cleaned:
+            continue
+
+        items.append(f"<li>{cleaned}</li>")
+
+    if not items:
+        return original_block
+
+    return (
+        '<ol class="math-generic-list">\n'
+        + "\n".join(items)
+        + "\n</ol>"
+    )
+
+
+def render_latex_generic_lists_to_html(html: str) -> str:
+    """
+    Convert generic LaTeX list environments into HTML lists.
+    """
+    return re.sub(
+        r"\\begin\{list\}(?:\{[^{}]*\})?(?:\{[^{}]*\})?([\s\S]*?)\\end\{list\}",
+        render_latex_generic_list_block,
+        html,
+        flags=re.IGNORECASE,
+    )
+
+
 def render_latex_bibliography_block(match: re.Match) -> str:
     """
     Convert a LaTeX thebibliography block into an HTML references section.
@@ -324,6 +380,10 @@ def render_latex_tabular_to_html(html: str) -> str:
 SIMPLE_BLOCK_ENVIRONMENTS = {
     "center": ("div", "math-center"),
     "quote": ("blockquote", "math-quote"),
+    "multicols": ("div", "math-multicols"),
+    "figure": ("figure", "math-figure"),
+    "minipage": ("div", "math-minipage"),
+    "document": ("div", "math-document"),
 }
 
 
@@ -354,6 +414,13 @@ def render_simple_latex_block_environment(match: re.Match) -> str:
 def render_simple_latex_block_environments_to_html(html: str) -> str:
     """
     Convert simple non-math LaTeX block environments into HTML.
+
+    This supports simple begin arguments such as:
+        \\begin{figure}[h]
+        \\begin{multicols}{2}
+        \\begin{minipage}{0.5\\textwidth}
+
+    The arguments are intentionally ignored for now.
     """
     env_names = "|".join(
         re.escape(name)
@@ -361,7 +428,11 @@ def render_simple_latex_block_environments_to_html(html: str) -> str:
     )
 
     pattern = re.compile(
-        rf"\\begin\{{({env_names})\}}([\s\S]*?)\\end\{{\1\}}",
+        rf"\\begin\{{({env_names})\}}"
+        rf"(?:\[[^\]]*\])?"
+        rf"(?:\{{[^{{}}]*\}})*"
+        rf"([\s\S]*?)"
+        rf"\\end\{{\1\}}",
         flags=re.IGNORECASE,
     )
 
@@ -596,6 +667,7 @@ def render_prose_latex_to_html(tex: str) -> str:
     # Order matters: list/table/environment renderers should run before generic
     # line-break and paragraph conversion.
     html = render_latex_lists_to_html(html)
+    html = render_latex_generic_lists_to_html(html)
     html = render_latex_description_to_html(html)
     html = render_latex_tabular_to_html(html)
     html = render_latex_bibliography_to_html(html)
