@@ -522,8 +522,13 @@ def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
         return ""
 
+    # Normalize Windows/Mac line endings to Unix-style newlines so later regex
+    # replacements behave consistently.
     html = tex.replace("\r\n", "\n").replace("\r", "\n")
 
+    # Convert larger LaTeX block environments before paragraph wrapping.
+    # Order matters: list/table/environment renderers should run before generic
+    # line-break and paragraph conversion.
     html = render_latex_lists_to_html(html)
     html = render_latex_description_to_html(html)
     html = render_latex_tabular_to_html(html)
@@ -531,6 +536,9 @@ def render_prose_latex_to_html(tex: str) -> str:
     html = render_latex_named_environments_to_html(html)
     html = render_simple_latex_block_environments_to_html(html)
 
+    # Convert PlanetMath explicit links:
+    #   \PMlinkname{visible text}{TargetSlug}
+    # into normal clickable concept links.
     html = re.sub(
         r"\\PMlinkname\{([^{}]+)\}\{([^{}]+)\}",
         render_pmlinkname,
@@ -538,6 +546,8 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Preserve PlanetMath no-autolink text as a span that the frontend autolinker
+    # can intentionally skip.
     html = re.sub(
         r"\\PMlinkescapetext\{([^{}]*)\}",
         r'<span class="math-no-autolink">\1</span>',
@@ -545,6 +555,9 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Convert LaTeX bold text:
+    #   \textbf{...}
+    # into semantic HTML bold text.
     html = re.sub(
         r"\\textbf\{([^{}]*)\}",
         r"<strong>\1</strong>",
@@ -552,6 +565,9 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Convert LaTeX emphasized text:
+    #   \emph{...}
+    # into semantic HTML emphasis.
     html = re.sub(
         r"\\emph\{([^{}]*)\}",
         r"<em>\1</em>",
@@ -559,6 +575,9 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Convert older TeX-style emphasis:
+    #   {\em ...}
+    # into semantic HTML emphasis.
     html = re.sub(
         r"\{\\em\s+([^{}]*)\}",
         r"<em>\1</em>",
@@ -566,6 +585,9 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Convert LaTeX italic text:
+    #   \textit{...}
+    # into semantic HTML emphasis.
     html = re.sub(
         r"\\textit\{([^{}]*)\}",
         r"<em>\1</em>",
@@ -573,6 +595,9 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Convert older TeX-style italics:
+    #   {\it ...}
+    # into semantic HTML emphasis.
     html = re.sub(
         r"\{\\it\s+([^{}]*)\}",
         r"<em>\1</em>",
@@ -580,6 +605,9 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Convert older TeX-style bold:
+    #   {\bf ...}
+    # into semantic HTML bold text.
     html = re.sub(
         r"\{\\bf\s+([^{}]*)\}",
         r"<strong>\1</strong>",
@@ -587,14 +615,71 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Convert LaTeX subsubsections into still-lower-level HTML headings.
+    html = re.sub(
+        r"\\subsubsection\*?\{([^{}]*)\}",
+        r"<h4>\1</h4>",
+        html,
+        flags=re.DOTALL,
+    )
+
+    # Convert LaTeX subsections into lower-level HTML headings.
+    html = re.sub(
+        r"\\subsection\*?\{([^{}]*)\}",
+        r"<h3>\1</h3>",
+        html,
+        flags=re.DOTALL,
+    )
+
+    # Convert top-level LaTeX sections into HTML headings.
+    html = re.sub(
+        r"\\section\*?\{([^{}]*)\}",
+        r"<h2>\1</h2>",
+        html,
+        flags=re.DOTALL,
+    )
+
+    # Drop LaTeX labels for now.
+    # These are internal anchors for \ref, but we are not building anchor targets yet.
+    html = re.sub(
+        r"\\label\{[^{}]*\}",
+        "",
+        html,
+        flags=re.DOTALL,
+    )
+
+    # Convert LaTeX references into visible fallback text.
+    # Later, this could become a real link if we build label/anchor support.
+    html = re.sub(
+        r"\\ref\{([^{}]*)\}",
+        r"\1",
+        html,
+        flags=re.DOTALL,
+    )
+
+    # Convert LaTeX citations into simple visible fallback text.
+    # Later, this could link to rendered bibliography entries.
+    html = re.sub(
+        r"\\cite\{([^{}]*)\}",
+        r"[citation: \1]",
+        html,
+        flags=re.DOTALL,
+    )
+
+    # Convert LaTeX forced line breaks followed by a blank line into paragraph breaks.
     html = re.sub(r"\\\\[ \t]*(?:\n[ \t]*){2,}", "\n\n", html)
+
+    # Convert remaining LaTeX forced line breaks into HTML line breaks.
     html = re.sub(r"\\\\[ \t]*", "<br>\n", html)
 
+    # Remove empty list items that can result from unusual nested list structures.
     html = remove_empty_html_list_items(html)
 
+    # Split prose into paragraphs on blank lines.
     parts = re.split(r"\n\s*\n+", html.strip())
     paragraphs = []
 
+    # Wrap each non-empty prose block in a paragraph.
     for part in parts:
         cleaned = part.strip()
         if cleaned:
