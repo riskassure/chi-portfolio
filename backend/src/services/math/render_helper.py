@@ -214,6 +214,113 @@ def render_latex_bibliography_to_html(html: str) -> str:
     )
 
 
+def clean_latex_table_cell(cell: str) -> str:
+    """
+    Clean one LaTeX table cell before wrapping it in <td>.
+    """
+    cell = cell.strip()
+
+    # Defensive cleanup in case previously-rendered HTML sneaks in.
+    cell = re.sub(r"</?p[^>]*>", "", cell, flags=re.IGNORECASE)
+    cell = re.sub(r"<br\s*/?>", "", cell, flags=re.IGNORECASE)
+
+    # Remove table rule commands that should not be visible as text.
+    cell = re.sub(r"\\hline\b", "", cell, flags=re.IGNORECASE)
+    cell = re.sub(r"\\cline\{[^{}]*\}", "", cell, flags=re.IGNORECASE)
+
+    return cell.strip()
+
+
+def render_latex_tabular_block(match: re.Match) -> str:
+    """
+    Convert a simple LaTeX tabular environment into an HTML table.
+
+    This intentionally handles the common PlanetMath-style cases:
+        \\begin{tabular}{|c|c|}
+        \\hline
+        A & B \\\\
+        \\hline
+        1 & 2
+        \\end{tabular}
+
+    Fail-safe rule:
+        If parsing produces no usable rows, return the original block.
+    """
+    original_block = match.group(0)
+    body = match.group(2).strip()
+
+    if not body:
+        return original_block
+
+    # Defensive cleanup in case this function is ever run on already-rendered text.
+    body = re.sub(
+        r"<br\s*/?>\s*</p>\s*<p[^>]*>",
+        r"\\\\",
+        body,
+        flags=re.IGNORECASE,
+    )
+    body = re.sub(r"</?p[^>]*>", "", body, flags=re.IGNORECASE)
+    body = re.sub(r"<br\s*/?>", r"\\\\", body, flags=re.IGNORECASE)
+
+    # Split rows on LaTeX row breaks.
+    raw_rows = re.split(
+        r"\\\\(?:\s*\[[^\]]*\])?",
+        body,
+        flags=re.IGNORECASE,
+    )
+
+    html_rows = []
+
+    for raw_row in raw_rows:
+        row = raw_row.strip()
+
+        if not row:
+            continue
+
+        row = re.sub(r"\\hline\b", "", row, flags=re.IGNORECASE)
+        row = re.sub(r"\\cline\{[^{}]*\}", "", row, flags=re.IGNORECASE)
+        row = row.strip()
+
+        if not row:
+            continue
+
+        raw_cells = row.split("&")
+        cells = [clean_latex_table_cell(cell) for cell in raw_cells]
+
+        # Avoid creating empty junk rows.
+        if not any(cells):
+            continue
+
+        html_cells = "".join(f"<td>{cell}</td>" for cell in cells)
+
+        html_rows.append(f"<tr>{html_cells}</tr>")
+
+    if not html_rows:
+        return original_block
+
+    return (
+        '<div class="math-table-wrapper">\n'
+        '<table class="math-table">\n'
+        '<tbody>\n'
+        + "\n".join(html_rows)
+        + "\n</tbody>\n"
+        "</table>\n"
+        "</div>"
+    )
+
+
+def render_latex_tabular_to_html(html: str) -> str:
+    """
+    Convert simple LaTeX tabular environments into HTML tables.
+    """
+    return re.sub(
+        r"\\begin\{tabular\}(\{[^{}]*\})?([\s\S]*?)\\end\{tabular\}",
+        render_latex_tabular_block,
+        html,
+        flags=re.IGNORECASE,
+    )
+
+
 SIMPLE_BLOCK_ENVIRONMENTS = {
     "center": ("div", "math-center"),
     "quote": ("blockquote", "math-quote"),
@@ -334,6 +441,83 @@ def render_latex_named_environments_to_html(html: str) -> str:
     return pattern.sub(render_latex_named_environment_block, html)
 
 
+def render_latex_description_block(match: re.Match) -> str:
+    """
+    Convert a LaTeX description environment into an HTML description list.
+
+    Example:
+        \\begin{description}
+        \\item[Term] Explanation
+        \\item[Other] More explanation
+        \\end{description}
+
+    becomes:
+        <dl class="math-description-list">
+        <dt>Term</dt>
+        <dd>Explanation</dd>
+        ...
+        </dl>
+    """
+    original_block = match.group(0)
+    body = match.group(1).strip()
+
+    if not body:
+        return original_block
+
+    item_pattern = re.compile(
+        r"\\item(?:\s*\[([^\]]*)\])?\s*",
+        flags=re.IGNORECASE,
+    )
+
+    item_matches = list(item_pattern.finditer(body))
+
+    if not item_matches:
+        return original_block
+
+    entries = []
+
+    for index, item_match in enumerate(item_matches):
+        label = (item_match.group(1) or "").strip()
+        item_start = item_match.end()
+
+        if index + 1 < len(item_matches):
+            item_end = item_matches[index + 1].start()
+        else:
+            item_end = len(body)
+
+        description = body[item_start:item_end].strip()
+
+        if not label and not description:
+            continue
+
+        if label:
+            entries.append(f"<dt>{label}</dt>")
+            entries.append(f"<dd>{description}</dd>")
+        else:
+            entries.append(f"<dd>{description}</dd>")
+
+    if not entries:
+        return original_block
+
+    return (
+        '<dl class="math-description-list">\n'
+        + "\n".join(entries)
+        + "\n</dl>"
+    )
+
+
+def render_latex_description_to_html(html: str) -> str:
+    """
+    Convert LaTeX description environments into HTML description lists.
+    """
+    return re.sub(
+        r"\\begin\{description\}([\s\S]*?)\\end\{description\}",
+        render_latex_description_block,
+        html,
+        flags=re.IGNORECASE,
+    )
+
+
 def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
         return ""
@@ -341,6 +525,8 @@ def render_prose_latex_to_html(tex: str) -> str:
     html = tex.replace("\r\n", "\n").replace("\r", "\n")
 
     html = render_latex_lists_to_html(html)
+    html = render_latex_description_to_html(html)
+    html = render_latex_tabular_to_html(html)
     html = render_latex_bibliography_to_html(html)
     html = render_latex_named_environments_to_html(html)
     html = render_simple_latex_block_environments_to_html(html)

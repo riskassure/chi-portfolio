@@ -603,3 +603,38 @@
     border-left: 4px solid #ccc;
     font-style: italic;
 }
+
+.math-description-list {
+    margin: 1rem 0;
+}
+
+.math-description-list dt {
+    font-weight: 700;
+    margin-top: 0.75rem;
+}
+
+.math-description-list dd {
+    margin-left: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.math-table-wrapper {
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+.math-table {
+    border-collapse: collapse;
+    width: max-content;
+    max-width: 100%;
+}
+
+.math-table td {
+    border: 1px solid #ccc;
+    padding: 0.35rem 0.55rem;
+    vertical-align: top;
+}
+
+.math-table tr:first-child td {
+    font-weight: 700;
+}

@@ -12,6 +12,32 @@ if str(SRC_DIR) not in sys.path:
 
 from config import DB_PATH
 
+MATHJAX_ALLOWED_ENVIRONMENTS = {
+    "align",
+    "align*",
+    "alignat",
+    "alignat*",
+    "equation",
+    "equation*",
+    "eqnarray",
+    "eqnarray*",
+    "gather",
+    "gather*",
+    "multline",
+    "multline*",
+    "displaymath",
+    "split",
+    "cases",
+    "matrix",
+    "pmatrix",
+    "bmatrix",
+    "Bmatrix",
+    "vmatrix",
+    "Vmatrix",
+    "smallmatrix",
+    "array",
+}
+
 
 def main():
     conn = sqlite3.connect(DB_PATH)
@@ -30,7 +56,8 @@ def main():
         rendered_tex = row["rendered_tex"] or ""
 
         for env in re.findall(r"\\begin\{([^}]+)\}", rendered_tex):
-            env_counter[env] += 1
+            if env not in MATHJAX_ALLOWED_ENVIRONMENTS:
+                env_counter[env] += 1
 
         for cmd in re.findall(r"\\([A-Za-z]+)", rendered_tex):
             command_counter[cmd] += 1
