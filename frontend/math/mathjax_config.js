@@ -120,7 +120,17 @@
 
                     if (
                         parent.closest(
-                            "script, style, textarea, pre, code, .mathjax-diagnostic-ignore"
+                            [
+                                "script",
+                                "style",
+                                "textarea",
+                                "pre",
+                                "code",
+                                "mjx-assistive-mml",
+                                "annotation",
+                                "semantics",
+                                ".mathjax-diagnostic-ignore"
+                            ].join(", ")
                         )
                     ) {
                         return NodeFilter.FILTER_REJECT;
@@ -135,6 +145,17 @@
                         return NodeFilter.FILTER_REJECT;
                     }
 
+                    const rect = parent.getBoundingClientRect();
+
+                    if (
+                        rect.width === 0 ||
+                        rect.height === 0 ||
+                        style.opacity === "0" ||
+                        style.clipPath !== "none"
+                    ) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    
                     return NodeFilter.FILTER_ACCEPT;
                 }
             }
