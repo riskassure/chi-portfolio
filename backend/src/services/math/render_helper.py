@@ -525,7 +525,13 @@ def render_latex_named_environments_to_html(html: str) -> str:
         flags=re.IGNORECASE,
     )
 
-    return pattern.sub(render_latex_named_environment_block, html)
+    previous = None
+
+    while previous != html:
+        previous = html
+        html = pattern.sub(render_latex_named_environment_block, html)
+
+    return html
 
 
 def render_latex_description_block(match: re.Match) -> str:
