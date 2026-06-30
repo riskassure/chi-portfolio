@@ -697,6 +697,230 @@ def replace_latex_text_command(
     return "".join(output_parts)
 
 
+def replace_latex_text_command_until_stable(
+    html: str,
+    command_name: str,
+    open_tag: str,
+    close_tag: str,
+) -> str:
+    """
+    Repeatedly replace a LaTeX text command until no more replacements occur.
+
+    This handles nested same-command cases such as:
+        \\emph{... \\emph{nested text} ...}
+    """
+    previous = None
+
+    while previous != html:
+        previous = html
+        html = replace_latex_text_command(
+            html,
+            command_name,
+            open_tag,
+            close_tag,
+        )
+
+    return html
+
+
+def unwrap_latex_ensuremath(replacement: str) -> str:
+    """
+    Convert \\ensuremath{...} macro bodies into just their math contents.
+    """
+    replacement = replacement.strip()
+
+    command = r"\ensuremath"
+
+    if not replacement.startswith(command):
+        return replacement
+
+    open_brace_index = replacement.find("{", len(command))
+
+    if open_brace_index == -1:
+        return replacement
+
+    close_brace_index = find_matching_latex_brace(replacement, open_brace_index)
+
+    if close_brace_index != len(replacement) - 1:
+        return replacement
+
+    return replacement[open_brace_index + 1:close_brace_index]
+
+
+def render_latex_newcommand_definitions_to_html(html: str) -> str:
+    """
+    Remove simple \\newcommand definitions and expand their later uses.
+
+    Example:
+        \\newcommand{\\concat}{\\ensuremath{+\\hspace{-1ex}+}}
+
+    becomes:
+        uses of \\concat are replaced by +\\hspace{-1ex}+
+    """
+    command = r"\newcommand"
+    search_start = 0
+    output_parts = []
+    macro_replacements = {}
+
+    while True:
+        start_index = html.find(command, search_start)
+
+        if start_index == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        cursor = start_index + len(command)
+
+        while cursor < len(html) and html[cursor].isspace():
+            cursor += 1
+
+        if cursor >= len(html) or html[cursor] != "{":
+            output_parts.append(html[search_start:])
+            break
+
+        macro_name_close = find_matching_latex_brace(html, cursor)
+
+        if macro_name_close == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        macro_name = html[cursor + 1:macro_name_close].strip()
+        cursor = macro_name_close + 1
+
+        while cursor < len(html) and html[cursor].isspace():
+            cursor += 1
+
+        # Ignore optional argument counts for now, but skip them if present.
+        if cursor < len(html) and html[cursor] == "[":
+            optional_close = html.find("]", cursor + 1)
+
+            if optional_close == -1:
+                output_parts.append(html[search_start:])
+                break
+
+            cursor = optional_close + 1
+
+            while cursor < len(html) and html[cursor].isspace():
+                cursor += 1
+
+        if cursor >= len(html) or html[cursor] != "{":
+            output_parts.append(html[search_start:])
+            break
+
+        replacement_close = find_matching_latex_brace(html, cursor)
+
+        if replacement_close == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        replacement = html[cursor + 1:replacement_close].strip()
+
+        output_parts.append(html[search_start:start_index])
+
+        if macro_name.startswith("\\"):
+            macro_replacements[macro_name] = unwrap_latex_ensuremath(replacement)
+
+        search_start = replacement_close + 1
+
+    rendered = "".join(output_parts)
+
+    for macro_name, replacement in macro_replacements.items():
+        rendered = re.sub(
+            re.escape(macro_name) + r"\b",
+            lambda _match, replacement=replacement: replacement,
+            rendered,
+        )
+
+    return rendered
+
+
+def render_pmlinkexternal_to_html(html: str) -> str:
+    """
+    Convert PlanetMath external links into HTML anchors.
+
+    Handles nested braces in the visible text, such as:
+        \\PMlinkexternal{\\emph{Title}}{https://example.com}
+    """
+    command = r"\PMlinkexternal"
+    search_start = 0
+    output_parts = []
+
+    while True:
+        start_index = html.find(command, search_start)
+
+        if start_index == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        cursor = start_index + len(command)
+
+        while cursor < len(html) and html[cursor].isspace():
+            cursor += 1
+
+        if cursor >= len(html) or html[cursor] != "{":
+            output_parts.append(html[search_start:])
+            break
+
+        text_close = find_matching_latex_brace(html, cursor)
+
+        if text_close == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        link_text = html[cursor + 1:text_close]
+        cursor = text_close + 1
+
+        while cursor < len(html) and html[cursor].isspace():
+            cursor += 1
+
+        if cursor >= len(html) or html[cursor] != "{":
+            output_parts.append(html[search_start:])
+            break
+
+        url_close = find_matching_latex_brace(html, cursor)
+
+        if url_close == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        url = html[cursor + 1:url_close].strip()
+        url = url.replace(r"\%", "%")
+        url = url.replace(r"\&", "&")
+
+        output_parts.append(html[search_start:start_index])
+        output_parts.append(
+            '<a class="math-external-link" '
+            f'href="{html_lib.escape(url, quote=True)}" '
+            'target="_blank" '
+            'rel="noopener noreferrer">'
+            f"{link_text}</a>"
+        )
+
+        search_start = url_close + 1
+
+    return "".join(output_parts)
+
+
+def remove_orphan_latex_named_environment_end_tags(html: str) -> str:
+    """
+    Remove leftover theorem/proof-like \\end{...} tags after named environments
+    have already been rendered.
+
+    This is a cleanup pass for malformed or partially converted source.
+    """
+    env_names = "|".join(
+        re.escape(name)
+        for name in sorted(THEOREM_LIKE_ENVIRONMENTS.keys(), key=len, reverse=True)
+    )
+
+    return re.sub(
+        rf"\\end\{{(?:{env_names})\}}",
+        "",
+        html,
+        flags=re.IGNORECASE,
+    )
+
+
 def render_latex_verbatim_block(match: re.Match) -> str:
     """
     Convert a LaTeX verbatim environment into an escaped HTML code block.
@@ -869,7 +1093,9 @@ def render_prose_latex_to_html(tex: str) -> str:
     html = render_latex_multicols_to_html(html)
     html = render_latex_bibliography_to_html(html)
     html = render_latex_named_environments_to_html(html)
+    html = remove_orphan_latex_named_environment_end_tags(html)
     html = render_simple_latex_block_environments_to_html(html)
+    html = render_latex_newcommand_definitions_to_html(html)
 
     # Convert PlanetMath explicit links:
     #   \PMlinkname{visible text}{TargetSlug}
@@ -890,14 +1116,18 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Convert PlanetMath external links, including link text with nested commands.
+    html = render_pmlinkexternal_to_html(html)
+
     # Convert LaTeX text commands that use braced arguments.
     # Use the balanced-brace helper instead of simple regex so nested content such as
     #   \textbf{\emph{points}}
     #   \emph{$\mathcal{R}$-closed}
     # is handled correctly.
-    html = replace_latex_text_command(html, "textbf", "<strong>", "</strong>")
-    html = replace_latex_text_command(html, "emph", "<em>", "</em>")
-    html = replace_latex_text_command(html, "textit", "<em>", "</em>")
+    html = replace_latex_text_command_until_stable(html, "defnterm", "<dfn>", "</dfn>")
+    html = replace_latex_text_command_until_stable(html, "textbf", "<strong>", "</strong>")
+    html = replace_latex_text_command_until_stable(html, "emph", "<em>", "</em>")
+    html = replace_latex_text_command_until_stable(html, "textit", "<em>", "</em>")
 
     # Convert older TeX-style emphasis:
     #   {\em ...}
@@ -959,6 +1189,14 @@ def render_prose_latex_to_html(tex: str) -> str:
         r"<h2>\1</h2>",
         html,
         flags=re.DOTALL,
+    )
+
+    # Drop table of contents markers for now.
+    html = re.sub(
+        r"\\tableofcontents\b",
+        "",
+        html,
+        flags=re.IGNORECASE,
     )
 
     # Drop LaTeX labels for now.
