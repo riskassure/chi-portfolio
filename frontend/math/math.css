@@ -638,3 +638,31 @@
 .math-table tr:first-child td {
     font-weight: 700;
 }
+
+.math-multicols,
+.math-minipage,
+.math-document {
+    margin: 1rem 0;
+}
+
+.math-figure {
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.math-generic-list {
+    margin: 1rem 0;
+    padding-left: 2rem;
+}
+
+.math-verbatim {
+    overflow-x: auto;
+    margin: 1rem 0;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    white-space: pre;
+}
+
+.math-verbatim code {
+    font-family: Consolas, Monaco, monospace;
+}

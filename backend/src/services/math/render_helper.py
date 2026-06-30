@@ -2,6 +2,7 @@
 
 import re
 import html as html_lib
+from html import escape as html_escape
 import hashlib
 from urllib.parse import quote
 
@@ -421,6 +422,15 @@ def render_simple_latex_block_environments_to_html(html: str) -> str:
         \\begin{minipage}{0.5\\textwidth}
 
     The arguments are intentionally ignored for now.
+
+    The replacement runs repeatedly so nested wrappers are handled. For example:
+        \\begin{figure}
+        \\begin{center}
+        ...
+        \\end{center}
+        \\end{figure}
+
+    can convert both figure and center.
     """
     env_names = "|".join(
         re.escape(name)
@@ -436,7 +446,13 @@ def render_simple_latex_block_environments_to_html(html: str) -> str:
         flags=re.IGNORECASE,
     )
 
-    return pattern.sub(render_simple_latex_block_environment, html)
+    previous = None
+
+    while previous != html:
+        previous = html
+        html = pattern.sub(render_simple_latex_block_environment, html)
+
+    return html
 
 
 THEOREM_LIKE_ENVIRONMENTS = {
@@ -655,6 +671,38 @@ def replace_latex_text_command(
     return "".join(output_parts)
 
 
+def render_latex_verbatim_block(match: re.Match) -> str:
+    """
+    Convert a LaTeX verbatim environment into an escaped HTML code block.
+
+    Important:
+        Backslashes are stored as HTML entities so diagnostics do not treat
+        literal example code like \\begin{center} as an unrendered environment.
+    """
+    body = match.group(1).strip("\n")
+
+    escaped = html_escape(body)
+    escaped = escaped.replace("\\", "&#92;")
+
+    return (
+        '<pre class="math-verbatim"><code>'
+        + escaped
+        + "</code></pre>"
+    )
+
+
+def render_latex_verbatim_to_html(html: str) -> str:
+    """
+    Convert LaTeX verbatim environments into escaped HTML code blocks.
+    """
+    return re.sub(
+        r"\\begin\{verbatim\}([\s\S]*?)\\end\{verbatim\}",
+        render_latex_verbatim_block,
+        html,
+        flags=re.IGNORECASE,
+    )
+
+
 def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
         return ""
@@ -662,6 +710,10 @@ def render_prose_latex_to_html(tex: str) -> str:
     # Normalize Windows/Mac line endings to Unix-style newlines so later regex
     # replacements behave consistently.
     html = tex.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Convert verbatim before any other environment rendering so literal LaTeX
+    # examples inside verbatim are preserved instead of being interpreted.
+    html = render_latex_verbatim_to_html(html)
 
     # Convert larger LaTeX block environments before paragraph wrapping.
     # Order matters: list/table/environment renderers should run before generic
