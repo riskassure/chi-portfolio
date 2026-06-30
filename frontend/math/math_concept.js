@@ -69,12 +69,13 @@ async function renderConceptPage(concept) {
         renderFooterArrays(concept);
 
         // 4. #1 & #2 Process TeX payload
-        let rawTexContent = concept.display_tex || concept.rendered_tex || concept.cleaned_tex || "No textual mathematical content saved.";
-        
-        let preProcessedTex = rawTexContent;
+        const rawTexContent = window.MathCmsRender
+            ? window.MathCmsRender.getDisplayTex(concept)
+            : concept.display_tex || concept.rendered_tex || concept.cleaned_tex || "No textual mathematical content saved.";
 
-        preProcessedTex = cleanLaTeXEnvironments(preProcessedTex);
-        preProcessedTex = normalizeDiagramImageUrls(preProcessedTex);
+        const preProcessedTex = window.MathCmsRender
+            ? window.MathCmsRender.prepareConceptHtml(rawTexContent, { apiEndpoint: API_ENDPOINT })
+            : normalizeDiagramImageUrls(cleanLaTeXEnvironments(rawTexContent));
 
         const canvas = document.getElementById("mathContentCanvas");
         canvas.innerHTML = preProcessedTex;

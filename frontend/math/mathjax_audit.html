@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MathJax Macro Audit</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="math.css?v=dev">
+
+    <script src="mathjax_config.js?v=dev"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body class="tex2jax_ignore" style="font-family: system-ui, sans-serif; background-color: #f8fafc; margin: 0; padding: 2rem;">
+    <div style="max-width: 1300px; margin: 0 auto;">
+        <div class="nav-btn-row" style="margin-bottom: 1rem;">
+            <a href="index.html" class="btn-secondary">Main Directory Index 🏠</a>
+            <a href="concept.html" class="btn-secondary">Concept Viewer</a>
+        </div>
+
+        <section style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 2px rgba(15,23,42,0.06); margin-bottom: 1.25rem;">
+            <h1 style="margin: 0 0 0.5rem 0; color: #0f172a;">MathJax Unresolved Macro Audit</h1>
+
+            <p style="color: #475569; line-height: 1.5; margin-top: 0;">
+                This runs actual browser MathJax rendering, then scans the visible rendered page for leftover commands like
+                <code>\dom</code>, <code>\foo</code>, etc.
+            </p>
+
+            <label class="editor-label" for="manualSlugsInput">
+                Manual slugs or IDs, one per line
+            </label>
+
+            <textarea
+                id="manualSlugsInput"
+                style="width: 100%; min-height: 130px; font-family: Consolas, 'Courier New', monospace; font-size: 0.95rem; line-height: 1.45; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.9rem;"
+                placeholder="Paste the two broken concept slugs here, one per line..."
+            ></textarea>
+
+            <div class="editor-action-row">
+                <div class="editor-action-hint">
+                    Manual mode works now. Full crawl mode will work once the backend audit-list endpoint exists.
+                </div>
+
+                <div class="editor-action-buttons">
+                    <button id="auditManualBtn" type="button" class="btn btn-preview">
+                        Audit Manual List
+                    </button>
+
+                    <button id="auditAllBtn" type="button" class="btn btn-primary">
+                        Audit All Concepts
+                    </button>
+
+                    <button id="copyCsvBtn" type="button" class="btn btn-secondary">
+                        Copy CSV
+                    </button>
+                </div>
+            </div>
+
+            <div id="auditStatus" style="margin-top: 1rem; font-weight: 700; color: #334155;">
+                Ready.
+            </div>
+        </section>
+
+        <section style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 2px rgba(15,23,42,0.06);">
+            <h2 style="margin-top: 0;">Audit Results</h2>
+
+            <div id="auditSummary" style="margin-bottom: 1rem; color: #475569;">
+                No results yet.
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table id="auditResultsTable" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; border-bottom: 2px solid #cbd5e1; padding: 0.5rem;">Command</th>
+                            <th style="text-align: left; border-bottom: 2px solid #cbd5e1; padding: 0.5rem;">Count</th>
+                            <th style="text-align: left; border-bottom: 2px solid #cbd5e1; padding: 0.5rem;">Concept</th>
+                            <th style="text-align: left; border-bottom: 2px solid #cbd5e1; padding: 0.5rem;">Slug</th>
+                            <th style="text-align: left; border-bottom: 2px solid #cbd5e1; padding: 0.5rem;">Example</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditResultsBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <div
+            id="auditCanvas"
+            class="math-canvas-frame tex2jax_process"
+            style="position: fixed; left: -10000px; top: 0; width: 900px; max-height: 900px; overflow: hidden;"
+        ></div>
+    </div>
+
+    <script src="../navbar.js"></script>
+    <script src="math_render_helpers.js?v=dev"></script>
+    <script src="mathjax_audit.js?v=dev"></script>
+</body>
+</html>
