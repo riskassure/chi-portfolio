@@ -682,3 +682,15 @@
 .math-prooftree code {
     font-family: Consolas, Monaco, monospace;
 }
+
+.math-code-block {
+    overflow-x: auto;
+    margin: 1rem 0;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    white-space: pre;
+}
+
+.math-code-block code {
+    font-family: Consolas, Monaco, monospace;
+}

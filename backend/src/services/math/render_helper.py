@@ -789,6 +789,38 @@ def render_latex_prooftree_to_html(html: str) -> str:
     )
 
 
+def render_latex_code_like_environment_block(match: re.Match) -> str:
+    """
+    Convert code/algorithm-like LaTeX environments into escaped HTML code blocks.
+
+    This is intentionally conservative. It preserves the original source instead
+    of trying to visually render algorithm syntax.
+    """
+    env_name = match.group(1).lower()
+    body = match.group(2).strip("\n")
+
+    escaped = html_escape(body)
+    escaped = escaped.replace("\\", "&#92;")
+
+    return (
+        f'<pre class="math-code-block math-code-block-{env_name}"><code>'
+        + escaped
+        + "</code></pre>"
+    )
+
+
+def render_latex_code_like_environments_to_html(html: str) -> str:
+    """
+    Convert LaTeX program/alg environments into escaped HTML code blocks.
+    """
+    return re.sub(
+        r"\\begin\{(program|alg)\}(?:\[[^\]]*\])?([\s\S]*?)\\end\{\1\}",
+        render_latex_code_like_environment_block,
+        html,
+        flags=re.IGNORECASE,
+    )
+
+
 def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
         return ""
@@ -803,6 +835,9 @@ def render_prose_latex_to_html(tex: str) -> str:
 
     # Preserve proof-tree source for now instead of leaking raw prooftree environments.
     html = render_latex_prooftree_to_html(html)
+
+    # Preserve code/algorithm-like source blocks for now.
+    html = render_latex_code_like_environments_to_html(html)
 
     # Convert larger LaTeX block environments before paragraph wrapping.
     # Order matters: list/table/environment renderers should run before generic
