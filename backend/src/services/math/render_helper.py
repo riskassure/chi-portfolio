@@ -1,4 +1,4 @@
-# backend/src/utils/math/render_helpers.py
+# backend/src/services/math/render_helper.py
 
 import re
 import html as html_lib
