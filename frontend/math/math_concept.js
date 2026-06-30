@@ -80,14 +80,16 @@ async function renderConceptPage(concept) {
         canvas.innerHTML = preProcessedTex;
 
         // --- CRITICAL: Trigger asynchronous MathJax 3 rendering ---
-        if (window.MathJax && typeof window.MathJax.typesetPromise === "function") {
-            // Clear previous MathJax rendering for this canvas
-            if (typeof window.MathJax.typesetClear === "function") {
-                window.MathJax.typesetClear([canvas]);
-            }
-            
-            // Typeset the new content
-            await window.MathJax.typesetPromise([canvas]);
+        if (
+            window.MathCmsMathJax &&
+            typeof window.MathCmsMathJax.typesetElement === "function"
+        ) {
+            await window.MathCmsMathJax.typesetElement(canvas, {
+                page: "concept",
+                concept_id: concept.id || null,
+                slug: concept.slug || currentSlug || null,
+                title: concept.title || null
+            });
         }
 
         await hydrateConceptAdminControls(concept);

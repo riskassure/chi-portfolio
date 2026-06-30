@@ -1100,13 +1100,16 @@ async function updatePreview() {
     const cleaned = cleanEditorPreviewTex(tex);
     preview.innerHTML = cleaned;
 
-    if (window.MathJax && typeof window.MathJax.typesetPromise === "function") {
+    if (
+        window.MathCmsMathJax &&
+        typeof window.MathCmsMathJax.typesetElement === "function"
+    ) {
         try {
-            if (typeof window.MathJax.typesetClear === "function") {
-                window.MathJax.typesetClear([preview]);
-            }
-
-            await window.MathJax.typesetPromise([preview]);
+            await window.MathCmsMathJax.typesetElement(preview, {
+                page: "editor_preview",
+                mode: editorMode,
+                concept_id: document.getElementById("conceptIdInput")?.value || conceptId || null
+            });
 
         } catch (err) {
             console.warn("Preview MathJax render warning:", err);

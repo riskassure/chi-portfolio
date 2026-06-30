@@ -7,21 +7,7 @@
     <link rel="stylesheet" href="../style.css">
     <link rel="stylesheet" href="math.css?v=2.1">
     
-    <script>
-        window.MathJax = {
-            loader: {load: ['[tex]/ams', '[tex]/noerrors', '[tex]/noundefined', '[tex]/textmacros']},
-            tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]']],
-                processEscapes: true,
-                packages: {'[+]': ['ams', 'noerrors', 'noundefined', 'textmacros']}
-            },
-            options: {
-                ignoreHtmlClass: 'tex2jax_ignore',
-                processHtmlClass: 'tex2jax_process'
-            }
-        };
-    </script>
+    <script src="mathjax_config.js?v=dev"></script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body class="tex2jax_ignore" style="font-family: system-ui, sans-serif; background-color: #f8fafc; margin: 0; padding: 2rem;">
