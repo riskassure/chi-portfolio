@@ -758,6 +758,37 @@ def render_latex_multicols_to_html(html: str) -> str:
     )
 
 
+def render_latex_prooftree_block(match: re.Match) -> str:
+    """
+    Convert a LaTeX prooftree environment into an escaped HTML code block.
+
+    This preserves the proof-tree source for now. A richer visual proof-tree
+    renderer can be added later.
+    """
+    body = match.group(1).strip("\n")
+
+    escaped = html_escape(body)
+    escaped = escaped.replace("\\", "&#92;")
+
+    return (
+        '<pre class="math-prooftree"><code>'
+        + escaped
+        + "</code></pre>"
+    )
+
+
+def render_latex_prooftree_to_html(html: str) -> str:
+    """
+    Convert LaTeX prooftree environments into escaped HTML code blocks.
+    """
+    return re.sub(
+        r"\\begin\{prooftree\}([\s\S]*?)\\end\{prooftree\}",
+        render_latex_prooftree_block,
+        html,
+        flags=re.IGNORECASE,
+    )
+
+
 def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
         return ""
@@ -769,6 +800,9 @@ def render_prose_latex_to_html(tex: str) -> str:
     # Convert verbatim before any other environment rendering so literal LaTeX
     # examples inside verbatim are preserved instead of being interpreted.
     html = render_latex_verbatim_to_html(html)
+
+    # Preserve proof-tree source for now instead of leaking raw prooftree environments.
+    html = render_latex_prooftree_to_html(html)
 
     # Convert larger LaTeX block environments before paragraph wrapping.
     # Order matters: list/table/environment renderers should run before generic

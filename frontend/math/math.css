@@ -670,3 +670,15 @@
 .math-multicols {
     margin: 1rem 0;
 }
+
+.math-prooftree {
+    overflow-x: auto;
+    margin: 1rem 0;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    white-space: pre;
+}
+
+.math-prooftree code {
+    font-family: Consolas, Monaco, monospace;
+}
