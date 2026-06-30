@@ -666,3 +666,7 @@
 .math-verbatim code {
     font-family: Consolas, Monaco, monospace;
 }
+
+.math-multicols {
+    margin: 1rem 0;
+}

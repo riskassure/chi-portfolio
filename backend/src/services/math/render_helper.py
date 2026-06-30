@@ -709,6 +709,55 @@ def render_latex_verbatim_to_html(html: str) -> str:
     )
 
 
+def render_latex_multicols_block(match: re.Match) -> str:
+    """
+    Convert a LaTeX multicols environment into a simple HTML wrapper.
+
+    Handles PlanetMath-style blocks such as:
+        \\begin{multicols}{2}{
+        ...
+        }\\end{multicols}
+
+    The column count is ignored for now; CSS can decide layout later.
+    """
+    original_block = match.group(0)
+    body = match.group(1).strip()
+
+    if not body:
+        return original_block
+
+    # PlanetMath sometimes wraps the entire multicols body in one extra pair
+    # of braces. Strip only that outer wrapper after other renderers have
+    # already converted inner lists/tables.
+    if body.startswith("{") and body.endswith("}"):
+        body = body[1:-1].strip()
+
+    if not body:
+        return original_block
+
+    return (
+        '<div class="math-multicols">\n'
+        + body
+        + "\n</div>"
+    )
+
+
+def render_latex_multicols_to_html(html: str) -> str:
+    """
+    Convert LaTeX multicols environments into HTML wrappers.
+    """
+    return re.sub(
+        r"\\begin\{multicols\}"
+        r"(?:\[[^\]]*\])?"
+        r"(?:\{[^{}]*\})?"
+        r"([\s\S]*?)"
+        r"\\end\{multicols\}",
+        render_latex_multicols_block,
+        html,
+        flags=re.IGNORECASE,
+    )
+
+
 def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
         return ""
@@ -728,6 +777,7 @@ def render_prose_latex_to_html(tex: str) -> str:
     html = render_latex_generic_lists_to_html(html)
     html = render_latex_description_to_html(html)
     html = render_latex_tabular_to_html(html)
+    html = render_latex_multicols_to_html(html)
     html = render_latex_bibliography_to_html(html)
     html = render_latex_named_environments_to_html(html)
     html = render_simple_latex_block_environments_to_html(html)
