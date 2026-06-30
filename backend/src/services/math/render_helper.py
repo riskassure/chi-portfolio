@@ -371,7 +371,7 @@ def render_latex_tabular_to_html(html: str) -> str:
     Convert simple LaTeX tabular environments into HTML tables.
     """
     return re.sub(
-        r"\\begin\{tabular\}(\{[^{}]*\})?([\s\S]*?)\\end\{tabular\}",
+        r"\\begin\{(?:tabular|supertabular)\}(\{[^{}]*\})?([\s\S]*?)\\end\{(?:tabular|supertabular)\}",
         render_latex_tabular_block,
         html,
         flags=re.IGNORECASE,
