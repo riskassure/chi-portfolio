@@ -385,6 +385,12 @@ SIMPLE_BLOCK_ENVIRONMENTS = {
     "figure": ("figure", "math-figure"),
     "minipage": ("div", "math-minipage"),
     "document": ("div", "math-document"),
+
+    # PlanetMath/custom prose wrappers.
+    "stp": ("div", "math-stp"),
+    "conv": ("aside", "math-convention"),
+    "warning": ("aside", "math-warning"),
+    "large": ("div", "math-large"),
 }
 
 
@@ -460,6 +466,7 @@ THEOREM_LIKE_ENVIRONMENTS = {
     "prop": "Proposition",
     "thm": "Theorem",
     "thm*": "Theorem",
+    "thmplain": "Theorem",
     "theorem": "Theorem",
     "lem": "Lemma",
     "lemma": "Lemma",
