@@ -206,14 +206,15 @@ def render_latex_generic_lists_to_html(html: str) -> str:
 
 def render_latex_bibliography_block(match: re.Match) -> str:
     """
-    Convert a LaTeX thebibliography block into an HTML references section.
+    Convert a LaTeX bibliography block into an HTML references section.
 
     Handles:
         \\bibitem{key} Reference text
         \\bibitem[Label]{key} Reference text
+        \\bitem{key} Reference text
 
-    Fail-safe rule:
-        If parsing fails, return the original LaTeX block.
+    If no bibitem-like entries exist, render the whole bibliography body as
+    one reference item instead of leaving raw LaTeX behind.
     """
     original_block = match.group(0)
     body = match.group(1).strip()
@@ -222,26 +223,31 @@ def render_latex_bibliography_block(match: re.Match) -> str:
         return original_block
 
     bibitem_pattern = re.compile(
-        r"\\bibitem(?:\[[^\]]*\])?\{([^{}]*)\}\s*",
+        r"\\b(?:ib)?item(?:\[[^\]]*\])?\{([^{}]*)\}\s*",
         flags=re.IGNORECASE,
     )
 
     bibitem_matches = list(bibitem_pattern.finditer(body))
 
-    if not bibitem_matches:
-        return original_block
-
     items = []
 
-    for index, bib_match in enumerate(bibitem_matches):
-        item_start = bib_match.end()
+    if bibitem_matches:
+        for index, bib_match in enumerate(bibitem_matches):
+            item_start = bib_match.end()
 
-        if index + 1 < len(bibitem_matches):
-            item_end = bibitem_matches[index + 1].start()
-        else:
-            item_end = len(body)
+            if index + 1 < len(bibitem_matches):
+                item_end = bibitem_matches[index + 1].start()
+            else:
+                item_end = len(body)
 
-        cleaned = body[item_start:item_end].strip()
+            cleaned = body[item_start:item_end].strip()
+
+            if cleaned:
+                items.append(f"<li>{cleaned}</li>")
+    else:
+        # Some PlanetMath entries contain a bibliography environment without
+        # explicit \bibitem entries. Preserve the whole body as one reference.
+        cleaned = body.strip()
 
         if cleaned:
             items.append(f"<li>{cleaned}</li>")
@@ -261,10 +267,17 @@ def render_latex_bibliography_block(match: re.Match) -> str:
 
 def render_latex_bibliography_to_html(html: str) -> str:
     """
-    Convert LaTeX thebibliography environments into an HTML references section.
+    Convert LaTeX bibliography environments into an HTML references section.
+
+    Supports both:
+        \begin{thebibliography}
+        \begin{bibliography}
     """
     return re.sub(
-        r"\\begin\{thebibliography\}(?:\{[^{}]*\})?([\s\S]*?)\\end\{thebibliography\}",
+        r"\\begin\{(?:thebibliography|bibliography)\}"
+        r"(?:\{[^{}]*\})?"
+        r"([\s\S]*?)"
+        r"\\end\{(?:thebibliography|bibliography)\}",
         render_latex_bibliography_block,
         html,
         flags=re.IGNORECASE,
