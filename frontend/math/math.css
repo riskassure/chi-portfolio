@@ -707,3 +707,11 @@
 .math-warning {
     font-weight: 500;
 }
+
+.pm-tex-red {
+    color: #b00020 !important;
+}
+
+.pm-tex-blue {
+    color: #1d4ed8 !important;
+}
