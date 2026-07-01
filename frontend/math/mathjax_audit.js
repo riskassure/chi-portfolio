@@ -67,7 +67,7 @@ async function auditAllConcepts() {
     } catch (err) {
         console.warn(err);
         setAuditStatus(
-            `Full crawl is not ready yet: ${err.message}. Use manual slug mode for now.`,
+            `Audit All failed: ${err.message}`,
             "error"
         );
     }

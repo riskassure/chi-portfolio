@@ -538,6 +538,75 @@ def search_admin_math_concepts():
     return process_search()
 
 
+@math_bp.route("/api/admin/math/concepts/audit-list", methods=["GET", "OPTIONS"])
+def get_admin_math_concepts_audit_list():
+    """
+    Protected lightweight concept list for the browser-side MathJax audit page.
+
+    This intentionally returns only enough metadata for the audit page to loop
+    through concepts one at a time. It does not return cleaned_tex/rendered_tex.
+    """
+    if request.method == "OPTIONS":
+        return jsonify({"status": "CORS preflight ok"}), 200
+
+    from app import admin_required
+
+    @admin_required
+    def process_audit_list():
+        conn = None
+
+        try:
+            conn = sqlite3.connect(str(DB_PATH))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT
+                    id,
+                    canonical_name,
+                    slug,
+                    title
+                FROM math_concepts
+                ORDER BY
+                    COALESCE(title, canonical_name, slug, CAST(id AS TEXT)) COLLATE NOCASE ASC;
+            """)
+
+            concepts = []
+
+            for row in cursor.fetchall():
+                concept = dict(row)
+
+                concepts.append({
+                    "id": concept["id"],
+                    "canonical_name": concept["canonical_name"],
+                    "slug": concept["slug"],
+                    "title": (
+                        concept["title"]
+                        or concept["canonical_name"]
+                        or concept["slug"]
+                        or f"Concept {concept['id']}"
+                    )
+                })
+
+            return jsonify({
+                "status": "success",
+                "count": len(concepts),
+                "data": concepts
+            }), 200
+
+        except sqlite3.Error as e:
+            return jsonify({
+                "status": "error",
+                "message": str(e)
+            }), 500
+
+        finally:
+            if conn:
+                conn.close()
+
+    return process_audit_list()
+
+
 @math_bp.route("/api/admin/math/types", methods=["GET", "OPTIONS"])
 def get_admin_math_types():
     """Protected admin lookup route for editor type suggestions."""
