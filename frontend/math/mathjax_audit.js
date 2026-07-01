@@ -156,6 +156,13 @@ async function auditConcept(concept) {
         apiEndpoint: API_ENDPOINT
     });
 
+    // Important for full-audit mode:
+    // MathJax keeps internal references to previously typeset nodes.
+    // Clear those references before replacing the reused audit canvas HTML.
+    if (window.MathJax && typeof window.MathJax.typesetClear === "function") {
+        window.MathJax.typesetClear([canvas]);
+    }
+
     canvas.innerHTML = html;
 
     let leftovers = [];
