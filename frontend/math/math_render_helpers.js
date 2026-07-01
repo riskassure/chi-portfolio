@@ -612,6 +612,76 @@
             .replace(/\\begin\{equation\}([\s\S]*?)\\end\{equation\}/gi, "\\[$1\\]");
     }
 
+    function convertPiecewiseArraysToHtml(tex) {
+        if (!tex) return "";
+
+        return String(tex).replace(
+            /\\\[\s*([\s\S]*?)\\left\s*\\?\{\s*\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*\\right\s*\.\s*\\\]/gi,
+            function(_, prefix, columnSpec, body) {
+                return buildPiecewiseArrayHtml(prefix, body);
+            }
+        );
+    }
+
+    function buildPiecewiseArrayHtml(prefix, body) {
+        const cleanPrefix = normalizePiecewiseMathCell(prefix);
+        const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
+
+        const rows = splitEqnarrayRows(normalizedBody)
+            .map(splitEqnarrayCells)
+            .filter(cells => cells.some(cell => cell.trim().length > 0));
+
+        const braceFontSizeRem = Math.max(2.8, rows.length * 1.48);
+
+        if (rows.length === 0) {
+            return cleanPrefix ? `\\[${cleanPrefix}\\]` : "";
+        }
+
+        const rowHtml = rows.map(cells => {
+            const leftCell = normalizePiecewiseMathCell(cells[0] || "");
+            const rightCell = normalizePiecewiseMathCell(cells.slice(1).join(" ") || "");
+
+            return `
+                <tr>
+                    <td style="padding:0.12rem 0.35rem; text-align:left; white-space:nowrap;">\\(${escapeHtmlForMathCell(leftCell)}\\)</td>
+                    <td style="padding:0.12rem 0.35rem; text-align:left;">\\(${escapeHtmlForMathCell(rightCell)}\\)</td>
+                </tr>
+            `;
+        }).join("");
+
+        const prefixHtml = cleanPrefix
+            ? `<span style="
+                    display:inline-block;
+                    vertical-align:middle;
+                    margin-right:0.35rem;
+                    transform:translateY(0.16em);
+                ">\\(${escapeHtmlForMathCell(cleanPrefix)}\\)</span>`
+            : "";
+
+        return `
+            <div class="pm-piecewise-block tex2jax_process" style="text-align:center; margin:1rem 0;">
+                ${prefixHtml}
+                <span style="
+                    display:inline-block;
+                    vertical-align:middle;
+                    font-size:${braceFontSizeRem.toFixed(2)}rem;
+                    line-height:0.9;
+                ">{</span>
+                <table style="display:inline-table; vertical-align:middle; border-collapse:collapse; text-align:left;">
+                    ${rowHtml}
+                </table>
+            </div>
+        `;
+    }
+
+    function normalizePiecewiseMathCell(value) {
+        return normalizeEqnarrayHtmlArtifacts(value)
+            .replace(/\\textrm\{([^{}]*)\}/gi, "\\text{$1}")
+            .replace(/\\mbox\{([^{}]*)\}/gi, "\\text{$1}")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
     function cleanLaTeXEnvironments(tex) {
         if (!tex) return "";
 
@@ -619,6 +689,9 @@
 
         // Normalize legacy display wrappers so MathJax can process their contents.
         clean = normalizeDisplayMathEnvironments(clean);
+
+        // Convert common PlanetMath piecewise array blocks before MathJax typesetting.
+        clean = convertPiecewiseArraysToHtml(clean);
 
         // Text-level underline used in PlanetMath prose.
         clean = clean.replace(/\\underline\{([^{}]+)\}/gi, "<u>$1</u>");
