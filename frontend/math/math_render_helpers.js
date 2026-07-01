@@ -111,9 +111,38 @@
     }
 
     function splitEqnarrayCells(row) {
-        return String(row || "")
-            .split(/(?<!\\)&/g)
-            .map(cell => cell.trim());
+        const text = String(row || "");
+        const cells = [];
+        let start = 0;
+        let nestedDepth = 0;
+
+        for (let i = 0; i < text.length; i++) {
+            const env = readLatexEnvironmentAt(text, i);
+
+            if (env && isNestedLatexEnvironment(env.name)) {
+                if (env.type === "begin") {
+                    nestedDepth += 1;
+                } else {
+                    nestedDepth = Math.max(0, nestedDepth - 1);
+                }
+
+                i = env.endIndex - 1;
+                continue;
+            }
+
+            if (
+                nestedDepth === 0 &&
+                text[i] === "&" &&
+                text[i - 1] !== "\\"
+            ) {
+                cells.push(text.slice(start, i).trim());
+                start = i + 1;
+            }
+        }
+
+        cells.push(text.slice(start).trim());
+
+        return cells;
     }
 
     function padEqnarrayCells(cells, maxColumns) {
@@ -139,11 +168,91 @@
     }
 
     function splitEqnarrayRows(body) {
-        return String(body || "")
-            // Split LaTeX row separators, including optional spacing like \\[4pt].
-            .split(/\\\\(?:\s*\[[^\]]*\])?/g)
-            .map(row => row.trim())
-            .filter(Boolean);
+        const text = String(body || "");
+        const rows = [];
+        let start = 0;
+        let nestedDepth = 0;
+
+        for (let i = 0; i < text.length; i++) {
+            const env = readLatexEnvironmentAt(text, i);
+
+            if (env && isNestedLatexEnvironment(env.name)) {
+                if (env.type === "begin") {
+                    nestedDepth += 1;
+                } else {
+                    nestedDepth = Math.max(0, nestedDepth - 1);
+                }
+
+                i = env.endIndex - 1;
+                continue;
+            }
+
+            if (
+                nestedDepth === 0 &&
+                text[i] === "\\" &&
+                text[i + 1] === "\\"
+            ) {
+                rows.push(text.slice(start, i).trim());
+                i += 1;
+                start = i + 1;
+            }
+        }
+
+        rows.push(text.slice(start).trim());
+
+        return rows.filter(row => row.length > 0);
+    }
+
+    function readLatexEnvironmentAt(text, index) {
+        const beginMarker = "\\begin{";
+        const endMarker = "\\end{";
+
+        let type = null;
+        let marker = null;
+
+        if (text.startsWith(beginMarker, index)) {
+            type = "begin";
+            marker = beginMarker;
+        } else if (text.startsWith(endMarker, index)) {
+            type = "end";
+            marker = endMarker;
+        } else {
+            return null;
+        }
+
+        const nameStart = index + marker.length;
+        const nameEnd = text.indexOf("}", nameStart);
+
+        if (nameEnd === -1) {
+            return null;
+        }
+
+        return {
+            type,
+            name: text.slice(nameStart, nameEnd),
+            endIndex: nameEnd + 1
+        };
+    }
+
+    function isNestedLatexEnvironment(name) {
+        const normalized = String(name || "").replace(/\*$/, "");
+
+        return [
+            "array",
+            "cases",
+            "matrix",
+            "pmatrix",
+            "bmatrix",
+            "Bmatrix",
+            "vmatrix",
+            "Vmatrix",
+            "smallmatrix",
+            "aligned",
+            "alignedat",
+            "split",
+            "gathered",
+            "subarray"
+        ].includes(normalized);
     }
 
     function normalizeEqnarrayCell(cell) {
@@ -615,12 +724,61 @@
     function convertPiecewiseArraysToHtml(tex) {
         if (!tex) return "";
 
-        return String(tex).replace(
-            /\\\[\s*([\s\S]*?)\\left\s*\\?\{\s*\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*\\right\s*\.\s*\\\]/gi,
+        let output = String(tex);
+
+        // Display-wrapped piecewise arrays:
+        // \[ prefix \left\{ \begin{array}{ll} ... \end{array} \right. \]
+        // Also catches \left \lbrace and \left\lbrace.
+        output = output.replace(
+            /\\\[\s*([\s\S]*?)\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*\\right\s*\.?\s*\\\]/gi,
             function(_, prefix, columnSpec, body) {
                 return buildPiecewiseArrayHtml(prefix, body);
             }
         );
+
+        // $$-wrapped piecewise arrays.
+        output = output.replace(
+            /\$\$\s*([\s\S]*?)\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*\\right\s*\.?\s*\$\$/gi,
+            function(_, prefix, columnSpec, body) {
+                return buildPiecewiseArrayHtml(prefix, body);
+            }
+        );
+
+        // Bare piecewise arrays without a clean display wrapper.
+        // We intentionally do not try to capture a prefix here, to avoid eating prose before the formula.
+        // output = output.replace(
+        //     /\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*\\right\s*\.?/gi,
+        //     function(_, columnSpec, body) {
+        //         return buildPiecewiseArrayHtml("", body);
+        //     }
+        // );
+
+        // Display-wrapped cases environment:
+        // \[ prefix \begin{cases} ... \end{cases} \]
+        output = output.replace(
+            /\\\[\s*([\s\S]*?)\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*\\\]/gi,
+            function(_, prefix, body) {
+                return buildPiecewiseArrayHtml(prefix, body);
+            }
+        );
+
+        // $$-wrapped cases environment.
+        output = output.replace(
+            /\$\$\s*([\s\S]*?)\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*\$\$/gi,
+            function(_, prefix, body) {
+                return buildPiecewiseArrayHtml(prefix, body);
+            }
+        );
+
+        // Bare cases environment.
+        // output = output.replace(
+        //     /\\begin\{cases\}([\s\S]*?)\\end\{cases\}/gi,
+        //     function(_, body) {
+        //         return buildPiecewiseArrayHtml("", body);
+        //     }
+        // );
+
+        return output;
     }
 
     function buildPiecewiseArrayHtml(prefix, body) {
