@@ -151,6 +151,8 @@ async function auditConcept(concept) {
         throw new Error("Audit canvas was not found.");
     }
 
+    canvas.classList.add("tex2jax_process");
+
     const rawTex = window.MathCmsRender.getDisplayTex(concept);
     const html = window.MathCmsRender.prepareConceptHtml(rawTex, {
         apiEndpoint: API_ENDPOINT

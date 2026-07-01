@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "eqnarray-html-table-v1",
+        debugVersion: "displaymath-normalize-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -603,10 +603,22 @@
         `;
     }
 
+    function normalizeDisplayMathEnvironments(tex) {
+        if (!tex) return "";
+
+        return String(tex)
+            .replace(/\\begin\{displaymath\}([\s\S]*?)\\end\{displaymath\}/gi, "\\[$1\\]")
+            .replace(/\\begin\{equation\*\}([\s\S]*?)\\end\{equation\*\}/gi, "\\[$1\\]")
+            .replace(/\\begin\{equation\}([\s\S]*?)\\end\{equation\}/gi, "\\[$1\\]");
+    }
+
     function cleanLaTeXEnvironments(tex) {
         if (!tex) return "";
 
-        let clean = tex;
+        let clean = String(tex || "");
+
+        // Normalize legacy display wrappers so MathJax can process their contents.
+        clean = normalizeDisplayMathEnvironments(clean);
 
         // Text-level underline used in PlanetMath prose.
         clean = clean.replace(/\\underline\{([^{}]+)\}/gi, "<u>$1</u>");
