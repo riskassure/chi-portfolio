@@ -859,6 +859,26 @@
         clean = clean.replace(/\\red\s*([+-]?\d+(?:\.\d+)?)/gi, '<span class="pm-tex-red">$1</span>');
         clean = clean.replace(/\\blue\s*([+-]?\d+(?:\.\d+)?)/gi, '<span class="pm-tex-blue">$1</span>');
 
+        // PlanetMath font-size macros.
+        // Keep braced footnotesize content, but strip unbraced size switches safely.
+        clean = clean.replace(
+            /\\footnotesize\{([\s\S]*?)\}/gi,
+            '<span class="pm-tex-footnotesize">$1</span>'
+        );
+
+        clean = clean.replace(/\\footnotesize\b/gi, "");
+        clean = clean.replace(/\\scriptsize\b/gi, "");
+        clean = clean.replace(/\\small\b/gi, "");
+        clean = clean.replace(/\\normalsize\b/gi, "");
+        clean = clean.replace(/\\large\b/gi, "");
+        clean = clean.replace(/\\Large\b/g, "");
+        clean = clean.replace(/\\LARGE\b/g, "");
+        clean = clean.replace(/\\huge\b/gi, "");
+        clean = clean.replace(/\\Huge\b/g, "");
+
+        // PSTricks configuration commands are not visitor-facing content.
+        clean = clean.replace(/\\psset\{[^{}]*\}/gi, "");
+
         // Text-level underline used in PlanetMath prose.
         clean = clean.replace(/\\underline\{([^{}]+)\}/gi, "<u>$1</u>");
 

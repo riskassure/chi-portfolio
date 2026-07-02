@@ -715,3 +715,7 @@
 .pm-tex-blue {
     color: #1d4ed8 !important;
 }
+
+.pm-tex-footnotesize {
+    font-size: 0.85em;
+}
