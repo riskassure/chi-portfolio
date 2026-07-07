@@ -1,6 +1,7 @@
 # backend/src/utils/math/step2_build_diagrams.py
 
 import sys
+import re
 import sqlite3
 import subprocess
 from pathlib import Path
@@ -13,7 +14,6 @@ if str(SRC_DIR) not in sys.path:
 from config import DB_PATH, MATH_DIAGRAM_DIR, MATH_TEMP_DIR
 
 from services.math.render_helper import (
-    PSPICTURE_RE,
     hash_pstricks_block,
     make_diagram_img_tag,
     render_prose_latex_to_html,
@@ -37,6 +37,52 @@ def wrap_pstricks_document(ps_block: str) -> str:
 {ps_block}
 \end{{document}}
 """
+
+
+PSTRICKS_BLOCK_WITH_SETUP_RE = re.compile(
+    r"""
+    (?P<setup>
+        (?:
+            [ \t\r\n]*
+            \\psset\s*\{[^{}]*\}
+        )*
+    )
+    [ \t\r\n]*
+    (?P<picture>
+        \\begin\{pspicture\}
+        [\s\S]*?
+        \\end\{pspicture\}
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def iter_pstricks_blocks_with_setup(cleaned_tex: str):
+    """
+    Yield PSTricks conversion blocks.
+
+    If one or more \\psset{...} commands appear immediately before a
+    pspicture block, include them in the conversion source and replacement
+    source. This lets PSTricks scaling/setup affect the generated SVG and
+    prevents the setup command from remaining as visible prose.
+    """
+    text = cleaned_tex or ""
+
+    for match in PSTRICKS_BLOCK_WITH_SETUP_RE.finditer(text):
+        full_block = match.group(0)
+        setup = match.group("setup") or ""
+        picture = match.group("picture") or ""
+
+        conversion_source = f"{setup}\n{picture}".strip()
+
+        yield {
+            "full_block": full_block,
+            "conversion_source": conversion_source,
+            "picture": picture,
+            "setup": setup,
+        }
+
 
 
 def combine_process_output(error: subprocess.CalledProcessError) -> str:
@@ -196,10 +242,13 @@ def build_math_diagrams():
         concept_count += 1
         rendered_tex = cleaned_tex
 
-        for block_index, ps_block in enumerate(PSPICTURE_RE.findall(cleaned_tex), start=1):
-            source_hash = hash_pstricks_block(ps_block)
+        for block_index, block_info in enumerate(iter_pstricks_blocks_with_setup(cleaned_tex), start=1):
+            full_block = block_info["full_block"]
+            conversion_source = block_info["conversion_source"]
+
+            source_hash = hash_pstricks_block(conversion_source)
             svg_path, error_output, failure_stage = convert_pstricks_to_svg(
-                ps_block,
+                conversion_source,
                 source_hash
             )
 
@@ -221,13 +270,13 @@ def build_math_diagrams():
                     concept_id,
                     block_index,
                     source_hash,
-                    ps_block,
+                    conversion_source,
                     svg_url_path,
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 ))
 
                 rendered_tex = rendered_tex.replace(
-                    ps_block,
+                    full_block,
                     make_diagram_img_tag(svg_filename),
                     1
                 )
@@ -254,7 +303,7 @@ def build_math_diagrams():
                     concept_id,
                     block_index,
                     source_hash,
-                    ps_block,
+                    conversion_source,
                     failure_stage,
                     error_output,
                     tex_temp_path,
@@ -262,7 +311,7 @@ def build_math_diagrams():
                 ))
 
                 rendered_tex = rendered_tex.replace(
-                    ps_block,
+                    full_block,
                     make_failed_diagram_placeholder(source_hash),
                     1
                 )

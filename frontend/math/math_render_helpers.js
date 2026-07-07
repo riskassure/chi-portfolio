@@ -876,9 +876,6 @@
         clean = clean.replace(/\\huge\b/gi, "");
         clean = clean.replace(/\\Huge\b/g, "");
 
-        // PSTricks configuration commands are not visitor-facing content.
-        clean = clean.replace(/\\psset\{[^{}]*\}/gi, "");
-
         // Text-level underline used in PlanetMath prose.
         clean = clean.replace(/\\underline\{([^{}]+)\}/gi, "<u>$1</u>");
 
