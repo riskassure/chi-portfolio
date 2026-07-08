@@ -5,11 +5,17 @@ const AUDIT_VERSION = "mathjax-audit-v1";
 
 let latestAuditRows = [];
 
+const AUDIT_ROWS_STORAGE_KEY = "mathCmsLatestAuditRows";
+const AUDIT_STATUS_STORAGE_KEY = "mathCmsLatestAuditStatus";
+const AUDIT_SAVED_AT_STORAGE_KEY = "mathCmsLatestAuditSavedAt";
+
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("auditManualBtn")?.addEventListener("click", auditManualList);
     document.getElementById("auditAllBtn")?.addEventListener("click", auditAllConcepts);
     document.getElementById("auditProblematicBtn")?.addEventListener("click", auditProblematicConcepts);
     document.getElementById("copyCsvBtn")?.addEventListener("click", copyLatestCsv);
+
+    restoreLatestAuditSnapshot();
 });
 
 async function auditManualList() {
@@ -102,6 +108,7 @@ async function auditConceptListMode(mode) {
 async function runAudit(conceptRefs, options = {}) {
     latestAuditRows = [];
     renderAuditRows();
+    clearLatestAuditSnapshot();
 
     const mode = options.mode || "manual";
     const persistRun = Boolean(options.persistRun);
@@ -180,10 +187,15 @@ async function runAudit(conceptRefs, options = {}) {
 
     if (persistRun) {
         try {
-            setAuditStatus(
-                `Scan complete. Saving audit run with ${auditResultPayload.length} result record(s)...`,
-                "info"
-            );
+            const preSaveMessage =
+                `Scan complete. Saving audit run with ${auditResultPayload.length} result record(s)...`;
+
+            setAuditStatus(preSaveMessage, "info");
+
+            // Important:
+            // Live Server may reload the page when SQLite changes during batch-save.
+            // Save visible audit rows first so Copy CSV still works after reload.
+            saveLatestAuditSnapshot(preSaveMessage);
 
             batchSaveInfo = await batchSaveAuditRun(mode, auditResultPayload);
 
@@ -223,10 +235,14 @@ async function runAudit(conceptRefs, options = {}) {
         doneMessage.push(`saved audit run: ${batchSaveInfo.run_id}`);
     }
 
+    const finalMessage = `${doneMessage.join("; ")}.`;
+
     setAuditStatus(
-        `${doneMessage.join("; ")}.`,
+        finalMessage,
         latestAuditRows.length > 0 ? "warn" : "success"
     );
+
+    saveLatestAuditSnapshot(finalMessage);
 }
 
 async function batchSaveAuditRun(mode, results) {
@@ -327,6 +343,71 @@ async function auditConcept(concept) {
                     : ""
         }))
     };
+}
+
+function saveLatestAuditSnapshot(statusMessage = "") {
+    try {
+        sessionStorage.setItem(
+            AUDIT_ROWS_STORAGE_KEY,
+            JSON.stringify(latestAuditRows || [])
+        );
+
+        sessionStorage.setItem(
+            AUDIT_STATUS_STORAGE_KEY,
+            statusMessage || ""
+        );
+
+        sessionStorage.setItem(
+            AUDIT_SAVED_AT_STORAGE_KEY,
+            new Date().toLocaleString()
+        );
+
+    } catch (err) {
+        console.warn("Unable to save audit snapshot to sessionStorage.", err);
+    }
+}
+
+
+function restoreLatestAuditSnapshot() {
+    try {
+        const rawRows = sessionStorage.getItem(AUDIT_ROWS_STORAGE_KEY);
+
+        if (!rawRows) {
+            return;
+        }
+
+        const rows = JSON.parse(rawRows);
+
+        if (!Array.isArray(rows) || rows.length === 0) {
+            return;
+        }
+
+        latestAuditRows = rows;
+        renderAuditRows();
+
+        const savedAt = sessionStorage.getItem(AUDIT_SAVED_AT_STORAGE_KEY);
+        const priorStatus = sessionStorage.getItem(AUDIT_STATUS_STORAGE_KEY);
+
+        setAuditStatus(
+            priorStatus ||
+                `Restored ${rows.length} audit result row(s) from the previous audit${savedAt ? ` saved at ${savedAt}` : ""}. You can copy CSV now.`,
+            "warn"
+        );
+
+    } catch (err) {
+        console.warn("Unable to restore audit snapshot from sessionStorage.", err);
+    }
+}
+
+
+function clearLatestAuditSnapshot() {
+    try {
+        sessionStorage.removeItem(AUDIT_ROWS_STORAGE_KEY);
+        sessionStorage.removeItem(AUDIT_STATUS_STORAGE_KEY);
+        sessionStorage.removeItem(AUDIT_SAVED_AT_STORAGE_KEY);
+    } catch (err) {
+        console.warn("Unable to clear audit snapshot from sessionStorage.", err);
+    }
 }
 
 function getIssueCount(rows) {
