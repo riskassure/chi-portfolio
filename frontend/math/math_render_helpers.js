@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "displaymath-normalize-v1",
+        debugVersion: "xymatrix-options-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -282,9 +282,12 @@
                 break;
             }
 
-            const braceStart = findNextNonSpaceIndex(tex, matrixIndex + "\\xymatrix".length);
+            const braceStart = findXyMatrixBodyStart(
+                tex,
+                matrixIndex + "\\xymatrix".length
+            );
 
-            if (braceStart === -1 || tex[braceStart] !== "{") {
+            if (braceStart === -1) {
                 result += tex.slice(cursor, matrixIndex + "\\xymatrix".length);
                 cursor = matrixIndex + "\\xymatrix".length;
                 continue;
@@ -325,6 +328,76 @@
         }
 
         return result;
+    }
+
+    function findXyMatrixBodyStart(text, startIndex) {
+        let i = findNextNonSpaceIndex(text, startIndex);
+
+        if (i === -1) {
+            return -1;
+        }
+
+        // Ordinary case:
+        // \xymatrix{...}
+        if (text[i] === "{") {
+            return i;
+        }
+
+        // Extended PlanetMath / Xy-pic option cases:
+        // \xymatrix@C=1.5cm{...}
+        // \xymatrix@R-=2pt{...}
+        // \xymatrix@+=1.5cm{...}
+        // \xymatrix@1{...}
+        // \xymatrix @R=1pt @C=1.5cm {...}
+        // \xymatrix @!=1pt {...}
+        if (text[i] !== "@") {
+            return -1;
+        }
+
+        const limit = Math.min(text.length, i + 180);
+
+        while (i < limit) {
+            while (i < limit && /\s/.test(text[i])) {
+                i += 1;
+            }
+
+            if (i >= limit) {
+                return -1;
+            }
+
+            if (text[i] === "{" && text[i - 1] !== "\\") {
+                return i;
+            }
+
+            if (text[i] !== "@") {
+                return -1;
+            }
+
+            // Consume one @ option token.
+            // Examples:
+            //   @C=1.5cm
+            //   @R-=2pt
+            //   @+=3pc
+            //   @1
+            //   @!
+            //   @!=1pt
+            //   @-2ex
+            i += 1;
+
+            while (i < limit) {
+                if (text[i] === "{" && text[i - 1] !== "\\") {
+                    return i;
+                }
+
+                if (/\s/.test(text[i]) || text[i] === "@") {
+                    break;
+                }
+
+                i += 1;
+            }
+        }
+
+        return -1;
     }
 
     function findNextNonSpaceIndex(text, startIndex) {
@@ -472,7 +545,17 @@
         const text = String(rawCell || "").trim();
         const arrows = [];
 
-        const arrowPattern = /\\ar(?:\s*\[([^\]]*)\])?((?:\s*[_^]\{[^{}]*\})*)/g;
+        // Supports common Xy-pic variants:
+        //   \ar[r]
+        //   \ar[d]^f
+        //   \ar[r]^{F(x)}
+        //   \ar@<0.5ex>[r]^f
+        //   \ar@<-0.5ex>[r]_g
+        //   \ar@{->}[rd]
+        //   \ar@{}[dr]|{=}
+        //   \ar@/^1ex/[ddr]
+        const arrowPattern =
+            /\\ar(?:@\{[^{}]*\}|@<[^>]*>|@[^\s\[\]&{}]+)*(?:\s*\[([^\]]*)\])?((?:\s*(?:[_^](?:[-+])?(?:\{[^{}]*\}|\\?[A-Za-z0-9]+)|\|(?:\{[^{}]*\}|\\?[A-Za-z0-9=+\-]+)))*)/g;
 
         let match;
 
@@ -505,9 +588,21 @@
     }
 
     function extractXyArrowLabel(modifierText) {
-        const match = String(modifierText || "").match(/[_^]\{([^{}]*)\}/);
+        const text = String(modifierText || "");
 
-        return match ? match[1].trim() : "";
+        const bracedMatch = text.match(
+            /(?:[_^](?:[-+])?|\|)\{([^{}]*)\}/
+        );
+
+        if (bracedMatch) {
+            return bracedMatch[1].trim();
+        }
+
+        const unbracedMatch = text.match(
+            /(?:[_^](?:[-+])?|\|)\s*(\\?[A-Za-z0-9=+\-]+)/
+        );
+
+        return unbracedMatch ? unbracedMatch[1].trim() : "";
     }
 
     function setGridCellIfInBounds(grid, row, col, value) {
