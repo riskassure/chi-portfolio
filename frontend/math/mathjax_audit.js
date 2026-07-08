@@ -1,12 +1,14 @@
 // frontend/math/mathjax_audit.js
 
 const API_ENDPOINT = "http://127.0.0.1:5000/api";
+const AUDIT_VERSION = "mathjax-audit-v1";
 
 let latestAuditRows = [];
 
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("auditManualBtn")?.addEventListener("click", auditManualList);
     document.getElementById("auditAllBtn")?.addEventListener("click", auditAllConcepts);
+    document.getElementById("auditProblematicBtn")?.addEventListener("click", auditProblematicConcepts);
     document.getElementById("copyCsvBtn")?.addEventListener("click", copyLatestCsv);
 });
 
@@ -30,16 +32,30 @@ async function auditManualList() {
         identifier
     }));
 
-    await runAudit(conceptRefs);
+    await runAudit(conceptRefs, {
+        mode: "manual",
+        persistRun: false
+    });
 }
 
 async function auditAllConcepts() {
-    try {
-        setAuditStatus("Loading audit concept list...", "info");
+    await auditConceptListMode("all");
+}
 
-        const response = await fetch(`${API_ENDPOINT}/admin/math/concepts/audit-list`, {
-            credentials: "include"
-        });
+async function auditProblematicConcepts() {
+    await auditConceptListMode("problematic");
+}
+
+async function auditConceptListMode(mode) {
+    try {
+        setAuditStatus(`Loading ${mode} audit concept list...`, "info");
+
+        const response = await fetch(
+            `${API_ENDPOINT}/admin/math/concepts/audit-list?mode=${encodeURIComponent(mode)}`,
+            {
+                credentials: "include"
+            }
+        );
 
         const json = await response.json();
 
@@ -58,30 +74,45 @@ async function auditAllConcepts() {
             }))
             .filter(row => row.identifier);
 
+        latestAuditRows = [];
+        renderAuditRows();
+
         if (conceptRefs.length === 0) {
-            throw new Error("Audit-list endpoint returned zero concepts.");
+            setAuditStatus(
+                json.message || `No concepts returned for ${mode} audit mode.`,
+                "success"
+            );
+            return;
         }
 
-        await runAudit(conceptRefs);
+        await runAudit(conceptRefs, {
+            mode,
+            persistRun: true
+        });
 
     } catch (err) {
         console.warn(err);
         setAuditStatus(
-            `Audit All failed: ${err.message}`,
+            `Audit ${mode} failed: ${err.message}`,
             "error"
         );
     }
 }
 
-async function runAudit(conceptRefs) {
+async function runAudit(conceptRefs, options = {}) {
     latestAuditRows = [];
     renderAuditRows();
+
+    const mode = options.mode || "manual";
+    const persistRun = Boolean(options.persistRun);
 
     const total = conceptRefs.length;
     let checked = 0;
     let failed = 0;
 
-    setAuditStatus(`Starting audit for ${total} concept(s)...`, "info");
+    const auditResultPayload = [];
+
+    setAuditStatus(`Starting ${mode} audit for ${total} concept(s)...`, "info");
 
     for (const ref of conceptRefs) {
         checked += 1;
@@ -93,16 +124,31 @@ async function runAudit(conceptRefs) {
 
         try {
             const concept = await fetchConcept(ref.identifier);
-            const rows = await auditConcept(concept);
+            const auditResult = await auditConcept(concept);
+            const rows = auditResult.rows || [];
 
             latestAuditRows.push(...rows);
             renderAuditRows();
 
-            // Small pause keeps the browser responsive during bigger runs.
-            await sleep(25);
+            if (persistRun && concept.id) {
+                auditResultPayload.push({
+                    concept_id: concept.id,
+                    rendered_tex_hash: auditResult.rendered_tex_hash || "unknown",
+                    status: rows.length > 0 ? "problematic" : "clean",
+                    issue_count: getIssueCount(rows),
+                    issue_summary: summarizeRowsForConcept(rows)
+                });
+            }
 
         } catch (err) {
             failed += 1;
+
+            console.warn("Fetch/render audit failed.", {
+                checked,
+                total,
+                ref,
+                error: err
+            });
 
             latestAuditRows.push({
                 command: "[FETCH_OR_RENDER_ERROR]",
@@ -115,19 +161,99 @@ async function runAudit(conceptRefs) {
             });
 
             renderAuditRows();
+
+            if (persistRun && ref.id) {
+                auditResultPayload.push({
+                    concept_id: ref.id,
+                    rendered_tex_hash: "unknown",
+                    status: "error",
+                    issue_count: 1,
+                    issue_summary: err.message || String(err)
+                });
+            }
+        }
+
+        await sleep(25);
+    }
+
+    let batchSaveInfo = null;
+
+    if (persistRun) {
+        try {
+            setAuditStatus(
+                `Scan complete. Saving audit run with ${auditResultPayload.length} result record(s)...`,
+                "info"
+            );
+
+            batchSaveInfo = await batchSaveAuditRun(mode, auditResultPayload);
+
+        } catch (err) {
+            console.warn("Unable to batch-save audit run.", err);
+
+            latestAuditRows.push({
+                command: "[AUDIT_BATCH_SAVE_ERROR]",
+                count: 1,
+                concept_id: "",
+                slug: "",
+                title: "Audit run",
+                example: err.message || String(err),
+                concept_url: ""
+            });
+
+            renderAuditRows();
         }
     }
 
     const issueConceptCount = new Set(
         latestAuditRows
-            .filter(row => row.command !== "[FETCH_OR_RENDER_ERROR]")
+            .filter(row =>
+                row.command !== "[FETCH_OR_RENDER_ERROR]" &&
+                row.command !== "[AUDIT_BATCH_SAVE_ERROR]"
+            )
             .map(row => row.slug || row.concept_id)
     ).size;
 
+    const doneMessage = [
+        `Done. Checked ${checked}`,
+        `concepts with visible macro issues: ${issueConceptCount}`,
+        `fetch/render failures: ${failed}`
+    ];
+
+    if (batchSaveInfo) {
+        doneMessage.push(`saved audit run: ${batchSaveInfo.run_id}`);
+    }
+
     setAuditStatus(
-        `Done. Checked ${checked}; concepts with visible macro issues: ${issueConceptCount}; fetch/render failures: ${failed}.`,
+        `${doneMessage.join("; ")}.`,
         latestAuditRows.length > 0 ? "warn" : "success"
     );
+}
+
+async function batchSaveAuditRun(mode, results) {
+    const response = await fetch(`${API_ENDPOINT}/admin/math/audit-runs/batch-save`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            mode,
+            audit_version: AUDIT_VERSION,
+            results
+        })
+    });
+
+    const json = await response.json();
+
+    if (!response.ok || json.status !== "success") {
+        throw new Error(
+            json.message ||
+            json.error ||
+            `Unable to batch-save audit run. HTTP ${response.status}`
+        );
+    }
+
+    return json;
 }
 
 async function fetchConcept(identifier) {
@@ -154,6 +280,8 @@ async function auditConcept(concept) {
     canvas.classList.add("tex2jax_process");
 
     const rawTex = window.MathCmsRender.getDisplayTex(concept);
+    const renderedTexHash = await hashText(rawTex || "");
+
     const html = window.MathCmsRender.prepareConceptHtml(rawTex, {
         apiEndpoint: API_ENDPOINT
     });
@@ -183,19 +311,74 @@ async function auditConcept(concept) {
         throw new Error("MathCmsMathJax.typesetElement is not available.");
     }
 
-    return leftovers.map(item => ({
-        command: item.command,
-        count: item.count,
-        concept_id: concept.id || "",
-        slug: concept.slug || "",
-        title: concept.title || "",
-        example: (item.examples || [])[0] || "",
-        concept_url: concept.slug
-            ? `concept.html?slug=${encodeURIComponent(concept.slug)}`
-            : concept.id
-                ? `concept.html?id=${encodeURIComponent(concept.id)}`
-                : ""
-    }));
+    return {
+        rendered_tex_hash: renderedTexHash,
+        rows: leftovers.map(item => ({
+            command: item.command,
+            count: item.count,
+            concept_id: concept.id || "",
+            slug: concept.slug || "",
+            title: concept.title || "",
+            example: (item.examples || [])[0] || "",
+            concept_url: concept.slug
+                ? `concept.html?slug=${encodeURIComponent(concept.slug)}`
+                : concept.id
+                    ? `concept.html?id=${encodeURIComponent(concept.id)}`
+                    : ""
+        }))
+    };
+}
+
+function getIssueCount(rows) {
+    return rows.reduce(
+        (total, row) => total + Number(row.count || 0),
+        0
+    );
+}
+
+function summarizeRowsForConcept(rows) {
+    if (!rows || rows.length === 0) {
+        return "";
+    }
+
+    const summary = {};
+
+    rows.forEach(row => {
+        const command = row.command || "[unknown]";
+        summary[command] = (summary[command] || 0) + Number(row.count || 0);
+    });
+
+    return JSON.stringify(summary);
+}
+
+async function hashText(text) {
+    const normalized = String(text || "");
+
+    if (
+        window.crypto &&
+        window.crypto.subtle &&
+        typeof TextEncoder !== "undefined"
+    ) {
+        const encoder = new TextEncoder();
+        const buffer = await window.crypto.subtle.digest(
+            "SHA-256",
+            encoder.encode(normalized)
+        );
+
+        return Array.from(new Uint8Array(buffer))
+            .map(byte => byte.toString(16).padStart(2, "0"))
+            .join("");
+    }
+
+    // Fallback for older/insecure browser contexts.
+    let hash = 0;
+
+    for (let i = 0; i < normalized.length; i += 1) {
+        hash = ((hash << 5) - hash) + normalized.charCodeAt(i);
+        hash |= 0;
+    }
+
+    return `fallback-${Math.abs(hash)}`;
 }
 
 function renderAuditRows() {
@@ -335,4 +518,4 @@ function escapeHtml(value) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
-}
+}   

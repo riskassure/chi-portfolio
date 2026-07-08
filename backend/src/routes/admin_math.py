@@ -538,13 +538,190 @@ def search_admin_math_concepts():
     return process_search()
 
 
+def get_now_timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def normalize_audit_mode(value):
+    mode = (value or "all").strip().lower()
+
+    if mode not in {"all", "problematic"}:
+        return "all"
+
+    return mode
+
+
+def get_latest_completed_audit_run_id(cursor):
+    cursor.execute("""
+        SELECT id
+        FROM math_audit_runs
+        WHERE completed_at IS NOT NULL
+        ORDER BY completed_at DESC, id DESC
+        LIMIT 1;
+    """)
+
+    row = cursor.fetchone()
+
+    if not row:
+        return None
+
+    return row["id"] if isinstance(row, sqlite3.Row) else row[0]
+
+
+@math_bp.route("/api/admin/math/audit-runs/batch-save", methods=["POST", "OPTIONS"])
+def batch_save_math_audit_run():
+    """Persist a completed browser-side MathJax audit run in one transaction."""
+    if request.method == "OPTIONS":
+        return jsonify({"status": "CORS preflight ok"}), 200
+
+    from app import admin_required
+
+    @admin_required
+    def process_batch_save():
+        data = request.get_json() or {}
+
+        mode = normalize_audit_mode(data.get("mode"))
+        audit_version = (data.get("audit_version") or "mathjax-audit-v1").strip()
+        results = data.get("results") or []
+
+        if not isinstance(results, list):
+            return jsonify({
+                "status": "error",
+                "message": "results must be a list."
+            }), 400
+
+        uniform_timestamp = get_now_timestamp()
+
+        conn = None
+
+        try:
+            conn = sqlite3.connect(str(DB_PATH))
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA foreign_keys = ON;")
+
+            cursor.execute("""
+                INSERT INTO math_audit_runs (
+                    started_at,
+                    completed_at,
+                    audit_version,
+                    mode,
+                    total_scanned,
+                    total_problematic,
+                    total_errors
+                )
+                VALUES (?, NULL, ?, ?, 0, 0, 0);
+            """, (
+                uniform_timestamp,
+                audit_version,
+                mode
+            ))
+
+            run_id = cursor.lastrowid
+
+            saved_count = 0
+
+            for row in results:
+                concept_id = row.get("concept_id")
+                rendered_tex_hash = (row.get("rendered_tex_hash") or "unknown").strip()
+                status = (row.get("status") or "").strip().lower()
+                issue_count = int(row.get("issue_count") or 0)
+                issue_summary = row.get("issue_summary") or ""
+
+                if not concept_id:
+                    continue
+
+                if status not in {"clean", "problematic", "error"}:
+                    status = "error"
+
+                cursor.execute("""
+                    INSERT OR REPLACE INTO math_concept_audit_results (
+                        run_id,
+                        concept_id,
+                        rendered_tex_hash,
+                        status,
+                        issue_count,
+                        issue_summary,
+                        created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                """, (
+                    run_id,
+                    concept_id,
+                    rendered_tex_hash,
+                    status,
+                    issue_count,
+                    issue_summary,
+                    uniform_timestamp
+                ))
+
+                saved_count += 1
+
+            cursor.execute("""
+                SELECT
+                    COUNT(*) AS total_scanned,
+                    SUM(CASE WHEN status = 'problematic' THEN 1 ELSE 0 END) AS total_problematic,
+                    SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS total_errors
+                FROM math_concept_audit_results
+                WHERE run_id = ?;
+            """, (run_id,))
+
+            totals = cursor.fetchone()
+
+            total_scanned = totals[0] or 0
+            total_problematic = totals[1] or 0
+            total_errors = totals[2] or 0
+
+            cursor.execute("""
+                UPDATE math_audit_runs
+                SET
+                    completed_at = ?,
+                    total_scanned = ?,
+                    total_problematic = ?,
+                    total_errors = ?
+                WHERE id = ?;
+            """, (
+                get_now_timestamp(),
+                total_scanned,
+                total_problematic,
+                total_errors,
+                run_id
+            ))
+
+            conn.commit()
+
+            return jsonify({
+                "status": "success",
+                "run_id": run_id,
+                "saved_count": saved_count,
+                "total_scanned": total_scanned,
+                "total_problematic": total_problematic,
+                "total_errors": total_errors
+            }), 201
+
+        except sqlite3.Error as e:
+            if conn:
+                conn.rollback()
+
+            return jsonify({
+                "status": "error",
+                "message": str(e)
+            }), 500
+
+        finally:
+            if conn:
+                conn.close()
+
+    return process_batch_save()
+    
+
 @math_bp.route("/api/admin/math/concepts/audit-list", methods=["GET", "OPTIONS"])
 def get_admin_math_concepts_audit_list():
     """
     Protected lightweight concept list for the browser-side MathJax audit page.
 
-    This intentionally returns only enough metadata for the audit page to loop
-    through concepts one at a time. It does not return cleaned_tex/rendered_tex.
+    Supported modes:
+      - all: return every concept
+      - problematic: return concepts that were problematic/error in the latest completed audit run
     """
     if request.method == "OPTIONS":
         return jsonify({"status": "CORS preflight ok"}), 200
@@ -553,6 +730,8 @@ def get_admin_math_concepts_audit_list():
 
     @admin_required
     def process_audit_list():
+        mode = normalize_audit_mode(request.args.get("mode"))
+
         conn = None
 
         try:
@@ -560,16 +739,46 @@ def get_admin_math_concepts_audit_list():
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            cursor.execute("""
+            params = []
+            latest_run_id = None
+
+            if mode == "problematic":
+                latest_run_id = get_latest_completed_audit_run_id(cursor)
+
+                if latest_run_id is None:
+                    return jsonify({
+                        "status": "success",
+                        "mode": mode,
+                        "latest_run_id": None,
+                        "count": 0,
+                        "data": [],
+                        "message": "No completed audit run exists yet."
+                    }), 200
+
+                where_clause = """
+                    WHERE mc.id IN (
+                        SELECT concept_id
+                        FROM math_concept_audit_results
+                        WHERE run_id = ?
+                          AND status IN ('problematic', 'error')
+                    )
+                """
+                params.append(latest_run_id)
+
+            else:
+                where_clause = ""
+
+            cursor.execute(f"""
                 SELECT
-                    id,
-                    canonical_name,
-                    slug,
-                    title
-                FROM math_concepts
+                    mc.id,
+                    mc.canonical_name,
+                    mc.slug,
+                    mc.title
+                FROM math_concepts mc
+                {where_clause}
                 ORDER BY
-                    COALESCE(title, canonical_name, slug, CAST(id AS TEXT)) COLLATE NOCASE ASC;
-            """)
+                    COALESCE(mc.title, mc.canonical_name, mc.slug, CAST(mc.id AS TEXT)) COLLATE NOCASE ASC;
+            """, params)
 
             concepts = []
 
@@ -590,6 +799,8 @@ def get_admin_math_concepts_audit_list():
 
             return jsonify({
                 "status": "success",
+                "mode": mode,
+                "latest_run_id": latest_run_id,
                 "count": len(concepts),
                 "data": concepts
             }), 200
