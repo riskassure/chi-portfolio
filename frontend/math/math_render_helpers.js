@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-options-v1",
+        debugVersion: "latex-image-placeholders-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -807,6 +807,90 @@
         `;
     }
 
+    function normalizeLatexImageArtifacts(tex) {
+        if (!tex) return "";
+
+        let output = String(tex || "");
+
+        // Remove figure wrappers but keep their contents.
+        output = output.replace(/\\begin\{figure\*?\}(?:\[[^\]]*\])?/gi, "");
+        output = output.replace(/\\end\{figure\*?\}/gi, "");
+
+        // LaTeX layout commands around old EPS images.
+        output = output.replace(/\\centering\b/gi, "");
+
+        // \scalebox{0.8}{\includegraphics{file.eps}}
+        output = output.replace(
+            /\\scalebox\{[^{}]*\}\s*\{\s*\\includegraphics(?:\[[^\]]*\])?\s*\{([^{}]*)\}\s*\}/gi,
+            function(_, filename) {
+                return makeLatexImagePlaceholder(filename);
+            }
+        );
+
+        // Plain \includegraphics[scale=...]{file.eps} or \includegraphics{file.eps}
+        output = output.replace(
+            /\\includegraphics(?:\[[^\]]*\])?\s*\{([^{}]*)\}/gi,
+            function(_, filename) {
+                return makeLatexImagePlaceholder(filename);
+            }
+        );
+
+        // Preserve captions as readable prose.
+        output = output.replace(
+            /\\caption\{([^{}]*)\}/gi,
+            function(_, caption) {
+                const cleanCaption = cleanLatexImageLabelText(caption);
+
+                if (!cleanCaption) {
+                    return "";
+                }
+
+                return `
+                    <div class="pm-latex-image-caption mathjax-diagnostic-ignore" style="text-align:center; color:#64748b; font-size:0.92rem; margin:0.25rem 0 1rem;">
+                        <em>${escapeHtmlForMathCell(cleanCaption)}</em>
+                    </div>
+                `;
+            }
+        );
+
+        return output;
+    }
+
+
+    function makeLatexImagePlaceholder(filename) {
+        const cleanFilename = cleanLatexImageLabelText(filename);
+
+        const label = cleanFilename
+            ? `Image placeholder: ${escapeHtmlForMathCell(cleanFilename)}`
+            : "Image placeholder";
+
+        return `
+            <div class="pm-latex-image-placeholder mathjax-diagnostic-ignore" style="margin:1rem auto; padding:0.75rem; max-width:28rem; border:1px dashed #cbd5e1; border-radius:6px; background:#f8fafc; color:#64748b; text-align:center;">
+                <em>[${label}]</em>
+            </div>
+        `;
+    }
+
+    function cleanLatexImageLabelText(value) {
+        return String(value || "")
+            // If the backend autolinker already linked text inside an image filename/caption,
+            // keep only the visible linked text.
+            .replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, "$1")
+
+            // Remove any other accidental HTML tags from placeholder labels.
+            .replace(/<[^>]*>/g, "")
+
+            // Basic entity cleanup.
+            .replace(/&nbsp;/gi, " ")
+            .replace(/&amp;/gi, "&")
+            .replace(/&lt;/gi, "<")
+            .replace(/&gt;/gi, ">")
+            .replace(/&quot;/gi, '"')
+
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
     function normalizeDisplayMathEnvironments(tex) {
         if (!tex) return "";
 
@@ -973,6 +1057,9 @@
 
         // Text-level underline used in PlanetMath prose.
         clean = clean.replace(/\\underline\{([^{}]+)\}/gi, "<u>$1</u>");
+
+        // Replace old LaTeX/EPS image commands with readable placeholders.
+        clean = normalizeLatexImageArtifacts(clean);
 
         // Normalize legacy eqnarray blocks before MathJax sees them.
         clean = convertEqnarrayToAligned(clean);
