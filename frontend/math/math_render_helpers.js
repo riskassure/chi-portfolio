@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "simple-matrix-html-v2",
+        debugVersion: "align-html-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -47,6 +47,112 @@
 
             // Common HTML whitespace artifact.
             .replace(/&nbsp;/gi, " ");
+    }
+
+    function convertAlignEnvironmentsToHtml(tex) {
+        if (!tex) return "";
+
+        let output = String(tex || "");
+
+        // Display-wrapped align / alignat:
+        // \[\begin{align*} ... \end{align*}\]
+        // \[\begin{alignat*}{2} ... \end{alignat*}\]
+        output = output.replace(
+            /\\\[\s*\\begin\{(align\*?|alignat\*?)\}\s*(?:\{[^{}]*\})?([\s\S]*?)\\end\{\1\}\s*\\\]/gi,
+            function(_, envName, body) {
+                return buildHtmlTableFromAlignBody(body);
+            }
+        );
+
+        // Raw standalone align / alignat.
+        output = output.replace(
+            /\\begin\{(align\*?|alignat\*?)\}\s*(?:\{[^{}]*\})?([\s\S]*?)\\end\{\1\}/gi,
+            function(_, envName, body) {
+                return buildHtmlTableFromAlignBody(body);
+            }
+        );
+
+        return output;
+    }
+
+    function buildHtmlTableFromAlignBody(body) {
+        const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
+
+        const rows = splitAlignRows(normalizedBody)
+            .map(splitEqnarrayCells)
+            .filter(cells => cells.some(cell => cell.trim().length > 0));
+
+        if (rows.length === 0) {
+            return "";
+        }
+
+        const maxColumns = Math.max(...rows.map(cells => cells.length));
+
+        const htmlRows = rows.map(cells => {
+            const paddedCells = padEqnarrayCells(cells, maxColumns);
+
+            const htmlCells = paddedCells.map((cell, index) => {
+                const align = getAlignColumnAlign(index);
+                const cleanCell = normalizeAlignCell(cell);
+
+                if (!cleanCell) {
+                    return `<td style="padding:0.12rem 0.28rem; text-align:${align};"></td>`;
+                }
+
+                return `<td style="padding:0.12rem 0.28rem; text-align:${align}; white-space:nowrap;">\\(${escapeHtmlForMathCell(cleanCell)}\\)</td>`;
+            }).join("");
+
+            return `<tr>${htmlCells}</tr>`;
+        }).join("");
+
+        return `
+            <table class="pm-align-table tex2jax_process" style="border-collapse:collapse; margin:1rem auto;">
+                ${htmlRows}
+            </table>
+        `;
+    }
+
+    function splitAlignRows(body) {
+        const normalized = String(body || "").trim();
+
+        if (!normalized) {
+            return [];
+        }
+
+        const slashRows = splitEqnarrayRows(normalized);
+
+        if (slashRows.length > 1) {
+            return slashRows;
+        }
+
+        // Many old PlanetMath rows lost their LaTeX \\ row separators
+        // but still retain actual line breaks.
+        const newlineRows = normalized
+            .split(/\r?\n+/)
+            .map(row => row.trim())
+            .filter(row => row.length > 0);
+
+        if (newlineRows.length > 1) {
+            return newlineRows;
+        }
+
+        return slashRows;
+    }
+
+    function getAlignColumnAlign(index) {
+        // align/alignat cells naturally alternate:
+        // left expression & aligned relation/right expression
+        if (index % 2 === 0) {
+            return "right";
+        }
+
+        return "left";
+    }
+
+    function normalizeAlignCell(cell) {
+        return normalizeEqnarrayHtmlArtifacts(cell)
+            .replace(/\s+/g, " ")
+            .trim();
     }
 
     function convertEqnarrayToAligned(tex) {
@@ -1270,6 +1376,9 @@
 
         // Convert common PlanetMath piecewise array blocks before MathJax typesetting.
         clean = convertPiecewiseArraysToHtml(clean);
+
+        // Convert align/alignat blocks into HTML alignment tables.
+        clean = convertAlignEnvironmentsToHtml(clean);
 
         // Convert simple display matrix/array blocks that MathJax often cannot recover
         // after PlanetMath row separators were lost.
