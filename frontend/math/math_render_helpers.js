@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "align-html-v1",
+        debugVersion: "prose-layout-cleanup-v2",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -32,6 +32,127 @@
         clean = normalizeDiagramImageUrls(clean, apiEndpoint);
 
         return clean;
+    }
+
+    function normalizeProseLayoutMacros(tex) {
+        if (!tex) return "";
+
+        let output = String(tex || "");
+
+        // PlanetMath link-ish macros that should not leak visibly.
+        output = output.replace(/\\PMlinkescapetext\{([^{}]*)\}/gi, "$1");
+        output = output.replace(/\\PMlinkname\{([^{}]*)\}\{[^{}]*\}/gi, "$1");
+        output = output.replace(/\\PMlinkid\{([^{}]*)\}\{[^{}]*\}/gi, "$1");
+        output = output.replace(/\\PMlinkID\{([^{}]*)\}\{[^{}]*\}/g, "$1");
+
+        // Remove setup/control commands that have no useful page meaning.
+        output = output.replace(/\\setcounter\{[^{}]*\}\{[^{}]*\}/gi, "");
+        output = output.replace(/\\newtheorem\{[^{}]*\}(?:\[[^\]]*\])?\{[^{}]*\}/gi, "");
+        output = output.replace(/\\clearpage\b/gi, "");
+        output = output.replace(/\\newpage\b/gi, "");
+        output = output.replace(/\\pagebreak\b(?:\[[^\]]*\])?/gi, "");
+
+        // Paragraph / vertical layout commands.
+        output = output.replace(/\\par\b/gi, "\n\n");
+        output = output.replace(/\\(?:smallskip|medskip|bigskip)\b/gi, "\n\n");
+        output = output.replace(/\\vspace\*?\s*\{[^{}]*\}/gi, "\n\n");
+
+        // Horizontal layout commands.
+        output = output.replace(/\\hspace\*?\s*\{[^{}]*\}/gi, " ");
+        output = output.replace(/\\hfill\b/gi, " ");
+        output = output.replace(/\\qquad\b/gi, " ");
+        output = output.replace(/\\quad\b/gi, " ");
+
+        // Common text wrappers. Keep contents, drop LaTeX command.
+        output = unwrapSimpleTextCommand(output, "mbox");
+        output = unwrapSimpleTextCommand(output, "text");
+        output = unwrapSimpleTextCommand(output, "textrm");
+        output = unwrapSimpleTextCommand(output, "mathrm");
+        output = unwrapSimpleTextCommand(output, "textnormal");
+        output = unwrapSimpleTextCommand(output, "textsc");
+        output = unwrapSimpleTextCommand(output, "textbf");
+        output = unwrapSimpleTextCommand(output, "textit");
+        output = unwrapSimpleTextCommand(output, "emph");
+
+        // Common text accent / special-letter macros seen in references.
+        output = normalizeCommonTextAccentMacros(output);
+
+        // Some old-style font groups contain accent macros with braces, so run this
+        // again after accent normalization.
+        output = output.replace(/\{\\(?:bf|em|it|rm|sc)\s*([^{}]*)\}/gi, "$1");
+        output = output.replace(/\{\\em\s*\{([^{}]*)\}\}/gi, "$1");
+
+        // Light cleanup around spaces introduced by removed layout commands.
+        output = output.replace(/[ \t]{2,}/g, " ");
+
+        // Light cleanup around spaces introduced by removed layout commands.
+        output = output.replace(/[ \t]{2,}/g, " ");
+        output = output.replace(/\n{3,}/g, "\n\n");
+
+        return output;
+    }
+
+
+    function unwrapSimpleTextCommand(text, commandName) {
+        const pattern = new RegExp("\\\\" + commandName + "\\s*\\{([^{}]*)\\}", "gi");
+
+        return String(text || "").replace(pattern, function(_, content) {
+            return String(content || "").trim();
+        });
+    }
+
+
+    function normalizeCommonTextAccentMacros(tex) {
+        let output = String(tex || "");
+
+        // Special case caused by \text{\L}ukasiewicz becoming \Lukasiewicz
+        // after text-wrapper cleanup.
+        output = output.replace(/\\Lukasiewicz/g, "Łukasiewicz");
+
+        // Polish / Scandinavian / German / French common prose letters.
+        output = output.replace(/\\L\b/g, "Ł");
+        output = output.replace(/\\l\b/g, "ł");
+        output = output.replace(/\\aa\s*\{\}/gi, "å");
+        output = output.replace(/\\AA\s*\{\}/g, "Å");
+        output = output.replace(/\\o\b/g, "ø");
+        output = output.replace(/\\O\b/g, "Ø");
+        output = output.replace(/\\ae\b/g, "æ");
+        output = output.replace(/\\AE\b/g, "Æ");
+        output = output.replace(/\\oe\b/g, "œ");
+        output = output.replace(/\\OE\b/g, "Œ");
+        output = output.replace(/\\ss\b/g, "ß");
+
+        // A few accent forms that appear in bibliography prose.
+        output = output.replace(/\\"a/g, "ä");
+        output = output.replace(/\\"o/g, "ö");
+        output = output.replace(/\\"u/g, "ü");
+        output = output.replace(/\\"A/g, "Ä");
+        output = output.replace(/\\"O/g, "Ö");
+        output = output.replace(/\\"U/g, "Ü");
+
+        output = output.replace(/\\'e/g, "é");
+        output = output.replace(/\\'a/g, "á");
+        output = output.replace(/\\'i/g, "í");
+        output = output.replace(/\\'o/g, "ó");
+        output = output.replace(/\\'u/g, "ú");
+
+        output = output.replace(/\\`e/g, "è");
+        output = output.replace(/\\`a/g, "à");
+        output = output.replace(/\\`i/g, "ì");
+        output = output.replace(/\\`o/g, "ò");
+        output = output.replace(/\\`u/g, "ù");
+
+        output = output.replace(/\\H\{o\}/g, "ő");
+        output = output.replace(/\\H\{O\}/g, "Ő");
+
+        output = output.replace(/\\v\{c\}/g, "č");
+        output = output.replace(/\\v\{C\}/g, "Č");
+        output = output.replace(/\\v\{s\}/g, "š");
+        output = output.replace(/\\v\{S\}/g, "Š");
+        output = output.replace(/\\v\{z\}/g, "ž");
+        output = output.replace(/\\v\{Z\}/g, "Ž");
+
+        return output;
     }
 
     function normalizeEqnarrayHtmlArtifacts(value) {
@@ -1414,6 +1535,9 @@
 
         // Replace old LaTeX/EPS image commands with readable placeholders.
         clean = normalizeLatexImageArtifacts(clean);
+
+        // Remove/prose-normalize LaTeX layout commands that should not be visible.
+        clean = normalizeProseLayoutMacros(clean);
 
         // Normalize legacy eqnarray blocks before MathJax sees them.
         clean = convertEqnarrayToAligned(clean);
