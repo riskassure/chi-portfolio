@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "latex-image-placeholders-v1",
+        debugVersion: "simple-matrix-html-v2",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -891,6 +891,235 @@
             .trim();
     }
 
+    function convertSimpleDisplayMatricesToHtml(tex) {
+        if (!tex) return "";
+
+        let output = String(tex || "");
+
+        // Simple display matrix environments:
+        // \[\begin{pmatrix} ... \end{pmatrix}.\]
+        output = output.replace(
+            /\\\[\s*\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix)\}([\s\S]*?)\\end\{\1\}\s*([.,;:]?)\s*\\\]/gi,
+            function(_, envName, body, trailingPunctuation) {
+                return buildDisplayMatrixHtml(envName, body, trailingPunctuation);
+            }
+        );
+
+        // Simple display array environments:
+        // \[\begin{array}{ccc} ... \end{array}\]
+        output = output.replace(
+            /\\\[\s*\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*([.,;:]?)\s*\\\]/gi,
+            function(_, columnSpec, body, trailingPunctuation) {
+                return buildDisplayMatrixHtml("array", body, trailingPunctuation);
+            }
+        );
+
+        return output;
+    }
+
+
+    function buildDisplayMatrixHtml(envName, body, trailingPunctuation = "") {
+        const matrixHtml = buildMatrixEnvironmentHtml(envName, body);
+        const punctuationHtml = trailingPunctuation
+            ? `<span style="display:inline-block; vertical-align:middle; margin-left:0.08rem;">${escapeHtmlForMathCell(trailingPunctuation)}</span>`
+            : "";
+
+        return `
+            <div class="pm-matrix-display tex2jax_process" style="text-align:center; margin:1rem 0;">
+                ${matrixHtml}${punctuationHtml}
+            </div>
+        `;
+    }
+
+    function renderMatrixDelimiter(delimiter, side = "left") {
+        if (!delimiter) {
+            return "";
+        }
+
+        const cleanDelimiter = String(delimiter || "");
+        const cleanSide = side === "right" ? "right" : "left";
+
+        const wrapperStyle = `
+            align-self:stretch;
+            display:flex;
+            align-items:stretch;
+            justify-content:center;
+            flex:0 0 auto;
+            width:0.88rem;
+            color:currentColor;
+        `;
+
+        if (cleanDelimiter === "(" || cleanDelimiter === ")") {
+            const path =
+                cleanSide === "left"
+                    ? "M24 2 C8 18 8 82 24 98"
+                    : "M6 2 C22 18 22 82 6 98";
+
+            return `
+                <span class="pm-matrix-delimiter pm-matrix-paren-${cleanSide}" style="${wrapperStyle}">
+                    <svg viewBox="0 0 30 100" preserveAspectRatio="none" style="display:block; width:100%; height:100%; min-height:2.4rem;">
+                        <path d="${path}" stroke="currentColor" stroke-width="4.2" fill="none" stroke-linecap="round"></path>
+                    </svg>
+                </span>
+            `;
+        }
+
+        if (cleanDelimiter === "[" || cleanDelimiter === "]") {
+            const path =
+                cleanSide === "left"
+                    ? "M25 2 H8 V98 H25"
+                    : "M5 2 H22 V98 H5";
+
+            return `
+                <span class="pm-matrix-delimiter pm-matrix-bracket-${cleanSide}" style="${wrapperStyle}">
+                    <svg viewBox="0 0 30 100" preserveAspectRatio="none" style="display:block; width:100%; height:100%; min-height:2.4rem;">
+                        <path d="${path}" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="square" stroke-linejoin="miter"></path>
+                    </svg>
+                </span>
+            `;
+        }
+
+        if (cleanDelimiter === "{" || cleanDelimiter === "}") {
+            const path =
+                cleanSide === "left"
+                    ? "M27 2 C14 2 15 22 15 32 C15 43 7 44 6 50 C7 56 15 57 15 68 C15 78 14 98 27 98"
+                    : "M7 2 C20 2 19 22 19 32 C19 43 27 44 28 50 C27 56 19 57 19 68 C19 78 20 98 7 98";
+
+            return `
+                <span class="pm-matrix-delimiter pm-matrix-brace-${cleanSide}" style="${wrapperStyle}">
+                    <svg viewBox="0 0 34 100" preserveAspectRatio="none" style="display:block; width:100%; height:100%; min-height:2.4rem;">
+                        <path d="${path}" stroke="currentColor" stroke-width="3.4" fill="none" stroke-linecap="round"></path>
+                    </svg>
+                </span>
+            `;
+        }
+
+        if (cleanDelimiter === "|") {
+            return `
+                <span class="pm-matrix-delimiter pm-matrix-vertical-${cleanSide}" style="${wrapperStyle}; width:0.36rem;">
+                    <span style="display:block; height:100%; border-left:3px solid currentColor;"></span>
+                </span>
+            `;
+        }
+
+        if (cleanDelimiter === "‖") {
+            return `
+                <span class="pm-matrix-delimiter pm-matrix-double-vertical-${cleanSide}" style="${wrapperStyle}; width:0.50rem; gap:0.10rem;">
+                    <span style="display:block; height:100%; border-left:2.4px solid currentColor;"></span>
+                    <span style="display:block; height:100%; border-left:2.4px solid currentColor;"></span>
+                </span>
+            `;
+        }
+
+        return `<span style="${wrapperStyle}; align-items:center;">${escapeHtmlForMathCell(cleanDelimiter)}</span>`;
+    }
+
+    function buildMatrixEnvironmentHtml(envName, body) {
+        const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
+
+        const rows = splitMatrixBodyRows(normalizedBody)
+            .map(splitEqnarrayCells)
+            .filter(cells => cells.some(cell => cell.trim().length > 0));
+
+        if (rows.length === 0) {
+            return "";
+        }
+
+        const maxColumns = Math.max(...rows.map(cells => cells.length));
+        const delimiters = getMatrixDelimiters(envName);
+
+        const htmlRows = rows.map(cells => {
+            const paddedCells = padEqnarrayCells(cells, maxColumns);
+
+            const htmlCells = paddedCells.map(cell => {
+                const cleanCell = normalizeMatrixCell(cell);
+
+                if (!cleanCell) {
+                    return `<td style="padding:0.10rem 0.35rem; text-align:center; white-space:nowrap;"></td>`;
+                }
+
+                return `<td style="padding:0.10rem 0.35rem; text-align:center; white-space:nowrap;">\\(${escapeHtmlForMathCell(cleanCell)}\\)</td>`;
+            }).join("");
+
+            return `<tr>${htmlCells}</tr>`;
+        }).join("");
+
+        const leftDelimiter = renderMatrixDelimiter(delimiters.left, "left");
+        const rightDelimiter = renderMatrixDelimiter(delimiters.right, "right");
+
+        return `
+            <span class="pm-matrix-render" style="display:inline-flex; align-items:stretch; justify-content:center; gap:0.06rem; vertical-align:middle; line-height:1;">
+                ${leftDelimiter}
+                <table style="display:inline-table; border-collapse:collapse; vertical-align:middle; align-self:center; margin:0.08rem 0;">
+                    ${htmlRows}
+                </table>
+                ${rightDelimiter}
+            </span>
+        `;
+    }
+
+
+    function splitMatrixBodyRows(body) {
+        const normalized = String(body || "").trim();
+
+        if (!normalized) {
+            return [];
+        }
+
+        const slashRows = splitEqnarrayRows(normalized);
+
+        if (slashRows.length > 1) {
+            return slashRows;
+        }
+
+        // Many PlanetMath matrix rows lost their LaTeX \\ row separators
+        // but still have actual line breaks in rendered_tex.
+        const newlineRows = normalized
+            .split(/\r?\n+/)
+            .map(row => row.trim())
+            .filter(row => row.length > 0);
+
+        if (newlineRows.length > 1) {
+            return newlineRows;
+        }
+
+        return slashRows;
+    }
+
+
+    function normalizeMatrixCell(cell) {
+        return normalizeEqnarrayHtmlArtifacts(cell)
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+
+    function getMatrixDelimiters(envName) {
+        const name = String(envName || "");
+
+        if (name === "pmatrix") {
+            return { left: "(", right: ")" };
+        }
+
+        if (name === "bmatrix") {
+            return { left: "[", right: "]" };
+        }
+
+        if (name === "Bmatrix") {
+            return { left: "{", right: "}" };
+        }
+
+        if (name === "vmatrix") {
+            return { left: "|", right: "|" };
+        }
+
+        if (name === "Vmatrix") {
+            return { left: "‖", right: "‖" };
+        }
+
+        return { left: "", right: "" };
+    }
+
     function normalizeDisplayMathEnvironments(tex) {
         if (!tex) return "";
 
@@ -898,6 +1127,17 @@
             .replace(/\\begin\{displaymath\}([\s\S]*?)\\end\{displaymath\}/gi, "\\[$1\\]")
             .replace(/\\begin\{equation\*\}([\s\S]*?)\\end\{equation\*\}/gi, "\\[$1\\]")
             .replace(/\\begin\{equation\}([\s\S]*?)\\end\{equation\}/gi, "\\[$1\\]");
+    }
+
+    function normalizeDollarDisplayMath(tex) {
+        if (!tex) return "";
+
+        return String(tex || "").replace(
+            /\$\$([\s\S]*?)\$\$/g,
+            function(_, body) {
+                return `\\[${body}\\]`;
+            }
+        );
     }
 
     function convertPiecewiseArraysToHtml(tex) {
@@ -1026,9 +1266,14 @@
 
         // Normalize legacy display wrappers so MathJax can process their contents.
         clean = normalizeDisplayMathEnvironments(clean);
+        clean = normalizeDollarDisplayMath(clean);
 
         // Convert common PlanetMath piecewise array blocks before MathJax typesetting.
         clean = convertPiecewiseArraysToHtml(clean);
+
+        // Convert simple display matrix/array blocks that MathJax often cannot recover
+        // after PlanetMath row separators were lost.
+        clean = convertSimpleDisplayMatricesToHtml(clean);
 
         // PlanetMath table color macros.
         // These commonly appear as \red0.01, \blue0.20, or \red{0.01}.
