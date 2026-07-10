@@ -23,7 +23,51 @@
             // Add newly discovered macros here as smoke tests reveal them.
             macros: {
                 down: "{\\mathord{\\downarrow}}",
-                dom: "\\operatorname{dom}"
+                dom: "\\operatorname{dom}",
+
+                grad: "\\nabla",
+                curl: "\\operatorname{curl}",
+                div: "\\operatorname{div}",
+                real: "\\mathbb{R}",
+                complex: "\\mathbb{C}",
+                integer: "\\mathbb{Z}",
+                integers: "\\mathbb{Z}",
+                rational: "\\mathbb{Q}",
+                rationals: "\\mathbb{Q}",
+
+                D: "\\mathrm{D}",
+                vv: "\\mathbf{v}",
+                ve: "\\mathbf{e}",
+                vx: "\\mathbf{x}",
+                vy: "\\mathbf{y}",
+                vz: "\\mathbf{z}",
+                vw: "\\mathbf{w}",
+                vu: "\\mathbf{u}",
+                vp: "\\mathbf{p}",
+                vs: "\\mathbf{s}",
+                vt: "\\mathbf{t}",
+
+                vi: "\\mathbf{i}",
+                vj: "\\mathbf{j}",
+                vk: "\\mathbf{k}",
+
+                vA: "\\mathbf{A}",
+                vB: "\\mathbf{B}",
+                vC: "\\mathbf{C}",
+                vF: "\\mathbf{F}",
+                vG: "\\mathbf{G}",
+                vH: "\\mathbf{H}",
+                vX: "\\mathbf{X}",
+                vY: "\\mathbf{Y}",
+                vZ: "\\mathbf{Z}",
+
+                norm: ["\\left\\lVert #1 \\right\\rVert", 1],
+                abs: ["\\left\\lvert #1 \\right\\rvert", 1],
+
+                lp: "(",
+                rp: ")",
+
+                pdiff: ["\\frac{\\partial #1}{\\partial #2}", 2],
             }
         },
 

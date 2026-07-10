@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "prose-layout-cleanup-v2",
+        debugVersion: "mathjax-macros-v5",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -44,6 +44,27 @@
         output = output.replace(/\\PMlinkname\{([^{}]*)\}\{[^{}]*\}/gi, "$1");
         output = output.replace(/\\PMlinkid\{([^{}]*)\}\{[^{}]*\}/gi, "$1");
         output = output.replace(/\\PMlinkID\{([^{}]*)\}\{[^{}]*\}/g, "$1");
+
+        // Equation/reference commands. We do not currently resolve these to real anchors,
+        // but we should not leak raw LaTeX commands into prose.
+        output = output.replace(/\\label\{[^{}]*\}/gi, "");
+        output = output.replace(/\\eqref\{([^{}]*)\}/gi, function(_, label) {
+            const cleanLabel = String(label || "")
+                .replace(/\s+/g, " ")
+                .trim()
+                .replace(/\s*-\s*/g, "-");
+
+            return cleanLabel ? `(${cleanLabel})` : "";
+        });
+
+        output = output.replace(/\\ref\{([^{}]*)\}/gi, function(_, label) {
+            const cleanLabel = String(label || "")
+                .replace(/\s+/g, " ")
+                .trim()
+                .replace(/\s*-\s*/g, "-");
+
+            return cleanLabel ? cleanLabel : "";
+        });
 
         // Remove setup/control commands that have no useful page meaning.
         output = output.replace(/\\setcounter\{[^{}]*\}\{[^{}]*\}/gi, "");
