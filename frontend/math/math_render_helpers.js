@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "mathjax-macros-v5",
+        debugVersion: "matrix-display-affix-v4",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -1144,27 +1144,35 @@
 
         let output = String(tex || "");
 
-        // Simple display matrix environments:
-        // \[\begin{pmatrix} ... \end{pmatrix}.\]
+        // Display matrix environments with optional prefix/suffix:
+        // \[ A=\begin{pmatrix} ... \end{pmatrix}. \]
+        // Important: prefix/suffix must not cross a display boundary.
         output = output.replace(
-            /\\\[\s*\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix)\}([\s\S]*?)\\end\{\1\}\s*([.,;:]?)\s*\\\]/gi,
-            function(_, envName, body, trailingPunctuation) {
-                return buildDisplayMatrixHtml(envName, body, trailingPunctuation);
+            /\\\[\s*((?:(?!\\\])[\s\S])*?)\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix)\}([\s\S]*?)\\end\{\2\}\s*((?:(?!\\\])[\s\S])*?)\\\]/gi,
+            function(_, prefix, envName, body, suffix) {
+                if (/\\begin\{(?:pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|array)\}/i.test(suffix || "")) {
+                    return _;
+                }
+
+                return buildDisplayMatrixHtmlWithAffixes(envName, prefix, body, suffix);
             }
         );
 
-        // Simple display array environments:
-        // \[\begin{array}{ccc} ... \end{array}\]
+        // Display array environments with optional prefix/suffix:
+        // \[ \pi=\begin{array}{ccc} ... \end{array} \]
         output = output.replace(
-            /\\\[\s*\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*([.,;:]?)\s*\\\]/gi,
-            function(_, columnSpec, body, trailingPunctuation) {
-                return buildDisplayMatrixHtml("array", body, trailingPunctuation);
+            /\\\[\s*((?:(?!\\\])[\s\S])*?)\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*((?:(?!\\\])[\s\S])*?)\\\]/gi,
+            function(_, prefix, columnSpec, body, suffix) {
+                if (/\\begin\{(?:pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|array)\}/i.test(suffix || "")) {
+                    return _;
+                }
+
+                return buildDisplayMatrixHtmlWithAffixes("array", prefix, body, suffix);
             }
         );
 
         return output;
     }
-
 
     function buildDisplayMatrixHtml(envName, body, trailingPunctuation = "") {
         const matrixHtml = buildMatrixEnvironmentHtml(envName, body);
@@ -1177,6 +1185,133 @@
                 ${matrixHtml}${punctuationHtml}
             </div>
         `;
+    }
+
+    function buildDisplayMatrixHtmlWithAffixes(envName, prefix, body, suffix = "") {
+        const affixInfo = extractMatrixAffixDelimiters(prefix, suffix, envName);
+
+        const cleanPrefix = normalizeMatrixAffix(affixInfo.prefix);
+        const cleanSuffix = normalizeMatrixAffix(affixInfo.suffix);
+
+        const prefixHtml = cleanPrefix
+            ? `<span style="display:inline-block; vertical-align:middle; margin-right:0.25rem;">\\(${escapeHtmlForMathCell(cleanPrefix)}\\)</span>`
+            : "";
+
+        let suffixHtml = "";
+
+        if (cleanSuffix) {
+            if (/^[.,;:]$/.test(cleanSuffix)) {
+                suffixHtml = `<span style="display:inline-block; vertical-align:middle; margin-left:0.08rem;">${escapeHtmlForMathCell(cleanSuffix)}</span>`;
+            } else {
+                suffixHtml = `<span style="display:inline-block; vertical-align:middle; margin-left:0.25rem;">\\(${escapeHtmlForMathCell(cleanSuffix)}\\)</span>`;
+            }
+        }
+
+        return `
+            <div class="pm-matrix-display tex2jax_process" style="text-align:center; margin:1rem 0;">
+                ${prefixHtml}${buildMatrixEnvironmentHtml(envName, body, affixInfo.delimiters)}${suffixHtml}
+            </div>
+        `;
+    }
+
+    function extractMatrixAffixDelimiters(prefix, suffix, envName) {
+        let cleanPrefix = String(prefix || "");
+        let cleanSuffix = String(suffix || "");
+
+        let delimiters = getMatrixDelimiters(envName);
+
+        const leftMatch = cleanPrefix.match(
+            /\\left\s*(\.|\(|\[|\{|\||\\\{|\\lbrace|\\vert|\\lvert|\\Vert|\\lVert)\s*$/i
+        );
+
+        const rightMatch = cleanSuffix.match(
+            /^\s*\\right\s*(\.|\)|\]|\}|\||\\\}|\\rbrace|\\vert|\\rvert|\\Vert|\\rVert)/i
+        );
+
+        if (leftMatch && rightMatch) {
+            const leftDelimiter = latexMatrixDelimiterTokenToText(leftMatch[1], "left");
+            const rightDelimiter = latexMatrixDelimiterTokenToText(rightMatch[1], "right");
+
+            delimiters = {
+                left: leftDelimiter,
+                right: rightDelimiter
+            };
+
+            cleanPrefix = cleanPrefix.slice(0, leftMatch.index);
+            cleanSuffix = cleanSuffix.slice(rightMatch[0].length);
+        }
+
+        return {
+            prefix: cleanPrefix,
+            suffix: cleanSuffix,
+            delimiters
+        };
+    }
+
+
+    function latexMatrixDelimiterTokenToText(token, side = "left") {
+        const clean = String(token || "").trim();
+
+        if (!clean || clean === ".") {
+            return "";
+        }
+
+        if (clean === "(" || clean === "\\(") {
+            return "(";
+        }
+
+        if (clean === ")" || clean === "\\)") {
+            return ")";
+        }
+
+        if (clean === "[" || clean === "\\[") {
+            return "[";
+        }
+
+        if (clean === "]" || clean === "\\]") {
+            return "]";
+        }
+
+        if (
+            clean === "{" ||
+            clean === "\\{" ||
+            clean === "\\lbrace"
+        ) {
+            return "{";
+        }
+
+        if (
+            clean === "}" ||
+            clean === "\\}" ||
+            clean === "\\rbrace"
+        ) {
+            return "}";
+        }
+
+        if (
+            clean === "|" ||
+            clean === "\\vert" ||
+            clean === "\\lvert" ||
+            clean === "\\rvert"
+        ) {
+            return "|";
+        }
+
+        if (
+            clean === "\\Vert" ||
+            clean === "\\lVert" ||
+            clean === "\\rVert"
+        ) {
+            return "‖";
+        }
+
+        return side === "left" ? "" : "";
+    }
+
+    function normalizeMatrixAffix(value) {
+        return normalizeEqnarrayHtmlArtifacts(value)
+            .replace(/\s+/g, " ")
+            .trim();
     }
 
     function renderMatrixDelimiter(delimiter, side = "left") {
@@ -1262,7 +1397,7 @@
         return `<span style="${wrapperStyle}; align-items:center;">${escapeHtmlForMathCell(cleanDelimiter)}</span>`;
     }
 
-    function buildMatrixEnvironmentHtml(envName, body) {
+    function buildMatrixEnvironmentHtml(envName, body, delimiterOverride = null) {
         const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
 
         const rows = splitMatrixBodyRows(normalizedBody)
@@ -1274,7 +1409,7 @@
         }
 
         const maxColumns = Math.max(...rows.map(cells => cells.length));
-        const delimiters = getMatrixDelimiters(envName);
+        const delimiters = delimiterOverride || getMatrixDelimiters(envName);
 
         const htmlRows = rows.map(cells => {
             const paddedCells = padEqnarrayCells(cells, maxColumns);
