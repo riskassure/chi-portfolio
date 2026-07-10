@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "matrix-display-affix-v4",
+        debugVersion: "matrix-math-sequence-v5",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -1174,6 +1174,175 @@
         return output;
     }
 
+    function convertRemainingMatrixMathSequencesToHtml(tex) {
+        if (!tex) return "";
+
+        let output = String(tex || "");
+
+        // Remaining display expressions containing one or more matrices.
+        //
+        // The earlier display-affix converter handles the common single-matrix
+        // case. This pass handles expressions such as:
+        //
+        // \[
+        //   \begin{pmatrix} A & O \\ O & B \end{pmatrix}
+        //   =
+        //   \begin{pmatrix} 3 & -1 & 0 & 0 \\ ... \end{pmatrix}
+        // \]
+        output = output.replace(
+            /\\\[([\s\S]*?)\\\]/g,
+            function(fullMatch, body) {
+                if (!containsSimpleMatrixEnvironment(body)) {
+                    return fullMatch;
+                }
+
+                return buildMatrixMathSequenceHtml(body, true);
+            }
+        );
+
+        // Explicit inline MathJax delimiters:
+        // \( ... \)
+        output = output.replace(
+            /\\\(([\s\S]*?)\\\)/g,
+            function(fullMatch, body) {
+                if (!containsSimpleMatrixEnvironment(body)) {
+                    return fullMatch;
+                }
+
+                return buildMatrixMathSequenceHtml(body, false);
+            }
+        );
+
+        // Legacy single-dollar inline math:
+        // $ ... $
+        //
+        // Dollar-display math has already been normalized earlier, so this
+        // intentionally handles only remaining single-dollar pairs.
+        output = output.replace(
+            /(^|[^\\$])\$((?:\\.|[^$])*?)\$/g,
+            function(fullMatch, leadingCharacter, body) {
+                if (!containsSimpleMatrixEnvironment(body)) {
+                    return fullMatch;
+                }
+
+                return (
+                    leadingCharacter +
+                    buildMatrixMathSequenceHtml(body, false)
+                );
+            }
+        );
+
+        return output;
+    }
+
+
+    function containsSimpleMatrixEnvironment(value) {
+        return /\\begin\{(?:pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix)\}/i
+            .test(String(value || ""));
+    }
+
+
+    function buildMatrixMathSequenceHtml(body, isDisplay) {
+        const source = String(body || "");
+
+        const matrixPattern =
+            /\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix)\}([\s\S]*?)\\end\{\1\}/gi;
+
+        const pieces = [];
+        let cursor = 0;
+        let match;
+
+        while ((match = matrixPattern.exec(source)) !== null) {
+            const mathBefore = source.slice(cursor, match.index);
+
+            appendMatrixSequenceMathPiece(pieces, mathBefore);
+
+            pieces.push(
+                buildMatrixEnvironmentHtml(match[1], match[2])
+            );
+
+            cursor = matrixPattern.lastIndex;
+        }
+
+        appendMatrixSequenceMathPiece(
+            pieces,
+            source.slice(cursor)
+        );
+
+        if (pieces.length === 0) {
+            return isDisplay
+                ? `\\[${source}\\]`
+                : `\\(${source}\\)`;
+        }
+
+        const wrapperTag = isDisplay ? "div" : "span";
+        const wrapperClass = isDisplay
+            ? "pm-matrix-display pm-matrix-sequence tex2jax_process"
+            : "pm-matrix-inline pm-matrix-sequence tex2jax_process";
+
+        const wrapperStyle = isDisplay
+            ? `
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                flex-wrap:wrap;
+                gap:0.25rem;
+                margin:1rem 0;
+                text-align:center;
+            `
+            : `
+                display:inline-flex;
+                align-items:center;
+                flex-wrap:nowrap;
+                gap:0.18rem;
+                vertical-align:middle;
+                white-space:nowrap;
+            `;
+
+        return `
+            <${wrapperTag} class="${wrapperClass}" style="${wrapperStyle}">
+                ${pieces.join("")}
+            </${wrapperTag}>
+        `;
+    }
+
+
+    function appendMatrixSequenceMathPiece(pieces, value) {
+        const cleanValue = normalizeMatrixSequenceMath(value);
+
+        if (!cleanValue) {
+            return;
+        }
+
+        if (/^[.,;:]+$/.test(cleanValue)) {
+            pieces.push(
+                `<span style="display:inline-block;">${escapeHtmlForMathCell(cleanValue)}</span>`
+            );
+            return;
+        }
+
+        pieces.push(
+            `<span style="display:inline-block; vertical-align:middle;">\\(${escapeHtmlForMathCell(cleanValue)}\\)</span>`
+        );
+    }
+
+
+    function normalizeMatrixSequenceMath(value) {
+        return normalizeEqnarrayHtmlArtifacts(value)
+            .replace(/\s+/g, " ")
+
+            // Plain prose words inside math mode lose ordinary whitespace.
+            // Put "where" back into MathJax text mode and add explicit spacing.
+            .replace(
+                /(^|[.,;:])\s*where\s*/gi,
+                function(_, punctuation) {
+                    return `${punctuation}\\;\\text{where}\\;`;
+                }
+            )
+
+            .trim();
+    }
+
     function buildDisplayMatrixHtml(envName, body, trailingPunctuation = "") {
         const matrixHtml = buildMatrixEnvironmentHtml(envName, body);
         const punctuationHtml = trailingPunctuation
@@ -1411,20 +1580,32 @@
         const maxColumns = Math.max(...rows.map(cells => cells.length));
         const delimiters = delimiterOverride || getMatrixDelimiters(envName);
 
-        const htmlRows = rows.map(cells => {
+        const htmlCells = rows.map(cells => {
             const paddedCells = padEqnarrayCells(cells, maxColumns);
 
-            const htmlCells = paddedCells.map(cell => {
+            return paddedCells.map(cell => {
                 const cleanCell = normalizeMatrixCell(cell);
 
                 if (!cleanCell) {
-                    return `<td style="padding:0.10rem 0.35rem; text-align:center; white-space:nowrap;"></td>`;
+                    return `
+                        <span style="
+                            display:block;
+                            padding:0.10rem 0.35rem;
+                            text-align:center;
+                            white-space:nowrap;
+                        "></span>
+                    `;
                 }
 
-                return `<td style="padding:0.10rem 0.35rem; text-align:center; white-space:nowrap;">\\(${escapeHtmlForMathCell(cleanCell)}\\)</td>`;
+                return `
+                    <span style="
+                        display:block;
+                        padding:0.10rem 0.35rem;
+                        text-align:center;
+                        white-space:nowrap;
+                    ">\\(${escapeHtmlForMathCell(cleanCell)}\\)</span>
+                `;
             }).join("");
-
-            return `<tr>${htmlCells}</tr>`;
         }).join("");
 
         const leftDelimiter = renderMatrixDelimiter(delimiters.left, "left");
@@ -1433,9 +1614,15 @@
         return `
             <span class="pm-matrix-render" style="display:inline-flex; align-items:stretch; justify-content:center; gap:0.06rem; vertical-align:middle; line-height:1;">
                 ${leftDelimiter}
-                <table style="display:inline-table; border-collapse:collapse; vertical-align:middle; align-self:center; margin:0.08rem 0;">
-                    ${htmlRows}
-                </table>
+                <span class="pm-matrix-grid" style="
+                    display:inline-grid;
+                    grid-template-columns:repeat(${maxColumns}, max-content);
+                    align-self:center;
+                    vertical-align:middle;
+                    margin:0.08rem 0;
+                ">
+                    ${htmlCells}
+                </span>
                 ${rightDelimiter}
             </span>
         `;
@@ -1694,6 +1881,10 @@
 
         // Remove/prose-normalize LaTeX layout commands that should not be visible.
         clean = normalizeProseLayoutMacros(clean);
+
+        // Convert inline matrices and expressions containing multiple matrices only
+        // after prose wrappers such as \text{where} have been normalized.
+        clean = convertRemainingMatrixMathSequencesToHtml(clean);
 
         // Normalize legacy eqnarray blocks before MathJax sees them.
         clean = convertEqnarrayToAligned(clean);
