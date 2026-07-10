@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "matrix-math-sequence-v5",
+        debugVersion: "delimiter-artifact-cleanup-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -560,14 +560,29 @@
             }
 
             const after = tex.slice(replaceEnd);
-            const displayEndMatch = after.match(/^\s*\\\]/);
+
+            // A display xymatrix commonly ends with punctuation:
+            //
+            //   \xymatrix{...}.
+            //   \xymatrix{...},
+            //
+            // Consume that punctuation together with the closing display delimiter,
+            // then restore it outside the generated diagram HTML.
+            const displayEndMatch = after.match(
+                /^(\s*[.,;:]?)\s*\\\]/
+            );
+
+            let trailingDisplayPunctuation = "";
 
             if (displayEndMatch) {
+                trailingDisplayPunctuation = displayEndMatch[1].trim();
                 replaceEnd += displayEndMatch[0].length;
             }
 
             const body = tex.slice(braceStart + 1, braceEnd);
-            const html = buildHtmlTableFromXyMatrixBody(body);
+            const html =
+                buildHtmlTableFromXyMatrixBody(body) +
+                trailingDisplayPunctuation;
 
             result += tex.slice(cursor, replaceStart);
             result += html;
@@ -1833,6 +1848,20 @@
         if (!tex) return "";
 
         let clean = String(tex || "");
+
+        // Remove TeX comment/separator lines that survived backend rendering.
+        clean = clean.replace(/^[ \t]*%+[ \t]*$/gm, "");
+
+        // Backend prose conversion can produce invalid constructs such as:
+        //
+        //   $<strong>CyclGrp</strong>$
+        //
+        // HTML tags cannot safely remain inside MathJax dollar delimiters.
+        // Preserve the intended HTML formatting, but remove the math delimiters.
+        clean = clean.replace(
+            /\$\s*<(strong|em|b|i)>([^<>$]*)<\/\1>\s*\$/gi,
+            "<$1>$2</$1>"
+        );
 
         // Normalize legacy display wrappers so MathJax can process their contents.
         clean = normalizeDisplayMathEnvironments(clean);
