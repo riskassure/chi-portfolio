@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "html-sensitive-math-v1",
+        debugVersion: "spaced-latex-environment-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -587,33 +587,21 @@
     }
 
     function readLatexEnvironmentAt(text, index) {
-        const beginMarker = "\\begin{";
-        const endMarker = "\\end{";
+        const source = String(text || "");
+        const remainder = source.slice(index);
 
-        let type = null;
-        let marker = null;
+        const markerMatch = remainder.match(
+            /^\\(begin|end)\s*\{\s*([^{}]+?)\s*\}/
+        );
 
-        if (text.startsWith(beginMarker, index)) {
-            type = "begin";
-            marker = beginMarker;
-        } else if (text.startsWith(endMarker, index)) {
-            type = "end";
-            marker = endMarker;
-        } else {
-            return null;
-        }
-
-        const nameStart = index + marker.length;
-        const nameEnd = text.indexOf("}", nameStart);
-
-        if (nameEnd === -1) {
+        if (!markerMatch) {
             return null;
         }
 
         return {
-            type,
-            name: text.slice(nameStart, nameEnd),
-            endIndex: nameEnd + 1
+            type: markerMatch[1],
+            name: markerMatch[2],
+            endIndex: index + markerMatch[0].length
         };
     }
 
@@ -1387,7 +1375,7 @@
 
 
     function containsSimpleMatrixEnvironment(value) {
-        return /\\begin\{(?:pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|array)\}/i
+        return /\\begin\s*\{(?:pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|array)\}/i
             .test(String(value || ""));
     }
 
@@ -1396,7 +1384,7 @@
         const source = String(body || "");
 
         const matrixPattern =
-            /(?:\\left\s*(\(|\[|\||\\\{)\s*)?\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|array)\}(?:\{([^{}]*)\})?([\s\S]*?)\\end\{\2\}(?:\s*\\right\s*(\)|\]|\||\\\}))?/gi;
+            /(?:\\left\s*(\(|\[|\||\\\{)\s*)?\\begin\s*\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|array)\}\s*(?:\{([^{}]*)\})?([\s\S]*?)\\end\s*\{\2\}(?:\s*\\right\s*(\.|\)|\]|\||\\\}))?/gi;
 
         const pieces = [];
         let cursor = 0;
@@ -1413,11 +1401,18 @@
             const matrixBody = match[4];
             const explicitRight = match[5] || "";
 
+            const hasExplicitLeft = explicitLeft.length > 0;
+            const hasExplicitRight = explicitRight.length > 0;
+
             const delimiterOverride =
-                explicitLeft && explicitRight
+                (hasExplicitLeft || hasExplicitRight)
                     ? {
-                        left: normalizeExplicitMatrixDelimiter(explicitLeft),
-                        right: normalizeExplicitMatrixDelimiter(explicitRight)
+                        left: hasExplicitLeft
+                            ? normalizeExplicitMatrixDelimiter(explicitLeft)
+                            : "",
+                        right: hasExplicitRight
+                            ? normalizeExplicitMatrixDelimiter(explicitRight)
+                            : ""
                     }
                     : null;
 
@@ -1484,6 +1479,10 @@
 
         if (value === "\\}") {
             return "}";
+        }
+
+        if (value === ".") {
+            return "";
         }
 
         return value;
