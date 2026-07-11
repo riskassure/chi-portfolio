@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "delimiter-artifact-cleanup-v1",
+        debugVersion: "align-matrix-cell-v6",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -187,6 +187,10 @@
             // Remove any leftover paragraph wrappers.
             .replace(/<\/?p[^>]*>/gi, "")
 
+            // Decode matrix/alignment separators that were HTML-escaped by the
+            // backend renderer before reaching the frontend parser.
+            .replace(/&amp;/gi, "&")
+
             // Common HTML whitespace artifact.
             .replace(/&nbsp;/gi, " ");
     }
@@ -241,7 +245,20 @@
                     return `<td style="padding:0.12rem 0.28rem; text-align:${align};"></td>`;
                 }
 
-                return `<td style="padding:0.12rem 0.28rem; text-align:${align}; white-space:nowrap;">\\(${escapeHtmlForMathCell(cleanCell)}\\)</td>`;
+                const renderedCell = containsSimpleMatrixEnvironment(cleanCell)
+                    ? buildMatrixMathSequenceHtml(cleanCell, false)
+                    : `\\(${escapeHtmlForMathCell(cleanCell)}\\)`;
+
+                return `
+                    <td style="
+                        padding:0.12rem 0.28rem;
+                        text-align:${align};
+                        white-space:nowrap;
+                        vertical-align:middle;
+                    ">
+                        ${renderedCell}
+                    </td>
+                `;
             }).join("");
 
             return `<tr>${htmlCells}</tr>`;
@@ -267,18 +284,109 @@
             return slashRows;
         }
 
-        // Many old PlanetMath rows lost their LaTeX \\ row separators
-        // but still retain actual line breaks.
-        const newlineRows = normalized
-            .split(/\r?\n+/)
-            .map(row => row.trim())
-            .filter(row => row.length > 0);
+        // If there is only one top-level alignment marker, the physical
+        // line breaks are just source formatting for one long equation.
+        if (countTopLevelAlignmentMarkers(normalized) <= 1) {
+            return slashRows;
+        }
+
+        // Some PlanetMath align blocks lost explicit \\ row separators and
+        // retain only physical line breaks. Split those line breaks only at
+        // top level; line breaks inside matrices, arrays, cases, etc. belong
+        // to the nested environment and must remain intact.
+        const newlineRows = splitTopLevelNewlineRows(normalized);
 
         if (newlineRows.length > 1) {
             return newlineRows;
         }
 
         return slashRows;
+    }
+
+    function countTopLevelAlignmentMarkers(body) {
+        const text = String(body || "");
+        let nestedDepth = 0;
+        let count = 0;
+
+        for (let i = 0; i < text.length; i += 1) {
+            const env = readLatexEnvironmentAt(text, i);
+
+            if (env && isNestedLatexEnvironment(env.name)) {
+                if (env.type === "begin") {
+                    nestedDepth += 1;
+                } else {
+                    nestedDepth = Math.max(0, nestedDepth - 1);
+                }
+
+                i = env.endIndex - 1;
+                continue;
+            }
+
+            if (
+                nestedDepth === 0 &&
+                text[i] === "&" &&
+                text[i - 1] !== "\\"
+            ) {
+                count += 1;
+            }
+        }
+
+        return count;
+    }
+
+    function splitTopLevelNewlineRows(body) {
+        const text = String(body || "");
+        const rows = [];
+
+        let start = 0;
+        let nestedDepth = 0;
+
+        for (let i = 0; i < text.length; i += 1) {
+            const env = readLatexEnvironmentAt(text, i);
+
+            if (env && isNestedLatexEnvironment(env.name)) {
+                if (env.type === "begin") {
+                    nestedDepth += 1;
+                } else {
+                    nestedDepth = Math.max(0, nestedDepth - 1);
+                }
+
+                i = env.endIndex - 1;
+                continue;
+            }
+
+            if (
+                nestedDepth === 0 &&
+                (text[i] === "\n" || text[i] === "\r")
+            ) {
+                const row = text.slice(start, i).trim();
+
+                if (row) {
+                    rows.push(row);
+                }
+
+                if (text[i] === "\r" && text[i + 1] === "\n") {
+                    i += 1;
+                }
+
+                while (
+                    i + 1 < text.length &&
+                    (text[i + 1] === "\n" || text[i + 1] === "\r")
+                ) {
+                    i += 1;
+                }
+
+                start = i + 1;
+            }
+        }
+
+        const finalRow = text.slice(start).trim();
+
+        if (finalRow) {
+            rows.push(finalRow);
+        }
+
+        return rows;
     }
 
     function getAlignColumnAlign(index) {
@@ -1261,7 +1369,7 @@
         const source = String(body || "");
 
         const matrixPattern =
-            /\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix)\}([\s\S]*?)\\end\{\1\}/gi;
+            /(?:\\left\s*(\(|\[|\||\\\{)\s*)?\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix)\}([\s\S]*?)\\end\{\2\}(?:\s*\\right\s*(\)|\]|\||\\\}))?/gi;
 
         const pieces = [];
         let cursor = 0;
@@ -1272,8 +1380,25 @@
 
             appendMatrixSequenceMathPiece(pieces, mathBefore);
 
+            const explicitLeft = match[1] || "";
+            const envName = match[2];
+            const matrixBody = match[3];
+            const explicitRight = match[4] || "";
+
+            const delimiterOverride =
+                explicitLeft && explicitRight
+                    ? {
+                        left: normalizeExplicitMatrixDelimiter(explicitLeft),
+                        right: normalizeExplicitMatrixDelimiter(explicitRight)
+                    }
+                    : null;
+
             pieces.push(
-                buildMatrixEnvironmentHtml(match[1], match[2])
+                buildMatrixEnvironmentHtml(
+                    envName,
+                    matrixBody,
+                    delimiterOverride
+                )
             );
 
             cursor = matrixPattern.lastIndex;
@@ -1321,6 +1446,19 @@
         `;
     }
 
+    function normalizeExplicitMatrixDelimiter(delimiter) {
+        const value = String(delimiter || "").trim();
+
+        if (value === "\\{") {
+            return "{";
+        }
+
+        if (value === "\\}") {
+            return "}";
+        }
+
+        return value;
+    }
 
     function appendMatrixSequenceMathPiece(pieces, value) {
         const cleanValue = normalizeMatrixSequenceMath(value);
@@ -1849,7 +1987,13 @@
 
         let clean = String(tex || "");
 
-        // Remove TeX comment/separator lines that survived backend rendering.
+        // Remove TeX comment/separator paragraphs and standalone lines that
+        // survived backend rendering.
+        clean = clean.replace(
+            /<p[^>]*>\s*(?:%+\s*)+<\/p>/gi,
+            ""
+        );
+
         clean = clean.replace(/^[ \t]*%+[ \t]*$/gm, "");
 
         // Backend prose conversion can produce invalid constructs such as:
@@ -1967,6 +2111,20 @@
                 </table>
             `;
         });
+
+        // Final cleanup for TeX separator/comment remnants after all HTML
+        // transformations have completed. Some malformed source paragraphs can
+        // be restructured by the browser-oriented rendering pipeline, so clean
+        // both wrapped and unwrapped percent-only remnants here.
+        clean = clean.replace(
+            /<p[^>]*>\s*(?:%+\s*(?:<br\s*\/?>)?\s*)+<\/p>/gi,
+            ""
+        );
+
+        clean = clean.replace(
+            /(^|>\s*)%+(?:\s*%+)*(?=\s*(?:<|$))/gmi,
+            "$1"
+        );
 
         return clean;
     }

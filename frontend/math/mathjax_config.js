@@ -24,6 +24,7 @@
             macros: {
                 down: "{\\mathord{\\downarrow}}",
                 dom: "\\operatorname{dom}",
+                sgn: "\\operatorname{sgn}",
 
                 grad: "\\nabla",
                 curl: "\\operatorname{curl}",
