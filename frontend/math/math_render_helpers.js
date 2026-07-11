@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "explicit-array-sequence-v1",
+        debugVersion: "html-sensitive-math-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -113,6 +113,34 @@
         return output;
     }
 
+    function normalizeHtmlSensitiveMathCharacters(value) {
+        let output = String(value || "");
+
+        const normalizeMathBody = body => String(body || "")
+            .replace(/</g, "\\lt ")
+            .replace(/>/g, "\\gt ");
+
+        // Display math: \[ ... \]
+        output = output.replace(
+            /\\\[([\s\S]*?)\\\]/g,
+            (_, body) => `\\[${normalizeMathBody(body)}\\]`
+        );
+
+        // Inline math: \( ... \)
+        output = output.replace(
+            /\\\(([\s\S]*?)\\\)/g,
+            (_, body) => `\\(${normalizeMathBody(body)}\\)`
+        );
+
+        // Legacy inline dollar math. Display dollars have already been normalized.
+        output = output.replace(
+            /(^|[^\\$])\$((?:\\.|[^$])*?)\$/g,
+            (_, prefix, body) =>
+                `${prefix}$${normalizeMathBody(body)}$`
+        );
+
+        return output;
+    }
 
     function unwrapSimpleTextCommand(text, commandName) {
         const pattern = new RegExp("\\\\" + commandName + "\\s*\\{([^{}]*)\\}", "gi");
@@ -121,7 +149,6 @@
             return String(content || "").trim();
         });
     }
-
 
     function normalizeCommonTextAccentMacros(tex) {
         let output = String(tex || "");
@@ -2008,6 +2035,9 @@
             /\$\s*<(strong|em|b|i)>([^<>$]*)<\/\1>\s*\$/gi,
             "<$1>$2</$1>"
         );
+
+        // Protect literal < and > characters inside math from HTML parsing.
+        clean = normalizeHtmlSensitiveMathCharacters(clean);
 
         // Normalize legacy display wrappers so MathJax can process their contents.
         clean = normalizeDisplayMathEnvironments(clean);
