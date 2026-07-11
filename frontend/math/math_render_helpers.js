@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "align-matrix-cell-v6",
+        debugVersion: "explicit-array-sequence-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -1360,7 +1360,7 @@
 
 
     function containsSimpleMatrixEnvironment(value) {
-        return /\\begin\{(?:pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix)\}/i
+        return /\\begin\{(?:pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|array)\}/i
             .test(String(value || ""));
     }
 
@@ -1369,7 +1369,7 @@
         const source = String(body || "");
 
         const matrixPattern =
-            /(?:\\left\s*(\(|\[|\||\\\{)\s*)?\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix)\}([\s\S]*?)\\end\{\2\}(?:\s*\\right\s*(\)|\]|\||\\\}))?/gi;
+            /(?:\\left\s*(\(|\[|\||\\\{)\s*)?\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|array)\}(?:\{([^{}]*)\})?([\s\S]*?)\\end\{\2\}(?:\s*\\right\s*(\)|\]|\||\\\}))?/gi;
 
         const pieces = [];
         let cursor = 0;
@@ -1382,8 +1382,9 @@
 
             const explicitLeft = match[1] || "";
             const envName = match[2];
-            const matrixBody = match[3];
-            const explicitRight = match[4] || "";
+            const arraySpec = match[3] || "";
+            const matrixBody = match[4];
+            const explicitRight = match[5] || "";
 
             const delimiterOverride =
                 explicitLeft && explicitRight
@@ -1397,7 +1398,8 @@
                 buildMatrixEnvironmentHtml(
                     envName,
                     matrixBody,
-                    delimiterOverride
+                    delimiterOverride,
+                    arraySpec
                 )
             );
 
@@ -1719,7 +1721,7 @@
         return `<span style="${wrapperStyle}; align-items:center;">${escapeHtmlForMathCell(cleanDelimiter)}</span>`;
     }
 
-    function buildMatrixEnvironmentHtml(envName, body, delimiterOverride = null) {
+    function buildMatrixEnvironmentHtml(envName, body, delimiterOverride = null, arraySpec = "") {
         const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
 
         const rows = splitMatrixBodyRows(normalizedBody)
