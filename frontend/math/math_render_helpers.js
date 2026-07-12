@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "inline-cases-typography-v1",
+        debugVersion: "legacy-matrix-over-cr-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -259,6 +259,29 @@
                 `\\begin{array}{${columnSpec}}${normalizeBody(body)}\\end{array}`
         );
 
+        output = output.replace(
+            /\\begin\s*\{(matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|smallmatrix)\}([\s\S]*?)\\end\s*\{\1\}/gi,
+            (_, envName, body) =>
+                `\\begin{${envName}}${normalizeBody(body)}\\end{${envName}}`
+        );
+
+        return output;
+    }
+
+    function normalizeLegacyOverFractions(value) {
+        let output = String(value || "");
+
+        // Common PlanetMath form:
+        //   {n \over 2^k}
+        //   {a+b \over c}
+        //
+        // Intentionally limited to simple, non-nested brace groups.
+        output = output.replace(
+            /\{\s*([^{}]+?)\s+\\over\s+([^{}]+?)\s*\}/g,
+            (_, numerator, denominator) =>
+                `\\frac{${numerator.trim()}}{${denominator.trim()}}`
+        );
+
         return output;
     }
 
@@ -497,7 +520,8 @@
     }
 
     function buildHtmlTableFromEqnarrayBody(body) {
-        const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
+        const normalizedBody = normalizeEqnarrayHtmlArtifacts(body)
+            .replace(/\\cr\b/gi, "\\\\");
 
         const rows = splitEqnarrayRows(normalizedBody)
             .map(splitEqnarrayCells)
@@ -1456,16 +1480,56 @@
                     }
                     : null;
 
-            pieces.push(
-                buildMatrixEnvironmentHtml(
-                    envName,
-                    matrixBody,
-                    delimiterOverride,
-                    arraySpec
-                )
+            const matrixHtml = buildMatrixEnvironmentHtml(
+                envName,
+                matrixBody,
+                delimiterOverride,
+                arraySpec
             );
 
-            cursor = matrixPattern.lastIndex;
+            let nextCursor = matrixPattern.lastIndex;
+
+            // Attach an immediately following exponent to the matrix itself:
+            //
+            //   \begin{pmatrix} ... \end{pmatrix}^n
+            //   \begin{pmatrix} ... \end{pmatrix}^{n+1}
+            const exponentMatch = source.slice(nextCursor).match(
+                /^\s*\^\s*(?:\{([^{}]+)\}|([A-Za-z0-9]+))/
+            );
+
+            if (exponentMatch) {
+                const exponent =
+                    exponentMatch[1] ||
+                    exponentMatch[2] ||
+                    "";
+
+                pieces.push(`
+                    <span class="pm-matrix-with-exponent" style="
+                        display:inline-flex;
+                        align-items:flex-start;
+                        vertical-align:middle;
+                        white-space:nowrap;
+                    ">
+                        ${matrixHtml}
+
+                        <span style="
+                            display:inline-block;
+                            margin-left:0.06rem;
+                            margin-top:-0.12rem;
+                            font-size:0.78em;
+                            line-height:1;
+                        ">
+                            \\(${escapeHtmlForMathCell(exponent)}\\)
+                        </span>
+                    </span>
+                `);
+
+                nextCursor += exponentMatch[0].length;
+            } else {
+                pieces.push(matrixHtml);
+            }
+
+            cursor = nextCursor;
         }
 
         appendMatrixSequenceMathPiece(
@@ -2303,7 +2367,7 @@
         // Repair HTML paragraph artifacts inside cases/array environments before
         // literal < and > characters are protected for safe innerHTML insertion.
         clean = normalizeStructuredMathHtmlArtifacts(clean);
-
+        clean = normalizeLegacyOverFractions(clean);
         clean = normalizeHtmlSensitiveMathCharacters(clean);
 
         // Normalize legacy display wrappers so MathJax can process their contents.
