@@ -25,6 +25,9 @@
                 down: "{\\mathord{\\downarrow}}",
                 dom: "\\operatorname{dom}",
                 sgn: "\\operatorname{sgn}",
+                hom: "\\operatorname{Hom}",
+                ob: "\\operatorname{Ob}",
+                eqv: "\\simeq",
 
                 grad: "\\nabla",
                 curl: "\\operatorname{curl}",

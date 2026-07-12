@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "math-html-bold-to-mathbf-v2",
+        debugVersion: "xymatrix-wrapper-punctuation-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -100,7 +100,10 @@
 
         // Some old-style font groups contain accent macros with braces, so run this
         // again after accent normalization.
-        output = output.replace(/\{\\(?:bf|em|it|rm|sc)\s*([^{}]*)\}/gi, "$1");
+        output = output.replace(
+            /\{\\(?:bf|em|it|rm|sc)\b\s*([^{}]*)\}/gi,
+            "$1"
+        );
         output = output.replace(/\{\\em\s*\{([^{}]*)\}\}/gi, "$1");
 
         // Light cleanup around spaces introduced by removed layout commands.
@@ -266,6 +269,52 @@
         );
 
         return output;
+    }
+
+    function normalizeXyMatrixHtmlArtifacts(value) {
+        const source = String(value || "");
+
+        let result = "";
+        let cursor = 0;
+
+        while (cursor < source.length) {
+            const matrixIndex = source.indexOf("\\xymatrix", cursor);
+
+            if (matrixIndex === -1) {
+                result += source.slice(cursor);
+                break;
+            }
+
+            const braceStart = findXyMatrixBodyStart(
+                source,
+                matrixIndex + "\\xymatrix".length
+            );
+
+            if (braceStart === -1) {
+                result += source.slice(cursor, matrixIndex + "\\xymatrix".length);
+                cursor = matrixIndex + "\\xymatrix".length;
+                continue;
+            }
+
+            const braceEnd = findMatchingBrace(source, braceStart);
+
+            if (braceEnd === -1) {
+                result += source.slice(cursor);
+                break;
+            }
+
+            const body = source.slice(braceStart + 1, braceEnd);
+
+            const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
+
+            result += source.slice(cursor, braceStart + 1);
+            result += normalizedBody;
+            result += "}";
+
+            cursor = braceEnd + 1;
+        }
+
+        return result;
     }
 
     function normalizeLegacyOverFractions(value) {
@@ -861,20 +910,42 @@
     }
 
     function findMatchingBrace(text, openIndex) {
+        const source = String(text || "");
         let depth = 0;
 
-        for (let i = openIndex; i < text.length; i += 1) {
-            const char = text[i];
-            const prev = text[i - 1];
+        for (let i = openIndex; i < source.length; i += 1) {
+            const char = source[i];
 
-            if (char === "{" && prev !== "\\") {
+            if (char !== "{" && char !== "}") {
+                continue;
+            }
+
+            // A brace is escaped only when preceded by an odd number of
+            // consecutive backslashes.
+            //
+            //   \{    escaped brace
+            //   \\{   xymatrix row break followed by a real opening brace
+            let backslashCount = 0;
+
+            for (let j = i - 1; j >= 0 && source[j] === "\\"; j -= 1) {
+                backslashCount += 1;
+            }
+
+            const isEscaped = backslashCount % 2 === 1;
+
+            if (isEscaped) {
+                continue;
+            }
+
+            if (char === "{") {
                 depth += 1;
-            } else if (char === "}" && prev !== "\\") {
-                depth -= 1;
+                continue;
+            }
 
-                if (depth === 0) {
-                    return i;
-                }
+            depth -= 1;
+
+            if (depth === 0) {
+                return i;
             }
         }
 
@@ -1246,6 +1317,61 @@
                 ${labelHtml}
             </div>
         `;
+    }
+
+    function unwrapConvertedXyMatrixMathWrappers(value) {
+        let output = String(value || "");
+
+        const tablePattern =
+            '(<table\\b[^>]*class=["\'][^"\']*\\bpm-xymatrix-table\\b[^"\']*["\'][^>]*>[\\s\\S]*?<\\/table>)';
+
+        // Allow ordinary sentence punctuation immediately after a diagram.
+        // For example:
+        //
+        //   $$\xymatrix{...},$$
+        //
+        // becomes:
+        //
+        //   <table>...</table>,
+        const trailingPunctuation = "([,.;:!?]?)";
+
+        // Display dollar wrappers: $$ <table> [, punctuation] $$
+        output = output.replace(
+            new RegExp(
+                `\\$\\$\\s*${tablePattern}\\s*${trailingPunctuation}\\s*\\$\\$`,
+                "gi"
+            ),
+            "$1$2"
+        );
+
+        // Inline dollar wrappers: $ <table> [, punctuation] $
+        output = output.replace(
+            new RegExp(
+                `\\$\\s*${tablePattern}\\s*${trailingPunctuation}\\s*\\$`,
+                "gi"
+            ),
+            "$1$2"
+        );
+
+        // LaTeX display wrappers: \[ <table> [, punctuation] \]
+        output = output.replace(
+            new RegExp(
+                `\\\\\\[\\s*${tablePattern}\\s*${trailingPunctuation}\\s*\\\\\\]`,
+                "gi"
+            ),
+            "$1$2"
+        );
+
+        // LaTeX inline wrappers: \( <table> [, punctuation] \)
+        output = output.replace(
+            new RegExp(
+                `\\\\\\(\\s*${tablePattern}\\s*${trailingPunctuation}\\s*\\\\\\)`,
+                "gi"
+            ),
+            "$1$2"
+        );
+
+        return output;
     }
 
     function makeUnsupportedXyMatrixPlaceholder(body) {
@@ -2412,8 +2538,42 @@
         // Repair HTML paragraph artifacts inside cases/array environments before
         // literal < and > characters are protected for safe innerHTML insertion.
         clean = normalizeStructuredMathHtmlArtifacts(clean);
+
+        // Repair paragraph and line-break artifacts inside xymatrix bodies before
+        // literal angle brackets inside math are protected as \lt and \gt.
+        clean = normalizeXyMatrixHtmlArtifacts(clean);
+
         clean = normalizeLegacyOverFractions(clean);
+
+        clean = convertXyMatrixToHtml(clean);
+
+        // Remove the original $, $$, \( \), or \[ \] wrappers after the
+        // xymatrix has been replaced with generated HTML.
+        clean = unwrapConvertedXyMatrixMathWrappers(clean);
+
+        // Temporarily protect generated xymatrix HTML while literal angle brackets
+        // in the remaining TeX are normalized.
+        const xymatrixHtmlBlocks = [];
+
+        clean = clean.replace(
+            /<table\b[^>]*class=["'][^"']*\bpm-xymatrix-table\b[^"']*["'][^>]*>[\s\S]*?<\/table>/gi,
+            (tableHtml) => {
+                const index = xymatrixHtmlBlocks.length;
+                xymatrixHtmlBlocks.push(tableHtml);
+                return `PMXYMATRIXHTMLPLACEHOLDER${index}END`;
+            }
+        );
+
         clean = normalizeHtmlSensitiveMathCharacters(clean);
+
+        // Restore the generated HTML after TeX angle-bracket normalization.
+        clean = clean.replace(
+            /PMXYMATRIXHTMLPLACEHOLDER(\d+)END/g,
+            (match, indexText) => {
+                const index = Number(indexText);
+                return xymatrixHtmlBlocks[index] ?? match;
+            }
+        );
 
         // Normalize legacy display wrappers so MathJax can process their contents.
         clean = normalizeDisplayMathEnvironments(clean);
@@ -2477,9 +2637,6 @@
 
         // Normalize legacy eqnarray blocks before MathJax sees them.
         clean = convertEqnarrayToAligned(clean);
-
-        // Convert simple Xy-pic xymatrix diagrams into HTML tables.
-        clean = convertXyMatrixToHtml(clean);
 
         // existing pspicture/list/etc cleanup continues below...
         clean = clean.replace(
