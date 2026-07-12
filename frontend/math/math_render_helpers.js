@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "math-prose-and-v1",
+        debugVersion: "inline-cases-typography-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -220,6 +220,46 @@
 
             // Common HTML whitespace artifact.
             .replace(/&nbsp;/gi, " ");
+    }
+
+    function normalizeStructuredMathHtmlArtifacts(value) {
+        let output = String(value || "");
+
+        const normalizeBody = body => String(body || "")
+            // Paragraph breaks inside cases/arrays represent TeX rows.
+            .replace(
+                /<br\s*\/?>\s*<\/p>\s*<p[^>]*>/gi,
+                "\\\\"
+            )
+            .replace(
+                /<\/p>\s*<p[^>]*>/gi,
+                "\\\\"
+            )
+            .replace(
+                /<br\s*\/?>/gi,
+                "\\\\"
+            )
+
+            // Remove any remaining paragraph wrappers.
+            .replace(/<\/?p[^>]*>/gi, "")
+
+            // A cases/array environment is already math. Nested dollar pairs,
+            // often inherited from \mbox{if $x>0$}, must not remain inside it.
+            .replace(/\$([^$]+)\$/g, "$1");
+
+        output = output.replace(
+            /\\begin\s*\{cases\}([\s\S]*?)\\end\s*\{cases\}/gi,
+            (_, body) =>
+                `\\begin{cases}${normalizeBody(body)}\\end{cases}`
+        );
+
+        output = output.replace(
+            /\\begin\s*\{array\}\s*\{([^{}]*)\}([\s\S]*?)\\end\s*\{array\}/gi,
+            (_, columnSpec, body) =>
+                `\\begin{array}{${columnSpec}}${normalizeBody(body)}\\end{array}`
+        );
+
+        return output;
     }
 
     function convertAlignEnvironmentsToHtml(tex) {
@@ -1928,6 +1968,25 @@
             }
         );
 
+        // Inline-dollar cases environment.
+        //
+        // Some list items contain constructs such as:
+        //
+        //   Mode $= \begin{cases} ... \end{cases}$
+        //
+        // Promote the complete inline fragment into the HTML piecewise renderer.
+        // Inline-dollar cases environment.
+        output = output.replace(
+            /\$([^$]*?)\\begin\s*\{cases\}([\s\S]*?)\\end\s*\{cases\}\s*\$/gi,
+            function(_, prefix, body) {
+                return buildPiecewiseArrayHtml(
+                    prefix,
+                    body,
+                    { inline: true }
+                );
+            }
+        );
+
         // Display-wrapped cases environment.
         output = output.replace(
             /\\\[\s*([\s\S]*?)\\begin\s*\{cases\}([\s\S]*?)\\end\s*\{cases\}\s*\\\]/gi,
@@ -2009,7 +2068,8 @@
         `;
     }
 
-    function buildPiecewiseArrayHtml(prefix, body) {
+    function buildPiecewiseArrayHtml(prefix, body, options = {}) {
+        const isInline = options.inline === true;
         const cleanPrefix = normalizePiecewiseMathCell(prefix);
         const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
 
@@ -2035,12 +2095,14 @@
                         padding:0.12rem 0.35rem;
                         text-align:left;
                         white-space:nowrap;
+                        vertical-align:middle;
                     ">\\(${escapeHtmlForMathCell(leftCell)}\\)</td>
 
                     <td style="
                         padding:0.12rem 0.35rem;
                         text-align:left;
                         white-space:nowrap;
+                        vertical-align:middle;
                     ">
                         ${buildPiecewiseConditionHtml(rightCell)}
                     </td>
@@ -2051,22 +2113,88 @@
         const prefixHtml = cleanPrefix
             ? `<span style="
                     display:inline-block;
-                    vertical-align:middle;
-                    margin-right:0.35rem;
-                    transform:translateY(0.16em);
+                    vertical-align:baseline;
+                    margin-right:0.12rem;
+                    transform:${isInline ? "translateY(0)" : "translateY(0.16em)"};
                 ">\\(${escapeHtmlForMathCell(cleanPrefix)}\\)</span>`
             : "";
 
+        if (isInline) {
+            const braceHtml = renderMatrixDelimiter("{", "left");
+
+            return `
+                <span
+                    class="pm-piecewise-block pm-piecewise-inline tex2jax_process"
+                    style="
+                        display:inline-flex;
+                        align-items:center;
+                        vertical-align:middle;
+                        margin-left:0.22rem;
+                        margin-top:0.10rem;
+                        margin-bottom:0.10rem;
+                        white-space:nowrap;
+                    "
+                >
+                    ${cleanPrefix
+                        ? `
+                            <span style="
+                                display:inline-flex;
+                                align-items:center;
+                                margin-right:0.16rem;
+                                white-space:nowrap;
+                            ">
+                                \\(${escapeHtmlForMathCell(cleanPrefix)}\\)
+                            </span>
+                        `
+                        : ""
+                    }
+
+                    <span style="
+                        display:inline-flex;
+                        align-items:stretch;
+                        align-self:stretch;
+                        vertical-align:middle;
+                        gap:0.06rem;
+                    ">
+                        ${braceHtml}
+
+                        <table style="
+                            display:inline-table;
+                            align-self:center;
+                            vertical-align:middle;
+                            border-collapse:collapse;
+                            text-align:left;
+                        ">
+                            ${rowHtml}
+                        </table>
+                    </span>
+                </span>
+            `;
+        }
+
         return `
-            <div class="pm-piecewise-block tex2jax_process" style="text-align:center; margin:1rem 0;">
+            <div
+                class="pm-piecewise-block tex2jax_process"
+                style="
+                    text-align:center;
+                    margin:1rem 0;
+                "
+            >
                 ${prefixHtml}
+
                 <span style="
                     display:inline-block;
                     vertical-align:middle;
                     font-size:${braceFontSizeRem.toFixed(2)}rem;
                     line-height:0.9;
                 ">{</span>
-                <table style="display:inline-table; vertical-align:middle; border-collapse:collapse; text-align:left;">
+
+                <table style="
+                    display:inline-table;
+                    vertical-align:middle;
+                    border-collapse:collapse;
+                    text-align:left;
+                ">
                     ${rowHtml}
                 </table>
             </div>
@@ -2079,13 +2207,32 @@
         // Accept either the original TeX wrappers or plain prose left behind
         // by earlier normalization.
         condition = condition
-            .replace(/^\\text\{\s*(if|when)\s*\}\s*/i, "$1 ")
-            .replace(/^\\text\{\s*(otherwise\.?)\s*\}\s*/i, "$1 ")
-            .replace(/^\\textrm\{\s*(if|when)\s*\}\s*/i, "$1 ")
-            .replace(/^\\textrm\{\s*(otherwise\.?)\s*\}\s*/i, "$1 ")
-            .replace(/^\\mbox\{\s*(if|when)\s*\}\s*/i, "$1 ")
-            .replace(/^\\mbox\{\s*(otherwise\.?)\s*\}\s*/i, "$1 ")
-            .trim();
+        // Wrapper contains both prose and the following math:
+        // \mbox{if \gamma>1}
+        // \text{when x\le r}
+        .replace(
+            /^\\(?:mbox|text|textrm)\{\s*(if|when)\s+([\s\S]*?)\s*\}$/i,
+            "$1 $2"
+        )
+
+        // Wrapper contains only prose:
+        // \mbox{otherwise}
+        .replace(
+            /^\\(?:mbox|text|textrm)\{\s*(otherwise\.?)\s*\}$/i,
+            "$1"
+        )
+
+        // Prose wrapper followed by math outside the braces:
+        // \mbox{if }\gamma>1
+        .replace(
+            /^\\(?:mbox|text|textrm)\{\s*(if|when)\s*\}\s*/i,
+            "$1 "
+        )
+        .replace(
+            /^\\(?:mbox|text|textrm)\{\s*(otherwise\.?)\s*\}\s*/i,
+            "$1 "
+        )
+        .trim();
 
         const proseMatch = condition.match(
             /^(if|when|otherwise\.?)\b\s*(.*)$/i
@@ -2105,9 +2252,17 @@
         }
 
         return `
-            ${proseHtml}
-            <span style="display:inline-block; margin-left:0.28rem;">
-                \\(${escapeHtmlForMathCell(remainingMath)}\\)
+            <span style="
+                display:inline-flex;
+                align-items:baseline;
+                column-gap:0.45rem;
+                white-space:nowrap;
+            ">
+                ${proseHtml}
+
+                <span style="display:inline-block;">
+                    \\(${escapeHtmlForMathCell(remainingMath)}\\)
+                </span>
             </span>
         `;
     }
@@ -2145,7 +2300,10 @@
             "<$1>$2</$1>"
         );
 
-        // Protect literal < and > characters inside math from HTML parsing.
+        // Repair HTML paragraph artifacts inside cases/array environments before
+        // literal < and > characters are protected for safe innerHTML insertion.
+        clean = normalizeStructuredMathHtmlArtifacts(clean);
+
         clean = normalizeHtmlSensitiveMathCharacters(clean);
 
         // Normalize legacy display wrappers so MathJax can process their contents.
@@ -2220,13 +2378,22 @@
             `<div class="img-placeholder mathjax-diagnostic-ignore"><em>[PSTricks diagram placeholder]</em></div>`
         );
 
-        clean = clean.replace(/\\begin{enumerate}/gi, "<ol style='margin-top: 0.5rem; padding-left: 1.5rem;'>");
+        clean = clean.replace(
+            /\\begin{enumerate}/gi,
+            "<ol class='pm-tex-list' style='margin:0.65rem 0 0.9rem; padding-left:1.75rem;'>"
+        );
         clean = clean.replace(/\\end{enumerate}/gi, "</ol>");
 
-        clean = clean.replace(/\\begin{itemize}/gi, "<ul style='margin-top: 0.5rem; padding-left: 1.5rem; list-style-type: disc;'>");
+        clean = clean.replace(
+            /\\begin{itemize}/gi,
+            "<ul class='pm-tex-list' style='margin:0.65rem 0 0.9rem; padding-left:1.75rem; list-style-type:disc;'>"
+        );
         clean = clean.replace(/\\end{itemize}/gi, "</ul>");
 
-        clean = clean.replace(/\\item/gi, "<li style='margin-bottom: 0.25rem;'>");
+        clean = clean.replace(
+            /\\item/gi,
+            "<li style='margin-bottom:0.6rem; padding-block:0.06rem; line-height:1.5;'>"
+        );
 
         clean = clean.replace(/\\emph\{([^}]+)\}/gi, "<em>$1</em>");
         clean = clean.replace(/\\textbf\{([^}]+)\}/gi, "<strong>$1</strong>");
