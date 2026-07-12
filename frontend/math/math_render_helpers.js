@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "spaced-latex-environment-v1",
+        debugVersion: "math-prose-and-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -1896,59 +1896,117 @@
 
         let output = String(tex);
 
-        // Display-wrapped piecewise arrays:
-        // \[ prefix \left\{ \begin{array}{ll} ... \end{array} \right. \]
-        // Also catches \left \lbrace and \left\lbrace.
+        // A display block may contain more than one piecewise array:
+        //
+        // \[
+        //   t_1 := \left\{ ... \right.
+        //   \hspace{1cm}
+        //   t_2 := \left\{ ... \right.
+        // \]
+        //
+        // Process the complete display body and extract each array separately.
         output = output.replace(
-            /\\\[\s*([\s\S]*?)\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*\\right\s*\.?\s*\\\]/gi,
-            function(_, prefix, columnSpec, body) {
-                return buildPiecewiseArrayHtml(prefix, body);
+            /\\\[([\s\S]*?)\\\]/gi,
+            function(fullMatch, body) {
+                if (!containsPiecewiseArray(body)) {
+                    return fullMatch;
+                }
+
+                return buildPiecewiseDisplaySequenceHtml(body);
             }
         );
 
-        // $$-wrapped piecewise arrays.
+        // Legacy $$ ... $$ display form.
         output = output.replace(
-            /\$\$\s*([\s\S]*?)\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*\\right\s*\.?\s*\$\$/gi,
-            function(_, prefix, columnSpec, body) {
-                return buildPiecewiseArrayHtml(prefix, body);
+            /\$\$([\s\S]*?)\$\$/gi,
+            function(fullMatch, body) {
+                if (!containsPiecewiseArray(body)) {
+                    return fullMatch;
+                }
+
+                return buildPiecewiseDisplaySequenceHtml(body);
             }
         );
 
-        // Bare piecewise arrays without a clean display wrapper.
-        // We intentionally do not try to capture a prefix here, to avoid eating prose before the formula.
-        // output = output.replace(
-        //     /\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\{array\}\{([^{}]*)\}([\s\S]*?)\\end\{array\}\s*\\right\s*\.?/gi,
-        //     function(_, columnSpec, body) {
-        //         return buildPiecewiseArrayHtml("", body);
-        //     }
-        // );
-
-        // Display-wrapped cases environment:
-        // \[ prefix \begin{cases} ... \end{cases} \]
+        // Display-wrapped cases environment.
         output = output.replace(
-            /\\\[\s*([\s\S]*?)\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*\\\]/gi,
+            /\\\[\s*([\s\S]*?)\\begin\s*\{cases\}([\s\S]*?)\\end\s*\{cases\}\s*\\\]/gi,
             function(_, prefix, body) {
                 return buildPiecewiseArrayHtml(prefix, body);
             }
         );
 
-        // $$-wrapped cases environment.
+        // Legacy $$-wrapped cases environment.
         output = output.replace(
-            /\$\$\s*([\s\S]*?)\\begin\{cases\}([\s\S]*?)\\end\{cases\}\s*\$\$/gi,
+            /\$\$\s*([\s\S]*?)\\begin\s*\{cases\}([\s\S]*?)\\end\s*\{cases\}\s*\$\$/gi,
             function(_, prefix, body) {
                 return buildPiecewiseArrayHtml(prefix, body);
             }
         );
-
-        // Bare cases environment.
-        // output = output.replace(
-        //     /\\begin\{cases\}([\s\S]*?)\\end\{cases\}/gi,
-        //     function(_, body) {
-        //         return buildPiecewiseArrayHtml("", body);
-        //     }
-        // );
 
         return output;
+    }
+
+    function containsPiecewiseArray(value) {
+        return /\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\s*\{array\}/i
+            .test(String(value || ""));
+    }
+
+    function buildPiecewiseDisplaySequenceHtml(displayBody) {
+        const source = String(displayBody || "");
+
+        const piecewisePattern =
+            /\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\s*\{array\}\s*\{([^{}]*)\}([\s\S]*?)\\end\s*\{array\}\s*\\right\s*\.?/gi;
+
+        const pieces = [];
+        let cursor = 0;
+        let match;
+
+        while ((match = piecewisePattern.exec(source)) !== null) {
+            let prefix = source.slice(cursor, match.index);
+
+            // Spacing commands between adjacent piecewise definitions should
+            // become visual spacing between the generated HTML blocks.
+            prefix = prefix
+                .replace(/\\hspace\s*\{[^{}]*\}/gi, " ")
+                .replace(/\\qquad\b/gi, " ")
+                .replace(/\\quad\b/gi, " ")
+                .trim();
+
+            pieces.push(
+                buildPiecewiseArrayHtml(
+                    prefix,
+                    match[2]
+                )
+            );
+
+            cursor = piecewisePattern.lastIndex;
+        }
+
+        const trailingMath = source.slice(cursor).trim();
+
+        if (trailingMath) {
+            pieces.push(
+                `<span style="display:inline-block; vertical-align:middle;">\\(${escapeHtmlForMathCell(trailingMath)}\\)</span>`
+            );
+        }
+
+        if (pieces.length === 0) {
+            return `\\[${source}\\]`;
+        }
+
+        return `
+            <div class="pm-piecewise-sequence tex2jax_process" style="
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                flex-wrap:wrap;
+                gap:2rem;
+                margin:1rem 0;
+            ">
+                ${pieces.join("")}
+            </div>
+        `;
     }
 
     function buildPiecewiseArrayHtml(prefix, body) {
@@ -1967,12 +2025,25 @@
 
         const rowHtml = rows.map(cells => {
             const leftCell = normalizePiecewiseMathCell(cells[0] || "");
-            const rightCell = normalizePiecewiseMathCell(cells.slice(1).join(" ") || "");
+            const rightCell = normalizePiecewiseMathCell(
+                cells.slice(1).join(" ") || ""
+            );
 
             return `
                 <tr>
-                    <td style="padding:0.12rem 0.35rem; text-align:left; white-space:nowrap;">\\(${escapeHtmlForMathCell(leftCell)}\\)</td>
-                    <td style="padding:0.12rem 0.35rem; text-align:left;">\\(${escapeHtmlForMathCell(rightCell)}\\)</td>
+                    <td style="
+                        padding:0.12rem 0.35rem;
+                        text-align:left;
+                        white-space:nowrap;
+                    ">\\(${escapeHtmlForMathCell(leftCell)}\\)</td>
+
+                    <td style="
+                        padding:0.12rem 0.35rem;
+                        text-align:left;
+                        white-space:nowrap;
+                    ">
+                        ${buildPiecewiseConditionHtml(rightCell)}
+                    </td>
                 </tr>
             `;
         }).join("");
@@ -1999,6 +2070,45 @@
                     ${rowHtml}
                 </table>
             </div>
+        `;
+    }
+
+    function buildPiecewiseConditionHtml(value) {
+        let condition = String(value || "").trim();
+
+        // Accept either the original TeX wrappers or plain prose left behind
+        // by earlier normalization.
+        condition = condition
+            .replace(/^\\text\{\s*(if|when)\s*\}\s*/i, "$1 ")
+            .replace(/^\\text\{\s*(otherwise\.?)\s*\}\s*/i, "$1 ")
+            .replace(/^\\textrm\{\s*(if|when)\s*\}\s*/i, "$1 ")
+            .replace(/^\\textrm\{\s*(otherwise\.?)\s*\}\s*/i, "$1 ")
+            .replace(/^\\mbox\{\s*(if|when)\s*\}\s*/i, "$1 ")
+            .replace(/^\\mbox\{\s*(otherwise\.?)\s*\}\s*/i, "$1 ")
+            .trim();
+
+        const proseMatch = condition.match(
+            /^(if|when|otherwise\.?)\b\s*(.*)$/i
+        );
+
+        if (!proseMatch) {
+            return `\\(${escapeHtmlForMathCell(condition)}\\)`;
+        }
+
+        const prose = proseMatch[1];
+        const remainingMath = proseMatch[2].trim();
+
+        const proseHtml = `<span style="font-style:normal;">${escapeHtmlForMathCell(prose)}</span>`;
+
+        if (!remainingMath) {
+            return proseHtml;
+        }
+
+        return `
+            ${proseHtml}
+            <span style="display:inline-block; margin-left:0.28rem;">
+                \\(${escapeHtmlForMathCell(remainingMath)}\\)
+            </span>
         `;
     }
 
@@ -2082,6 +2192,14 @@
 
         // Replace old LaTeX/EPS image commands with readable placeholders.
         clean = normalizeLatexImageArtifacts(clean);
+
+        // Preserve visible spacing around prose conjunctions inside math.
+        // Plain "and" is treated as math identifiers, so its surrounding
+        // spaces disappear after MathJax typesetting.
+        clean = clean.replace(
+            /\\(?:mbox|textrm|text)\{\s*and\s*\}/gi,
+            "\\;\\mathrm{and}\\;"
+        );
 
         // Remove/prose-normalize LaTeX layout commands that should not be visible.
         clean = normalizeProseLayoutMacros(clean);
