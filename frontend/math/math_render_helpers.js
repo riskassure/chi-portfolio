@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "legacy-matrix-over-cr-v1",
+        debugVersion: "math-html-bold-to-mathbf-v2",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -2339,6 +2339,47 @@
             .trim();
     }
 
+    function normalizeTextBoldInsideMath(value) {
+        let output = String(value || "");
+
+        const normalizeBody = body => String(body || "")
+            // Original TeX bold symbols.
+            .replace(
+                /\\textbf\s*\{([^{}]*)\}/gi,
+                "\\mathbf{$1}"
+            )
+
+            // Bold HTML already produced by backend rendered_tex/display_tex.
+            // HTML cannot remain inside MathJax delimiters.
+            .replace(
+                /<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/gi,
+                (_, tagName, content) =>
+                    `\\mathbf{${String(content || "").trim()}}`
+            );
+
+        output = output.replace(
+            /\\\[([\s\S]*?)\\\]/g,
+            (_, body) => `\\[${normalizeBody(body)}\\]`
+        );
+
+        output = output.replace(
+            /\\\(([\s\S]*?)\\\)/g,
+            (_, body) => `\\(${normalizeBody(body)}\\)`
+        );
+
+        output = output.replace(
+            /\$\$([\s\S]*?)\$\$/g,
+            (_, body) => `$$${normalizeBody(body)}$$`
+        );
+
+        output = output.replace(
+            /(?<!\\)(?<!\$)\$(?!\$)([\s\S]*?)(?<!\\)\$(?!\$)/g,
+            (_, body) => `$${normalizeBody(body)}$`
+        );
+
+        return output;
+    }
+
     function cleanLaTeXEnvironments(tex) {
         if (!tex) return "";
 
@@ -2363,6 +2404,10 @@
             /\$\s*<(strong|em|b|i)>([^<>$]*)<\/\1>\s*\$/gi,
             "<$1>$2</$1>"
         );
+
+        // Keep bold symbols inside math as TeX instead of later converting
+        // them into invalid HTML tags inside MathJax delimiters.
+        clean = normalizeTextBoldInsideMath(clean);
 
         // Repair HTML paragraph artifacts inside cases/array environments before
         // literal < and > characters are protected for safe innerHTML insertion.
