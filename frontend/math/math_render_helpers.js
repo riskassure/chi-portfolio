@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "latex-verb-math-spacing-v1",
+        debugVersion: "protect-mbox-and-text-in-math-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -133,6 +133,13 @@
         output = output.replace(
             /\\\(([\s\S]*?)\\\)/g,
             (_, body) => `\\(${normalizeMathBody(body)}\\)`
+        );
+
+        // Display dollar math. This must run before the inline-dollar rule.
+        output = output.replace(
+            /\$\$([\s\S]*?)\$\$/g,
+            (_, body) =>
+                `$$${normalizeMathBody(body)}$$`
         );
 
         // Legacy inline dollar math. Display dollars have already been normalized.
@@ -1770,8 +1777,13 @@
     function buildDisplayMatrixHtmlWithAffixes(envName, prefix, body, suffix = "") {
         const affixInfo = extractMatrixAffixDelimiters(prefix, suffix, envName);
 
-        const cleanPrefix = normalizeMatrixAffix(affixInfo.prefix);
-        const cleanSuffix = normalizeMatrixAffix(affixInfo.suffix);
+        const cleanPrefix = normalizeDetachedMatrixAffix(
+            normalizeMatrixAffix(affixInfo.prefix)
+        );
+
+        const cleanSuffix = normalizeDetachedMatrixAffix(
+            normalizeMatrixAffix(affixInfo.suffix)
+        );
 
         const prefixHtml = cleanPrefix
             ? `<span style="display:inline-block; vertical-align:middle; margin-right:0.25rem;">\\(${escapeHtmlForMathCell(cleanPrefix)}\\)</span>`
@@ -1828,6 +1840,24 @@
         };
     }
 
+    function normalizeDetachedMatrixAffix(value) {
+        return String(value || "")
+            // Opening delimiters that no longer have a matching \right
+            // in the same MathJax expression.
+            .replace(/\\left\s*\\\{/g, "\\lbrace")
+            .replace(/\\left\s*\\\[/g, "\\lbrack")
+            .replace(/\\left\s*\(/g, "(")
+            .replace(/\\left\s*\./g, "")
+
+            // Closing or middle delimiters that no longer have a matching
+            // \left in the same MathJax expression.
+            .replace(/\\right\s*\\\}/g, "\\rbrace")
+            .replace(/\\right\s*\\\]/g, "\\rbrack")
+            .replace(/\\right\s*\)/g, ")")
+            .replace(/\\right\s*\|/g, "\\mid")
+            .replace(/\\right\s*\\vert/g, "\\mid")
+            .replace(/\\right\s*\./g, "");
+    }
 
     function latexMatrixDelimiterTokenToText(token, side = "left") {
         const clean = String(token || "").trim();
@@ -2469,6 +2499,12 @@
         let output = String(value || "");
 
         const normalizeBody = body => String(body || "")
+            // AMS-style bold math symbols.
+            .replace(
+                /\\boldsymbol\s*\{([^{}]*)\}/gi,
+                "\\mathbf{$1}"
+            )
+
             // Original TeX bold symbols.
             .replace(
                 /\\textbf\s*\{([^{}]*)\}/gi,
@@ -2572,6 +2608,12 @@
 
         const verbProtection = protectLatexVerbCommands(clean);
         clean = verbProtection.text;
+
+        clean = normalizeMboxTabularInsideMath(clean);
+        clean = normalizeMboxHtmlTableInsideMath(clean);
+
+        const mboxProtection = protectMboxInsideMath(clean);
+        clean = mboxProtection.text;
 
         // Remove TeX comment/separator paragraphs and standalone lines that
         // survived backend rendering.
@@ -2778,7 +2820,217 @@
             verbProtection.verbValues
         );
 
+        clean = restoreMboxInsideMath(
+            clean,
+            mboxProtection.values
+        );
+
         return clean;
+    }
+
+    function normalizeMboxHtmlTableInsideMath(value) {
+        let output = String(value || "");
+
+        const decodeHtmlEntities = text => {
+            const textarea = document.createElement("textarea");
+            textarea.innerHTML = String(text || "");
+            return textarea.value;
+        };
+
+        const convertRow = rowHtml => {
+            const source = decodeHtmlEntities(
+                String(rowHtml || "")
+                    .replace(/<br\s*\/?>/gi, " ")
+                    .replace(/<[^>]+>/g, "")
+            ).trim();
+
+            if (!source) {
+                return "";
+            }
+
+            let result = "";
+            let cursor = 0;
+
+            source.replace(
+                /\$([^$]*?)\$/g,
+                (match, mathBody, offset) => {
+                    const prose = source.slice(cursor, offset);
+
+                    if (prose.trim()) {
+                        result += `\\mbox{${prose}}`;
+                    }
+
+                    result += String(mathBody || "");
+                    cursor = offset + match.length;
+
+                    return match;
+                }
+            );
+
+            const remainder = source.slice(cursor);
+
+            if (remainder.trim()) {
+                result += `\\mbox{${remainder}}`;
+            }
+
+            return result;
+        };
+
+        output = output.replace(
+            /\\mbox\s*\{\s*(<div\b[^>]*class=["'][^"']*\bmath-table-wrapper\b[^"']*["'][^>]*>[\s\S]*?<\/div>)\s*\}/gi,
+            (match, wrapperHtml) => {
+                const rows = [];
+
+                String(wrapperHtml || "").replace(
+                    /<tr\b[^>]*>\s*<td\b[^>]*>([\s\S]*?)<\/td>\s*<\/tr>/gi,
+                    (rowMatch, cellHtml) => {
+                        const row = convertRow(cellHtml);
+
+                        if (row) {
+                            rows.push(row);
+                        }
+
+                        return rowMatch;
+                    }
+                );
+
+                if (!rows.length) {
+                    return match;
+                }
+
+                return (
+                    "\\begin{array}{l}" +
+                    rows.join(" \\\\ ") +
+                    "\\end{array}"
+                );
+            }
+        );
+
+        return output;
+    }
+
+    function normalizeMboxTabularInsideMath(value) {
+        let output = String(value || "");
+
+        const convertRow = row => {
+            const source = String(row || "").trim();
+
+            if (!source) {
+                return "";
+            }
+
+            let result = "";
+            let cursor = 0;
+
+            // Preserve embedded $...$ as mathematics and wrap the surrounding
+            // prose in \text{...}.
+            source.replace(
+                /\$([^$]*?)\$/g,
+                (match, mathBody, offset) => {
+                    const prose = source.slice(cursor, offset);
+
+                    if (prose) {
+                        result += `\\text{${prose}}`;
+                    }
+
+                    result += mathBody;
+                    cursor = offset + match.length;
+
+                    return match;
+                }
+            );
+
+            const remainder = source.slice(cursor);
+
+            if (remainder) {
+                result += `\\text{${remainder}}`;
+            }
+
+            return result;
+        };
+
+        output = output.replace(
+            /\\mbox\s*\{\s*\\begin\s*\{tabular\}\s*\{[^{}]*\}([\s\S]*?)\\end\s*\{tabular\}\s*\}/gi,
+            (match, tableBody) => {
+                const rows = String(tableBody || "")
+                    .split(/\\\\/)
+                    .map(convertRow)
+                    .filter(Boolean);
+
+                if (!rows.length) {
+                    return "";
+                }
+
+                return `\\begin{array}{l}${rows.join(" \\\\ ")}\\end{array}`;
+            }
+        );
+
+        return output;
+    }
+
+    function protectMboxInsideMath(value) {
+        let output = String(value || "");
+        const values = [];
+
+        const protectBody = body => String(body || "").replace(
+            /\\(?:mbox|text)\s*\{([\s\S]*?)\}/gi,
+            (match, content) => {
+                const value = String(content || "");
+
+                // Structured environments inside \mbox need their own conversion.
+                // Do not treat them as ordinary prose placeholders.
+                if (/\\begin\s*\{(?:tabular|array|cases|matrix|pmatrix|bmatrix)\}/i.test(value)) {
+                    return match;
+                }
+
+                const index = values.length;
+                values.push(value);
+
+                return `PMMATHTEXTTOKEN${index}END`;
+            }
+        );
+
+        output = output.replace(
+            /\\\[([\s\S]*?)\\\]/g,
+            (_, body) => `\\[${protectBody(body)}\\]`
+        );
+
+        output = output.replace(
+            /\\\(([\s\S]*?)\\\)/g,
+            (_, body) => `\\(${protectBody(body)}\\)`
+        );
+
+        output = output.replace(
+            /\$\$([\s\S]*?)\$\$/g,
+            (_, body) => `$$${protectBody(body)}$$`
+        );
+
+        output = output.replace(
+            /(?<!\\)(?<!\$)\$(?!\$)([\s\S]*?)(?<!\\)\$(?!\$)/g,
+            (_, body) => `$${protectBody(body)}$`
+        );
+
+        return {
+            text: output,
+            values
+        };
+    }
+
+    function restoreMboxInsideMath(value, values) {
+        const items = Array.isArray(values) ? values : [];
+
+        return String(value || "").replace(
+            /PMMATHTEXTTOKEN(\d+)END/g,
+            (match, indexText) => {
+                const index = Number(indexText);
+
+                if (!Number.isInteger(index) || index < 0 || index >= items.length) {
+                    return match;
+                }
+
+                return `\\text{${items[index]}}`;
+            }
+        );
     }
 
     function protectLatexVerbCommands(value) {

@@ -28,6 +28,10 @@
                 hom: "\\operatorname{Hom}",
                 ob: "\\operatorname{Ob}",
                 eqv: "\\simeq",
+                Spec: "\\operatorname{Spec}",
+                lra: "\\longrightarrow",
+                res: "\\operatorname{res}",
+                st: "\\mid",
 
                 grad: "\\nabla",
                 curl: "\\operatorname{curl}",
@@ -40,6 +44,8 @@
                 rationals: "\\mathbb{Q}",
 
                 D: "\\mathrm{D}",
+                O: "\\mathcal{O}",
+                A: "\\mathbb{A}",
                 vv: "\\mathbf{v}",
                 ve: "\\mathbf{e}",
                 vx: "\\mathbf{x}",
