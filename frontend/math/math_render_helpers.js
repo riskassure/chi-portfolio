@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "protect-mbox-and-text-in-math-v1",
+        debugVersion: "restore-underline-html-in-math-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -20,6 +20,44 @@
         );
     }
 
+    function restoreUnderlineHtmlInsideMath(value) {
+        let output = String(value || "");
+
+        const restoreUnderline = body =>
+            String(body || "").replace(
+                /<u>\s*([\s\S]*?)\s*<\/u>/gi,
+                function (_, inner) {
+                    return `\\underline{${String(inner || "").trim()}}`;
+                }
+            );
+
+        // \[ ... \]
+        output = output.replace(
+            /\\\[([\s\S]*?)\\\]/g,
+            (_, body) => `\\[${restoreUnderline(body)}\\]`
+        );
+
+        // \( ... \)
+        output = output.replace(
+            /\\\(([\s\S]*?)\\\)/g,
+            (_, body) => `\\(${restoreUnderline(body)}\\)`
+        );
+
+        // $$ ... $$
+        output = output.replace(
+            /\$\$([\s\S]*?)\$\$/g,
+            (_, body) => `$$${restoreUnderline(body)}$$`
+        );
+
+        // single-dollar inline math
+        output = output.replace(
+            /(^|[^\\$])\$((?:\\.|[^$])*?)\$/g,
+            (_, prefix, body) => `${prefix}$${restoreUnderline(body)}$`
+        );
+
+        return output;
+    }
+
     function prepareConceptHtml(tex, options = {}) {
         const apiEndpoint =
             options.apiEndpoint ||
@@ -29,6 +67,7 @@
         let clean = tex || "";
 
         clean = cleanLaTeXEnvironments(clean);
+        clean = restoreUnderlineHtmlInsideMath(clean);
         clean = normalizeDiagramImageUrls(clean, apiEndpoint);
 
         return clean;
@@ -209,6 +248,22 @@
         output = output.replace(/\\v\{S\}/g, "Š");
         output = output.replace(/\\v\{z\}/g, "ž");
         output = output.replace(/\\v\{Z\}/g, "Ž");
+
+        // Braced umlaut forms used in bibliography prose.
+        output = output.replace(/\\"\{a\}/g, "ä");
+        output = output.replace(/\\"\{o\}/g, "ö");
+        output = output.replace(/\\"\{u\}/g, "ü");
+        output = output.replace(/\\"\{A\}/g, "Ä");
+        output = output.replace(/\\"\{O\}/g, "Ö");
+        output = output.replace(/\\"\{U\}/g, "Ü");
+
+        // Unbraced forms.
+        output = output.replace(/\\"a/g, "ä");
+        output = output.replace(/\\"o/g, "ö");
+        output = output.replace(/\\"u/g, "ü");
+        output = output.replace(/\\"A/g, "Ä");
+        output = output.replace(/\\"O/g, "Ö");
+        output = output.replace(/\\"U/g, "Ü");
 
         return output;
     }
