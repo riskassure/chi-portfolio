@@ -78,6 +78,9 @@
                 rp: ")",
 
                 pdiff: ["\\frac{\\partial #1}{\\partial #2}", 2],
+
+                infer: ["\\mathrel{\\mathop{\\frac{\\begin{aligned}#3\\end{aligned}}{#2}}\\limits^{#1}}", 3, ""],
+                "infer*": ["\\mathrel{\\frac{\\begin{aligned}#2\\end{aligned}}{#1}}", 2],
             }
         },
 
