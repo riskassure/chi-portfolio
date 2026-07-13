@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "restore-underline-html-in-math-v1",
+        debugVersion: "underbraced-xymatrix-lines-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -814,6 +814,171 @@
             .replace(/>/g, "&gt;");
     }
 
+    function convertUnderbracedXyMatrixToHtml(tex) {
+        const source = String(tex || "");
+
+        let result = "";
+        let cursor = 0;
+
+        while (cursor < source.length) {
+            const underbraceIndex = source.indexOf("\\underbrace", cursor);
+
+            if (underbraceIndex === -1) {
+                result += source.slice(cursor);
+                break;
+            }
+
+            const contentStart = findNextNonSpaceIndex(
+                source,
+                underbraceIndex + "\\underbrace".length
+            );
+
+            if (contentStart === -1 || source[contentStart] !== "{") {
+                result += source.slice(cursor, underbraceIndex + "\\underbrace".length);
+                cursor = underbraceIndex + "\\underbrace".length;
+                continue;
+            }
+
+            const contentEnd = findMatchingBrace(source, contentStart);
+
+            if (contentEnd === -1) {
+                result += source.slice(cursor);
+                break;
+            }
+
+            const content = source.slice(contentStart + 1, contentEnd).trim();
+
+            if (!content.startsWith("\\xymatrix")) {
+                result += source.slice(cursor, contentEnd + 1);
+                cursor = contentEnd + 1;
+                continue;
+            }
+
+            const subscriptMatch = source
+                .slice(contentEnd + 1)
+                .match(/^\s*_\s*\{/);
+
+            if (!subscriptMatch) {
+                result += source.slice(cursor, contentEnd + 1);
+                cursor = contentEnd + 1;
+                continue;
+            }
+
+            const labelStart =
+                contentEnd + 1 +
+                subscriptMatch[0].lastIndexOf("{");
+
+            const labelEnd = findMatchingBrace(source, labelStart);
+
+            if (labelEnd === -1) {
+                result += source.slice(cursor);
+                break;
+            }
+
+            const matrixStart = content.indexOf("\\xymatrix");
+            const matrixBraceStart = findXyMatrixBodyStart(
+                content,
+                matrixStart + "\\xymatrix".length
+            );
+
+            const matrixBraceEnd =
+                matrixBraceStart === -1
+                    ? -1
+                    : findMatchingBrace(content, matrixBraceStart);
+
+            if (matrixBraceEnd === -1) {
+                result += source.slice(cursor, labelEnd + 1);
+                cursor = labelEnd + 1;
+                continue;
+            }
+
+            const matrixBody = content.slice(
+                matrixBraceStart + 1,
+                matrixBraceEnd
+            );
+
+            const rawLabel = source.slice(labelStart + 1, labelEnd);
+
+            const cleanLabel = rawLabel
+                .replace(/\\displaystyle\s*/gi, "")
+                .replace(/\\mbox\s*\{([^{}]*)\}/gi, "\\text{$1}")
+                .trim();
+
+            const html = `
+                <figure class="pm-underbraced-xymatrix tex2jax_process" style="
+                    display:flex;
+                    flex-direction:column;
+                    align-items:center;
+                    width:max-content;
+                    max-width:100%;
+                    margin:1rem auto;
+                ">
+                    ${buildHtmlTableFromXyMatrixBody(matrixBody)}
+
+                    <div aria-hidden="true" style="
+                        width:100%;
+                        height:0.55rem;
+                        border-bottom:1.5px solid currentColor;
+                        border-left:1.5px solid currentColor;
+                        border-right:1.5px solid currentColor;
+                        border-radius:0 0 45% 45%;
+                        margin-top:-0.7rem;
+                    "></div>
+
+                    <figcaption style="margin-top:0.2rem;">
+                        \\(${escapeHtmlForMathCell(cleanLabel)}\\)
+                    </figcaption>
+                </figure>
+            `;
+
+            let replaceStart = underbraceIndex;
+            let replaceEnd = labelEnd + 1;
+
+            const before = source.slice(0, underbraceIndex);
+
+            // Support either \[ ... \] or $$ ... $$.
+            const latexDisplayStartMatch = before.match(/\\\[\s*$/);
+            const dollarDisplayStartMatch = before.match(/\$\$\s*$/);
+
+            let displayWrapper = "";
+
+            if (latexDisplayStartMatch) {
+                replaceStart =
+                    underbraceIndex - latexDisplayStartMatch[0].length;
+                displayWrapper = "latex";
+            } else if (dollarDisplayStartMatch) {
+                replaceStart =
+                    underbraceIndex - dollarDisplayStartMatch[0].length;
+                displayWrapper = "dollar";
+            }
+
+            if (displayWrapper === "latex") {
+                const displayEndMatch = source
+                    .slice(replaceEnd)
+                    .match(/^\s*\\\]/);
+
+                if (displayEndMatch) {
+                    replaceEnd += displayEndMatch[0].length;
+                }
+            } else if (displayWrapper === "dollar") {
+                const displayEndMatch = source
+                    .slice(replaceEnd)
+                    .match(/^\s*\$\$/);
+
+                if (displayEndMatch) {
+                    replaceEnd += displayEndMatch[0].length;
+                }
+            }
+
+            result += source.slice(cursor, replaceStart);
+            result += html;
+
+            cursor = replaceEnd;
+        }
+
+        return result;
+    }
+
     function convertXyMatrixToHtml(tex) {
         if (!tex) return "";
 
@@ -1073,6 +1238,8 @@
         return "0";
     }
 
+    const XY_PLAIN_HORIZONTAL_LINE = "__PM_XY_PLAIN_HORIZONTAL_LINE__";
+
     function buildHtmlTableFromXyMatrixBody(body) {
         const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
 
@@ -1108,13 +1275,65 @@
         });
 
         const htmlRows = grid.map((row, rowIndex) => {
-            const htmlCells = row.map((cellHtml, colIndex) => {
-                const padding = getXyMatrixCellPadding(rowIndex, colIndex);
+            const htmlCells = [];
+            let colIndex = 0;
 
-                return `<td style="padding:${padding}; text-align:center; vertical-align:middle; white-space:nowrap;">${cellHtml}</td>`;
-            }).join("");
+            while (colIndex < row.length) {
+                const cellHtml = row[colIndex];
 
-            return `<tr>${htmlCells}</tr>`;
+                if (cellHtml === XY_PLAIN_HORIZONTAL_LINE) {
+                    let runEnd = colIndex + 1;
+
+                    while (
+                        runEnd < row.length &&
+                        row[runEnd] === XY_PLAIN_HORIZONTAL_LINE
+                    ) {
+                        runEnd += 1;
+                    }
+
+                    const colspan = runEnd - colIndex;
+
+                    htmlCells.push(`
+                        <td
+                            colspan="${colspan}"
+                            aria-hidden="true"
+                            style="
+                                padding:0;
+                                height:1.2em;
+                                vertical-align:middle;
+                            "
+                        >
+                            <div style="
+                                width:100%;
+                                border-top:1.5px solid currentColor;
+                            "></div>
+                        </td>
+                    `);
+
+                    colIndex = runEnd;
+                    continue;
+                }
+
+                const padding = getXyMatrixCellPadding(
+                    rowIndex,
+                    colIndex
+                );
+
+                htmlCells.push(`
+                    <td style="
+                        padding:${padding};
+                        text-align:center;
+                        vertical-align:middle;
+                        white-space:nowrap;
+                    ">
+                        ${cellHtml}
+                    </td>
+                `);
+
+                colIndex += 1;
+            }
+
+            return `<tr>${htmlCells.join("")}</tr>`;
         }).join("");
 
         return `
@@ -1143,8 +1362,19 @@
         let match;
 
         while ((match = arrowPattern.exec(text)) !== null) {
+            const directionText = match[1] || "r";
+
+            // Examples:
+            //   \ar@{-}[rrrrrrrr]  -> style "-"
+            //   \ar@{->}[r]        -> style "->"
+            //   \ar[r]             -> default style "->"
+            const styleMatch = match[0].match(/@\{([^{}]*)\}/);
+
             arrows.push({
-                direction: normalizeXyArrowDirection(match[1] || "r"),
+                direction: normalizeXyArrowDirection(directionText),
+                directionText,
+                span: getXyArrowSpan(directionText),
+                style: styleMatch ? styleMatch[1] : "->",
                 label: extractXyArrowLabel(match[2] || "")
             });
         }
@@ -1168,6 +1398,14 @@
         if (clean.includes("l")) return "l";
 
         return "r";
+    }
+
+    function getXyArrowSpan(directionText) {
+        const clean = String(directionText || "r")
+            .toLowerCase()
+            .replace(/[^rlud]/g, "");
+
+        return Math.max(clean.length, 1);
     }
 
     function extractXyArrowLabel(modifierText) {
@@ -1201,11 +1439,51 @@
         grid[row][col] = value;
     }
 
+    function applyXyPlainHorizontalLineToGrid(
+        grid,
+        gridRow,
+        gridCol,
+        direction,
+        span
+    ) {
+        const sourceSpan = Math.max(Number(span) || 1, 1);
+        const step = direction === "left" ? -1 : 1;
+
+        // Expanded Xy grid:
+        // object, arrow-space, object, arrow-space, object...
+        //
+        // A source span of 1 occupies 1 expanded cell.
+        // A source span of 8 occupies 15 expanded cells.
+        const expandedCellCount = sourceSpan * 2 - 1;
+
+        for (let offset = 1; offset <= expandedCellCount; offset += 1) {
+            setGridCellIfInBounds(
+                grid,
+                gridRow,
+                gridCol + step * offset,
+                XY_PLAIN_HORIZONTAL_LINE
+            );
+        }
+    }
+
     function applyXyArrowToGrid(grid, gridRow, gridCol, arrow, arrowLayout) {
         const label = arrow.label || "";
         const direction = arrow.direction || "r";
+        const span = arrow.span || 1;
+        const isPlainLine = arrow.style === "-";
 
         if (direction === "r") {
+            if (isPlainLine) {
+                applyXyPlainHorizontalLineToGrid(
+                    grid,
+                    gridRow,
+                    gridCol,
+                    "right",
+                    span
+                );
+                return;
+            }
+
             setGridCellIfInBounds(
                 grid,
                 gridRow,
@@ -1216,6 +1494,17 @@
         }
 
         if (direction === "l") {
+            if (isPlainLine) {
+                applyXyPlainHorizontalLineToGrid(
+                    grid,
+                    gridRow,
+                    gridCol,
+                    "left",
+                    span
+                );
+                return;
+            }
+
             setGridCellIfInBounds(
                 grid,
                 gridRow,
@@ -1242,7 +1531,6 @@
                 gridCol,
                 renderVerticalArrow(label, "up", arrowLayout)
             );
-            return;
         }
     }
 
@@ -1254,9 +1542,17 @@
         return `\\(${escapeHtmlForMathCell(tex)}\\)`;
     }
 
-    function renderHorizontalArrow(label, direction = "right", arrowLayout = {}) {
+    function renderHorizontalArrow(
+        label,
+        direction = "right",
+        arrowLayout = {},
+        options = {}
+    ) {
         const safeLabel = escapeHtmlForMathCell(label || "");
-        const widthEm = arrowLayout.horizontalWidthEm || 3.2;
+        const showArrowHead = options.showArrowHead !== false;
+
+        const widthEm =
+            arrowLayout.horizontalWidthEm || 3.2;
 
         const labelHtml = safeLabel
             ? `<div style="
@@ -1269,30 +1565,34 @@
                 ">\\({\\scriptstyle ${safeLabel}}\\)</div>`
             : "";
 
-        const arrowHead =
-            direction === "left"
-                ? `<span style="
-                        position:absolute;
-                        left:0;
-                        top:50%;
-                        transform:translateY(-50%);
-                        width:0;
-                        height:0;
-                        border-top:0.30em solid transparent;
-                        border-bottom:0.30em solid transparent;
-                        border-right:0.48em solid currentColor;
-                    "></span>`
-                : `<span style="
-                        position:absolute;
-                        right:0;
-                        top:50%;
-                        transform:translateY(-50%);
-                        width:0;
-                        height:0;
-                        border-top:0.30em solid transparent;
-                        border-bottom:0.30em solid transparent;
-                        border-left:0.48em solid currentColor;
-                    "></span>`;
+        let arrowHead = "";
+
+        if (showArrowHead) {
+            arrowHead =
+                direction === "left"
+                    ? `<span style="
+                            position:absolute;
+                            left:0;
+                            top:50%;
+                            transform:translateY(-50%);
+                            width:0;
+                            height:0;
+                            border-top:0.30em solid transparent;
+                            border-bottom:0.30em solid transparent;
+                            border-right:0.48em solid currentColor;
+                        "></span>`
+                    : `<span style="
+                            position:absolute;
+                            right:0;
+                            top:50%;
+                            transform:translateY(-50%);
+                            width:0;
+                            height:0;
+                            border-top:0.30em solid transparent;
+                            border-bottom:0.30em solid transparent;
+                            border-left:0.48em solid currentColor;
+                        "></span>`;
+        }
 
         return `
             <div style="
@@ -1301,6 +1601,7 @@
                 height:1.8em;
                 display:inline-block;
                 vertical-align:middle;
+                z-index:1;
             ">
                 <span style="
                     position:absolute;
@@ -1310,6 +1611,7 @@
                     transform:translateY(-50%);
                     border-top:1.5px solid currentColor;
                 "></span>
+
                 ${arrowHead}
                 ${labelHtml}
             </div>
@@ -2705,6 +3007,7 @@
 
         clean = normalizeLegacyOverFractions(clean);
 
+        clean = convertUnderbracedXyMatrixToHtml(clean);
         clean = convertXyMatrixToHtml(clean);
 
         // Remove the original $, $$, \( \), or \[ \] wrappers after the
@@ -2715,6 +3018,17 @@
         // in the remaining TeX are normalized.
         const xymatrixHtmlBlocks = [];
 
+        // Protect the entire underbraced xymatrix wrapper first.
+        clean = clean.replace(
+            /<figure\b[^>]*class=["'][^"']*\bpm-underbraced-xymatrix\b[^"']*["'][^>]*>[\s\S]*?<\/figure>/gi,
+            (figureHtml) => {
+                const index = xymatrixHtmlBlocks.length;
+                xymatrixHtmlBlocks.push(figureHtml);
+                return `PMXYMATRIXHTMLPLACEHOLDER${index}END`;
+            }
+        );
+
+        // Protect ordinary generated xymatrix tables.
         clean = clean.replace(
             /<table\b[^>]*class=["'][^"']*\bpm-xymatrix-table\b[^"']*["'][^>]*>[\s\S]*?<\/table>/gi,
             (tableHtml) => {
