@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-wrapper-punctuation-v1",
+        debugVersion: "latex-verb-math-spacing-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -2506,10 +2506,72 @@
         return output;
     }
 
+    function normalizeTextItalicInsideMath(value) {
+        let output = String(value || "");
+
+        const normalizeChunk = (chunk) => {
+            return String(chunk || "")
+                // TeX italic text inside mathematics should remain TeX.
+                .replace(
+                    /\\textit\s*\{([^{}]*)\}/gi,
+                    "\\mathit{$1}"
+                )
+
+                // Protect italic HTML that may already have been generated.
+                .replace(
+                    /<(?:em|i)\b[^>]*>([\s\S]*?)<\/(?:em|i)>/gi,
+                    "\\mathit{$1}"
+                );
+        };
+
+        // Display math: \[ ... \]
+        output = output.replace(
+            /\\\[[\s\S]*?\\\]/g,
+            normalizeChunk
+        );
+
+        // Explicit inline math: \( ... \)
+        output = output.replace(
+            /\\\([\s\S]*?\\\)/g,
+            normalizeChunk
+        );
+
+        // Display-dollar math: $$ ... $$
+        output = output.replace(
+            /\$\$[\s\S]*?\$\$/g,
+            normalizeChunk
+        );
+
+        // Ordinary inline-dollar math.
+        output = output.replace(
+            /(^|[^$])\$([^$\n]*?)\$(?!\$)/g,
+            (match, prefix, body) => {
+                return `${prefix}$${normalizeChunk(body)}$`;
+            }
+        );
+
+        // Math environments that may not have surrounding dollar delimiters.
+        output = output.replace(
+            /\\begin\{(eqnarray\*?|align\*?|alignat\*?|array|cases|matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix)\}([\s\S]*?)\\end\{\1\}/gi,
+            (match, environmentName, body) => {
+                return (
+                    `\\begin{${environmentName}}` +
+                    normalizeChunk(body) +
+                    `\\end{${environmentName}}`
+                );
+            }
+        );
+
+        return output;
+    }
+
     function cleanLaTeXEnvironments(tex) {
         if (!tex) return "";
 
         let clean = String(tex || "");
+
+        const verbProtection = protectLatexVerbCommands(clean);
+        clean = verbProtection.text;
 
         // Remove TeX comment/separator paragraphs and standalone lines that
         // survived backend rendering.
@@ -2534,6 +2596,7 @@
         // Keep bold symbols inside math as TeX instead of later converting
         // them into invalid HTML tags inside MathJax delimiters.
         clean = normalizeTextBoldInsideMath(clean);
+        clean = normalizeTextItalicInsideMath(clean);
 
         // Repair HTML paragraph artifacts inside cases/array environments before
         // literal < and > characters are protected for safe innerHTML insertion.
@@ -2708,7 +2771,119 @@
             "$1"
         );
 
+        // Restore protected \verb contents only after all structural parsing
+        // and HTML-sensitive processing has completed.
+        clean = restoreLatexVerbCommands(
+            clean,
+            verbProtection.verbValues
+        );
+
         return clean;
+    }
+
+    function protectLatexVerbCommands(value) {
+        const source = String(value || "");
+        const verbValues = [];
+
+        // LaTeX \verb uses the character immediately following \verb
+        // as its delimiter:
+        //
+        //   \verb.<.
+        //   \verb.|.
+        //   \verb=aa*b=
+        //
+        // The starred form \verb* is handled as well.
+        const text = source.replace(
+            /\\verb\*?([^\w\s])([\s\S]*?)\1/g,
+            (match, delimiter, contents) => {
+                const index = verbValues.length;
+                verbValues.push(contents);
+
+                return `PMVERBATIMTOKEN${index}END`;
+            }
+        );
+
+        return {
+            text,
+            verbValues
+        };
+    }
+
+    function restoreLatexVerbCommands(value, verbValues) {
+        let output = String(value || "");
+        const values = Array.isArray(verbValues) ? verbValues : [];
+
+        const restoreToken = (match, indexText, insideMath = false) => {
+            const index = Number(indexText);
+
+            if (
+                !Number.isInteger(index) ||
+                index < 0 ||
+                index >= values.length
+            ) {
+                return match;
+            }
+
+            let contents = String(values[index] || "");
+
+            if (insideMath) {
+                // TeX ignores ordinary spaces in math mode. Convert each
+                // literal verbatim space into an explicit mathematical space.
+                contents = contents.replace(/ /g, "\\;");
+
+                // Keep literal angle brackets from being interpreted as HTML.
+                return contents
+                    .replace(/&/g, "\\mathbin{\\&}")
+                    .replace(/</g, "\\lt ")
+                    .replace(/>/g, "\\gt ");
+            }
+
+            // Outside MathJax, restore ordinary HTML-safe literal text.
+            return contents
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+        };
+
+        const restoreInsideMathChunk = (chunk) => {
+            return String(chunk || "").replace(
+                /PMVERBATIMTOKEN(\d+)END/g,
+                (match, indexText) =>
+                    restoreToken(match, indexText, true)
+            );
+        };
+
+        // Restore tokens inside MathJax expressions first.
+        output = output.replace(
+            /\\\[[\s\S]*?\\\]/g,
+            restoreInsideMathChunk
+        );
+
+        output = output.replace(
+            /\\\([\s\S]*?\\\)/g,
+            restoreInsideMathChunk
+        );
+
+        output = output.replace(
+            /\$\$[\s\S]*?\$\$/g,
+            restoreInsideMathChunk
+        );
+
+        output = output.replace(
+            /(^|[^$])\$([^$\n]*?)\$(?!\$)/g,
+            (match, prefix, body) => {
+                return `${prefix}$${restoreInsideMathChunk(body)}$`;
+            }
+        );
+
+        // Restore any remaining prose-mode verbatim tokens.
+        output = output.replace(
+            /PMVERBATIMTOKEN(\d+)END/g,
+            (match, indexText) =>
+                restoreToken(match, indexText, false)
+        );
+
+        return output;
     }
 
     function normalizeDiagramImageUrls(html, apiEndpoint = DEFAULT_API_ENDPOINT) {
