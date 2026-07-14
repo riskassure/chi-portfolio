@@ -251,6 +251,16 @@
     border-bottom-style: solid;
 }
 
+/* Continue explicit-link underline beneath inline MathJax content. */
+.math-autolink mjx-container {
+    border-bottom: 1px dashed currentColor;
+}
+
+/* Match the parent link's solid underline on hover. */
+.math-autolink:hover mjx-container {
+    border-bottom-style: solid;
+}
+
 /* 📑 META PANELS BELOW THE CANVAS */
 .meta-section-bottom {
     margin-top: 2.5rem;
