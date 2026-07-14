@@ -1123,6 +1123,64 @@ def render_latex_code_like_environments_to_html(html: str) -> str:
         flags=re.IGNORECASE,
     )
 
+CYRILLIC_LATEX_MACROS = {
+    "CYRA": "А",
+    "CYRI": "И",
+    "CYRM": "М",
+    "CYRN": "Н",
+
+    "cyra": "а",
+    "cyrb": "б",
+    "cyrv": "в",
+    "cyrg": "г",
+    "cyrd": "д",
+    "cyre": "е",
+    "cyrz": "з",
+    "cyri": "и",
+    "cyrk": "к",
+    "cyrl": "л",
+    "cyrm": "м",
+    "cyro": "о",
+    "cyrr": "р",
+    "cyrs": "с",
+    "cyrt": "т",
+    "cyru": "у",
+    "cyrc": "ц",
+    "cyrch": "ч",
+    "cyrery": "ы",
+    "cyrsftsn": "ь",
+}
+
+
+CYRILLIC_LATEX_MACRO_RE = re.compile(
+    r"\\("
+    + "|".join(
+        re.escape(name)
+        for name in sorted(
+            CYRILLIC_LATEX_MACROS,
+            key=len,
+            reverse=True,
+        )
+    )
+    + r")"
+)
+
+PROSE_SPACING_COMMANDS = {
+    r"\,": " ",
+    r"\:": " ",
+    r"\;": " ",
+    r"\!": "",
+}
+
+def render_cyrillic_latex_macros(text: str) -> str:
+    if not text:
+        return ""
+
+    return CYRILLIC_LATEX_MACRO_RE.sub(
+        lambda match: CYRILLIC_LATEX_MACROS[match.group(1)],
+        text,
+    )
+
 
 def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
@@ -1131,6 +1189,13 @@ def render_prose_latex_to_html(tex: str) -> str:
     # Normalize Windows/Mac line endings to Unix-style newlines so later regex
     # replacements behave consistently.
     html = tex.replace("\r\n", "\n").replace("\r", "\n")
+
+    html = render_cyrillic_latex_macros(html)
+
+    for command, replacement in PROSE_SPACING_COMMANDS.items():
+        html = html.replace(command, replacement)
+
+    html = html.replace(r"\&", "&")
 
     # Convert verbatim before any other environment rendering so literal LaTeX
     # examples inside verbatim are preserved instead of being interpreted.
