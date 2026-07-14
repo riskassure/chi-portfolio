@@ -3136,6 +3136,7 @@
         );
 
         clean = clean.replace(/\\emph\{([^}]+)\}/gi, "<em>$1</em>");
+        clean = clean.replace(/\\textsl\{([^}]+)\}/gi, "<em>$1</em>");
         clean = clean.replace(/\\textbf\{([^}]+)\}/gi, "<strong>$1</strong>");
 
         clean = clean.replace(
