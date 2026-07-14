@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 from collections import Counter
 from datetime import datetime
+from urllib.parse import quote, unquote
 from flask import Blueprint, jsonify, request, send_from_directory
 
 SRC_DIR = Path(__file__).resolve().parents[1]  # backend/src
@@ -137,6 +138,58 @@ def determine_smart_save_mode(old_tex: str, new_tex: str) -> dict:
     }
 
 
+def resolve_explicit_math_link_targets(tex_content, db_cursor):
+    """
+    Convert explicit PlanetMath links whose href target is a legacy
+    canonical_name into links using the concept's stored CMS slug.
+
+    If the target concept does not exist locally, keep only the visible
+    link text and remove the broken anchor.
+    """
+    if not tex_content or "math-explicit-link" not in tex_content:
+        return tex_content or ""
+
+    db_cursor.execute("""
+        SELECT canonical_name, slug
+        FROM math_concepts
+        WHERE canonical_name IS NOT NULL
+          AND slug IS NOT NULL;
+    """)
+
+    canonical_to_slug = {
+        row[0].strip().casefold(): row[1].strip()
+        for row in db_cursor.fetchall()
+        if row[0] and row[1]
+    }
+
+    pattern = re.compile(
+        r'<a\b[^>]*\bclass="[^"]*\bmath-explicit-link\b[^"]*"'
+        r'[^>]*\bhref="concept\.html\?slug=([^"]+)"[^>]*>'
+        r'([\s\S]*?)'
+        r'</a>',
+        flags=re.IGNORECASE,
+    )
+
+    def replace_target(match):
+        legacy_target = unquote(match.group(1)).strip()
+        link_text = match.group(2)
+
+        resolved_slug = canonical_to_slug.get(
+            legacy_target.casefold()
+        )
+
+        if not resolved_slug:
+            return link_text
+
+        return (
+            '<a class="math-explicit-link math-autolink" '
+            f'href="concept.html?slug={quote(resolved_slug)}">'
+            f'{link_text}</a>'
+        )
+
+    return pattern.sub(replace_target, tex_content)
+
+
 def apply_math_autolinker(concept_id, tex_content, db_cursor):
     """
     Tokenizes LaTeX content to safely apply anchor tags ONLY within standard
@@ -172,6 +225,11 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
         r"\\PMlinkescapeword\{[^}]+\}",
         "",
         tex_content
+    )
+
+    tex_content = resolve_explicit_math_link_targets(
+        tex_content,
+        db_cursor
     )
 
     # 3. Harvest all available global cross-linking destination keys.

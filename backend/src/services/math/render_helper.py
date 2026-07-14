@@ -901,6 +901,65 @@ def render_pmlinkexternal_to_html(html: str) -> str:
     return "".join(output_parts)
 
 
+def render_pmlinkname_to_html(html: str) -> str:
+    command = r"\PMlinkname"
+    search_start = 0
+    output_parts = []
+
+    while True:
+        start_index = html.find(command, search_start)
+
+        if start_index == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        cursor = start_index + len(command)
+
+        while cursor < len(html) and html[cursor].isspace():
+            cursor += 1
+
+        if cursor >= len(html) or html[cursor] != "{":
+            output_parts.append(html[search_start:start_index + len(command)])
+            search_start = start_index + len(command)
+            continue
+
+        text_close = find_matching_latex_brace(html, cursor)
+
+        if text_close == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        link_text = html[cursor + 1:text_close]
+        cursor = text_close + 1
+
+        while cursor < len(html) and html[cursor].isspace():
+            cursor += 1
+
+        if cursor >= len(html) or html[cursor] != "{":
+            output_parts.append(html[search_start:text_close + 1])
+            search_start = text_close + 1
+            continue
+
+        target_close = find_matching_latex_brace(html, cursor)
+
+        if target_close == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        target_slug = html[cursor + 1:target_close].strip()
+
+        output_parts.append(html[search_start:start_index])
+        output_parts.append(
+            '<a class="math-explicit-link" '
+            f'href="concept.html?slug={quote(target_slug)}">'
+            f"{link_text}</a>"
+        )
+
+        search_start = target_close + 1
+
+    return "".join(output_parts)
+
+
 def remove_orphan_latex_named_environment_end_tags(html: str) -> str:
     """
     Remove leftover theorem/proof-like \\end{...} tags after named environments
@@ -1100,12 +1159,7 @@ def render_prose_latex_to_html(tex: str) -> str:
     # Convert PlanetMath explicit links:
     #   \PMlinkname{visible text}{TargetSlug}
     # into normal clickable concept links.
-    html = re.sub(
-        r"\\PMlinkname\{([^{}]+)\}\{([^{}]+)\}",
-        render_pmlinkname,
-        html,
-        flags=re.DOTALL,
-    )
+    html = render_pmlinkname_to_html(html)
 
     # Preserve PlanetMath no-autolink text as a span that the frontend autolinker
     # can intentionally skip.
