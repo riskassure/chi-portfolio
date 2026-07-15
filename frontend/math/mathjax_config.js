@@ -32,6 +32,7 @@
                 lra: "\\longrightarrow",
                 res: "\\operatorname{res}",
                 st: "\\mid",
+                Aut: "\\operatorname{Aut}",
 
                 grad: "\\nabla",
                 curl: "\\operatorname{curl}",

@@ -747,27 +747,44 @@ def unwrap_latex_ensuremath(replacement: str) -> str:
     return replacement[open_brace_index + 1:close_brace_index]
 
 
-def render_latex_newcommand_definitions_to_html(html: str) -> str:
+def render_latex_command_definitions_to_html(html: str) -> str:
     """
-    Remove simple \\newcommand definitions and expand their later uses.
+    Remove legacy \\newcommand and \\providecommand definitions.
 
-    Example:
-        \\newcommand{\\concat}{\\ensuremath{+\\hspace{-1ex}+}}
-
-    becomes:
-        uses of \\concat are replaced by +\\hspace{-1ex}+
+    Simple \\newcommand definitions continue to be expanded later in the
+    document. \\providecommand definitions are removed without expansion,
+    because imported bibliography preambles commonly contain implementation
+    details that should never become visible prose.
     """
-    command = r"\newcommand"
+    command_names = (
+        r"\newcommand",
+        r"\providecommand",
+    )
+
     search_start = 0
     output_parts = []
     macro_replacements = {}
 
     while True:
-        start_index = html.find(command, search_start)
+        candidates = [
+            (html.find(command, search_start), command)
+            for command in command_names
+        ]
 
-        if start_index == -1:
+        candidates = [
+            candidate
+            for candidate in candidates
+            if candidate[0] != -1
+        ]
+
+        if not candidates:
             output_parts.append(html[search_start:])
             break
+
+        start_index, command = min(
+            candidates,
+            key=lambda candidate: candidate[0],
+        )
 
         cursor = start_index + len(command)
 
@@ -775,8 +792,11 @@ def render_latex_newcommand_definitions_to_html(html: str) -> str:
             cursor += 1
 
         if cursor >= len(html) or html[cursor] != "{":
-            output_parts.append(html[search_start:])
-            break
+            output_parts.append(
+                html[search_start:start_index + len(command)]
+            )
+            search_start = start_index + len(command)
+            continue
 
         macro_name_close = find_matching_latex_brace(html, cursor)
 
@@ -790,7 +810,7 @@ def render_latex_newcommand_definitions_to_html(html: str) -> str:
         while cursor < len(html) and html[cursor].isspace():
             cursor += 1
 
-        # Ignore optional argument counts for now, but skip them if present.
+        # Skip an optional argument-count declaration such as [2].
         if cursor < len(html) and html[cursor] == "[":
             optional_close = html.find("]", cursor + 1)
 
@@ -817,8 +837,15 @@ def render_latex_newcommand_definitions_to_html(html: str) -> str:
 
         output_parts.append(html[search_start:start_index])
 
-        if macro_name.startswith("\\"):
-            macro_replacements[macro_name] = unwrap_latex_ensuremath(replacement)
+        # Preserve the existing simple-newcommand expansion behavior.
+        # Bibliography-oriented providecommand definitions are only removed.
+        if (
+            command == r"\newcommand"
+            and macro_name.startswith("\\")
+        ):
+            macro_replacements[macro_name] = (
+                unwrap_latex_ensuremath(replacement)
+            )
 
         search_start = replacement_close + 1
 
@@ -827,7 +854,7 @@ def render_latex_newcommand_definitions_to_html(html: str) -> str:
     for macro_name, replacement in macro_replacements.items():
         rendered = re.sub(
             re.escape(macro_name) + r"\b",
-            lambda _match, replacement=replacement: replacement,
+            lambda _match, value=replacement: value,
             rendered,
         )
 
@@ -1272,6 +1299,15 @@ def render_prose_latex_to_html(tex: str) -> str:
     # Preserve code/algorithm-like source blocks for now.
     html = render_latex_code_like_environments_to_html(html)
 
+    # Bibliography style declarations affect LaTeX formatting only and
+    # should not appear as visible website content.
+    html = re.sub(
+        r"\\bibliographystyle\s*\{[^{}]*\}",
+        "",
+        html,
+        flags=re.IGNORECASE,
+    )
+
     # Convert larger LaTeX block environments before paragraph wrapping.
     # Order matters: list/table/environment renderers should run before generic
     # line-break and paragraph conversion.
@@ -1284,7 +1320,7 @@ def render_prose_latex_to_html(tex: str) -> str:
     html = render_latex_named_environments_to_html(html)
     html = remove_orphan_latex_named_environment_end_tags(html)
     html = render_simple_latex_block_environments_to_html(html)
-    html = render_latex_newcommand_definitions_to_html(html)
+    html = render_latex_command_definitions_to_html(html)
 
     # Convert PlanetMath explicit links:
     #   \PMlinkname{visible text}{TargetSlug}
@@ -1312,6 +1348,7 @@ def render_prose_latex_to_html(tex: str) -> str:
     html = replace_latex_text_command_until_stable(html, "textbf", "<strong>", "</strong>")
     html = replace_latex_text_command_until_stable(html, "emph", "<em>", "</em>")
     html = replace_latex_text_command_until_stable(html, "textit", "<em>", "</em>")
+    html = replace_latex_text_command_until_stable(html, "MR", "", "")
 
     # Convert older TeX-style emphasis:
     #   {\em ...}
