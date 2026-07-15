@@ -222,7 +222,7 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
 
     # Clean macro tags out so they do not corrupt presentation layout.
     tex_content = re.sub(
-        r"\\PMlinkescapeword\{[^}]+\}",
+        r"\\PMlinkescape(?:word|phrase)\{[^}]+\}",
         "",
         tex_content
     )
