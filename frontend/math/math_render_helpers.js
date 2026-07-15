@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "underbraced-xymatrix-lines-v1",
+        debugVersion: "eqnarray-protection-v6",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -116,6 +116,12 @@
         output = output.replace(/\\par\b/gi, "\n\n");
         output = output.replace(/\\(?:smallskip|medskip|bigskip)\b/gi, "\n\n");
         output = output.replace(/\\vspace\*?\s*\{[^{}]*\}/gi, "\n\n");
+
+        // Remove leftover forced line-break slashes at the end of prose.
+        output = output.replace(
+            /\\+\s*(?=<\/p>|\r?\n|$)/gi,
+            ""
+        );
 
         // Horizontal layout commands.
         output = output.replace(/\\hspace\*?\s*\{[^{}]*\}/gi, " ");
@@ -655,16 +661,23 @@
                     return `<td style="padding:0.15rem 0.35rem; text-align:${align};"></td>`;
                 }
 
-                return `<td style="padding:0.15rem 0.35rem; text-align:${align}; white-space:nowrap;">\\(${escapeHtmlForMathCell(cleanCell)}\\)</td>`;
+                return `<td style="
+                    padding:0.15rem 0.35rem;
+                    text-align:${align};
+                    white-space:nowrap;
+                ">\\(${escapeHtmlForMathCell(cleanCell)}\\)</td>`;
             }).join("");
 
             return `<tr>${htmlCells}</tr>`;
         }).join("");
 
         return `
-            <table class="pm-eqnarray-table tex2jax_process" style="border-collapse:collapse; margin:1rem auto;">
-                ${htmlRows}
-            </table>
+            <div style="max-width:100%; overflow-x:auto;">
+                <table class="pm-eqnarray-table tex2jax_process"
+                    style="border-collapse:collapse; margin:1rem auto; width:max-content;">
+                    ${htmlRows}
+                </table>
+            </div>
         `;
     }
 
@@ -804,6 +817,13 @@
     function normalizeEqnarrayCell(cell) {
         return normalizeEqnarrayHtmlArtifacts(cell)
             .replace(/\s+/g, " ")
+
+            // A malformed or partially normalized eqnarray row separator can
+            // leave one trailing backslash in the final cell. If retained, it
+            // combines with the generated closing \) delimiter and produces \\),
+            // which MathJax cannot recognize as an inline-math closing delimiter.
+            .replace(/\\+\s*$/, "")
+
             .trim();
     }
 
@@ -2958,10 +2978,44 @@
         return output;
     }
 
+    function protectEqnarrayEnvironments(value) {
+        const protectedBlocks = [];
+        let output = String(value || "");
+
+        output = output.replace(
+            /\\begin\{eqnarray\*?\}[\s\S]*?\\end\{eqnarray\*?\}/gi,
+            function (block) {
+                const token = `@@PM_EQNARRAY_BLOCK_${protectedBlocks.length}@@`;
+                protectedBlocks.push(block);
+                return token;
+            }
+        );
+
+        return {
+            text: output,
+            blocks: protectedBlocks
+        };
+    }
+
+
+    function restoreEqnarrayEnvironments(value, protectedBlocks) {
+        let output = String(value || "");
+
+        (protectedBlocks || []).forEach(function (block, index) {
+            const token = `@@PM_EQNARRAY_BLOCK_${index}@@`;
+            output = output.replace(token, block);
+        });
+
+        return output;
+    }
+
     function cleanLaTeXEnvironments(tex) {
         if (!tex) return "";
 
         let clean = String(tex || "");
+
+        const eqnarrayProtection = protectEqnarrayEnvironments(clean);
+        clean = eqnarrayProtection.text;
 
         const verbProtection = protectLatexVerbCommands(clean);
         clean = verbProtection.text;
@@ -3108,6 +3162,13 @@
         // Convert inline matrices and expressions containing multiple matrices only
         // after prose wrappers such as \text{where} have been normalized.
         clean = convertRemainingMatrixMathSequencesToHtml(clean);
+
+        // Restore protected eqnarray blocks only after prose and layout cleanup.
+        // This keeps row separators and text commands intact for the converter.
+        clean = restoreEqnarrayEnvironments(
+            clean,
+            eqnarrayProtection.blocks
+        );
 
         // Normalize legacy eqnarray blocks before MathJax sees them.
         clean = convertEqnarrayToAligned(clean);

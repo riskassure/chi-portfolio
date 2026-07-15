@@ -1273,6 +1273,68 @@ def strip_latex_comments(tex: str) -> str:
     return "".join(output)
 
 
+MATHJAX_PROTECTED_ENVIRONMENTS = (
+    "align",
+    "align*",
+    "alignat",
+    "alignat*",
+    "equation",
+    "equation*",
+    "eqnarray",
+    "eqnarray*",
+    "gather",
+    "gather*",
+    "multline",
+    "multline*",
+    "displaymath",
+)
+
+
+def protect_mathjax_environments(
+    html: str,
+) -> tuple[str, dict[str, str]]:
+    """
+    Temporarily replace MathJax display environments with safe tokens.
+
+    This prevents prose cleanup—especially conversion of LaTeX ``\\\\``
+    line breaks into HTML ``<br>`` tags—from damaging equation rows.
+    """
+    protected_blocks: dict[str, str] = {}
+
+    environment_pattern = "|".join(
+        re.escape(environment)
+        for environment in sorted(
+            MATHJAX_PROTECTED_ENVIRONMENTS,
+            key=len,
+            reverse=True,
+        )
+    )
+
+    pattern = re.compile(
+        rf"\\begin\{{({environment_pattern})\}}"
+        rf"[\s\S]*?"
+        rf"\\end\{{\1\}}",
+        flags=re.IGNORECASE,
+    )
+
+    def replace_block(match: re.Match) -> str:
+        token = f"@@MATHJAX_BLOCK_{len(protected_blocks)}@@"
+        protected_blocks[token] = match.group(0)
+        return token
+
+    return pattern.sub(replace_block, html), protected_blocks
+
+
+def restore_mathjax_environments(
+    html: str,
+    protected_blocks: dict[str, str],
+) -> str:
+    for token, original_block in protected_blocks.items():
+        html = html.replace(token, original_block)
+
+    return html
+
+
 def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
         return ""
@@ -1478,6 +1540,9 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
+    # Protect display-math environments from prose line-break and paragraph cleanup.
+    html, protected_mathjax_blocks = protect_mathjax_environments(html)
+
     # Convert LaTeX forced line breaks followed by a blank line into paragraph breaks.
     html = re.sub(r"\\\\[ \t]*(?:\n[ \t]*){2,}", "\n\n", html)
 
@@ -1497,4 +1562,11 @@ def render_prose_latex_to_html(tex: str) -> str:
         if cleaned:
             paragraphs.append(f"<p>{cleaned}</p>")
 
-    return "\n\n".join(paragraphs)
+    rendered_html = "\n\n".join(paragraphs)
+
+    rendered_html = restore_mathjax_environments(
+        rendered_html,
+        protected_mathjax_blocks,
+    )
+
+    return rendered_html
