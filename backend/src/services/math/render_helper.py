@@ -1182,6 +1182,69 @@ def render_cyrillic_latex_macros(text: str) -> str:
     )
 
 
+def strip_latex_comments(tex: str) -> str:
+    """
+    Remove true LaTeX comments while preserving:
+
+    - escaped percent signs: \\%
+    - percent signs inside verbatim environments
+    - the newline that ends each comment
+    """
+    if not tex:
+        return ""
+
+    verbatim_begin = r"\begin{verbatim}"
+    verbatim_end = r"\end{verbatim}"
+
+    output = []
+    index = 0
+    in_verbatim = False
+
+    while index < len(tex):
+        if not in_verbatim and tex.startswith(verbatim_begin, index):
+            in_verbatim = True
+            output.append(verbatim_begin)
+            index += len(verbatim_begin)
+            continue
+
+        if in_verbatim and tex.startswith(verbatim_end, index):
+            in_verbatim = False
+            output.append(verbatim_end)
+            index += len(verbatim_end)
+            continue
+
+        char = tex[index]
+
+        if char == "%" and not in_verbatim:
+            # A percent sign is escaped only when preceded by an odd number
+            # of consecutive backslashes.
+            backslash_count = 0
+            lookbehind = index - 1
+
+            while lookbehind >= 0 and tex[lookbehind] == "\\":
+                backslash_count += 1
+                lookbehind -= 1
+
+            is_escaped = backslash_count % 2 == 1
+
+            if not is_escaped:
+                # Skip through the remainder of the physical line, but retain
+                # the newline so neighboring source lines do not merge.
+                while index < len(tex) and tex[index] != "\n":
+                    index += 1
+
+                if index < len(tex) and tex[index] == "\n":
+                    output.append("\n")
+                    index += 1
+
+                continue
+
+        output.append(char)
+        index += 1
+
+    return "".join(output)
+
+
 def render_prose_latex_to_html(tex: str) -> str:
     if not tex:
         return ""
@@ -1189,6 +1252,8 @@ def render_prose_latex_to_html(tex: str) -> str:
     # Normalize Windows/Mac line endings to Unix-style newlines so later regex
     # replacements behave consistently.
     html = tex.replace("\r\n", "\n").replace("\r", "\n")
+
+    html = strip_latex_comments(html)
 
     html = render_cyrillic_latex_macros(html)
 
