@@ -1197,6 +1197,7 @@ PROSE_SPACING_COMMANDS = {
     r"\:": " ",
     r"\;": " ",
     r"\!": "",
+    "\\ ": " ",
 }
 
 def render_cyrillic_latex_macros(text: str) -> str:
@@ -1308,6 +1309,14 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.IGNORECASE,
     )
 
+    # Legacy LaTeX page-layout commands have no visible web equivalent.
+    html = re.sub(
+        r"\\(?:vfill|pagebreak|raggedright)\b",
+        "",
+        html,
+        flags=re.IGNORECASE,
+    )
+
     # Convert larger LaTeX block environments before paragraph wrapping.
     # Order matters: list/table/environment renderers should run before generic
     # line-break and paragraph conversion.
@@ -1339,6 +1348,22 @@ def render_prose_latex_to_html(tex: str) -> str:
     # Convert PlanetMath external links, including link text with nested commands.
     html = render_pmlinkexternal_to_html(html)
 
+    # Convert remaining TeX nonbreaking spaces in prose.
+    # External URLs have already been rendered, so URL tildes are preserved.
+    html = html.replace("~", " ")
+
+    # Unwrap old-style typewriter groups such as:
+    #   {\tt\PMlinkexternal{label}{url}}
+    #
+    # External links have already been converted, so only the obsolete
+    # font wrapper remains at this point.
+    html = re.sub(
+        r"\{\\tt\s*([\s\S]*?)\}",
+        r"\1",
+        html,
+        flags=re.IGNORECASE,
+    )
+
     # Convert LaTeX text commands that use braced arguments.
     # Use the balanced-brace helper instead of simple regex so nested content such as
     #   \textbf{\emph{points}}
@@ -1349,6 +1374,12 @@ def render_prose_latex_to_html(tex: str) -> str:
     html = replace_latex_text_command_until_stable(html, "emph", "<em>", "</em>")
     html = replace_latex_text_command_until_stable(html, "textit", "<em>", "</em>")
     html = replace_latex_text_command_until_stable(html, "MR", "", "")
+
+    # Legacy bibliography field commands.
+    html = replace_latex_text_command_until_stable(html, "name", "", "")
+    html = replace_latex_text_command_until_stable(html, "book", "<cite>", "</cite>")
+    html = replace_latex_text_command_until_stable(html, "isbn", "", "")
+    html = replace_latex_text_command_until_stable(html, "vol", "", "")
 
     # Convert older TeX-style emphasis:
     #   {\em ...}
