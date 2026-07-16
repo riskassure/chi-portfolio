@@ -24,6 +24,7 @@ def wrap_pstricks_document(ps_block: str) -> str:
     return rf"""
 \documentclass{{article}}
 \usepackage{{pstricks}}
+\usepackage{{pst-tree}}
 \usepackage{{pst-plot}}
 \usepackage{{pst-node}}
 \usepackage{{multido}}
@@ -83,6 +84,203 @@ def iter_pstricks_blocks_with_setup(cleaned_tex: str):
             "setup": setup,
         }
 
+
+VERBATIM_ENVIRONMENT_RE = re.compile(
+    r"""
+    \\begin\{verbatim\*?\}
+    [\s\S]*?
+    \\end\{verbatim\*?\}
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def get_verbatim_ranges(text: str) -> list[tuple[int, int]]:
+    """
+    Return source ranges occupied by verbatim environments.
+
+    Standalone PSTree examples shown as source code must not be converted
+    into diagrams.
+    """
+    return [
+        (match.start(), match.end())
+        for match in VERBATIM_ENVIRONMENT_RE.finditer(text or "")
+    ]
+
+
+def index_is_inside_ranges(
+    index: int,
+    ranges: list[tuple[int, int]],
+) -> bool:
+    return any(start <= index < end for start, end in ranges)
+
+
+def find_matching_delimiter(
+    text: str,
+    open_index: int,
+    opening: str,
+    closing: str,
+) -> int:
+    """
+    Find the matching closing delimiter using balanced parsing.
+
+    Escaped delimiters are ignored. This supports nested braces inside
+    PSTree roots and child lists.
+    """
+    if (
+        open_index < 0
+        or open_index >= len(text)
+        or text[open_index] != opening
+    ):
+        return -1
+
+    depth = 0
+
+    for index in range(open_index, len(text)):
+        character = text[index]
+
+        if character not in {opening, closing}:
+            continue
+
+        backslash_count = 0
+        previous = index - 1
+
+        while previous >= 0 and text[previous] == "\\":
+            backslash_count += 1
+            previous -= 1
+
+        if backslash_count % 2 == 1:
+            continue
+
+        if character == opening:
+            depth += 1
+        else:
+            depth -= 1
+
+            if depth == 0:
+                return index
+
+    return -1
+
+
+def skip_whitespace(text: str, index: int) -> int:
+    while index < len(text) and text[index].isspace():
+        index += 1
+
+    return index
+
+
+def parse_standalone_pstree_at(
+    text: str,
+    command_index: int,
+) -> dict | None:
+    """
+    Parse one complete:
+
+        \\pstree[optional settings]{root}{children}
+
+    expression, including nested PSTree commands inside the children.
+    """
+    command = "\\pstree"
+
+    if not text.startswith(command, command_index):
+        return None
+
+    cursor = command_index + len(command)
+    cursor = skip_whitespace(text, cursor)
+
+    options = ""
+
+    if cursor < len(text) and text[cursor] == "[":
+        options_end = find_matching_delimiter(
+            text,
+            cursor,
+            "[",
+            "]",
+        )
+
+        if options_end == -1:
+            return None
+
+        options = text[cursor:options_end + 1]
+        cursor = skip_whitespace(text, options_end + 1)
+
+    if cursor >= len(text) or text[cursor] != "{":
+        return None
+
+    root_end = find_matching_delimiter(
+        text,
+        cursor,
+        "{",
+        "}",
+    )
+
+    if root_end == -1:
+        return None
+
+    root = text[cursor:root_end + 1]
+    cursor = skip_whitespace(text, root_end + 1)
+
+    if cursor >= len(text) or text[cursor] != "{":
+        return None
+
+    children_end = find_matching_delimiter(
+        text,
+        cursor,
+        "{",
+        "}",
+    )
+
+    if children_end == -1:
+        return None
+
+    children = text[cursor:children_end + 1]
+    full_block = text[command_index:children_end + 1]
+
+    return {
+        "start": command_index,
+        "end": children_end + 1,
+        "full_block": full_block,
+        "conversion_source": full_block.strip(),
+        "options": options,
+        "root": root,
+        "children": children,
+    }
+
+
+def iter_standalone_pstree_blocks(cleaned_tex: str):
+    """
+    Yield top-level standalone PSTree blocks outside verbatim environments.
+
+    Advancing past the complete outer tree prevents nested \\pstree commands
+    from being returned as separate diagrams.
+    """
+    text = cleaned_tex or ""
+    verbatim_ranges = get_verbatim_ranges(text)
+
+    cursor = 0
+
+    while cursor < len(text):
+        command_index = text.find("\\pstree", cursor)
+
+        if command_index == -1:
+            break
+
+        if index_is_inside_ranges(command_index, verbatim_ranges):
+            cursor = command_index + len("\\pstree")
+            continue
+
+        parsed = parse_standalone_pstree_at(
+            text,
+            command_index,
+        )
+
+        if parsed is None:
+            cursor = command_index + len("\\pstree")
+            continue
+
+        yield parsed
+        cursor = parsed["end"]
 
 
 def combine_process_output(error: subprocess.CalledProcessError) -> str:
