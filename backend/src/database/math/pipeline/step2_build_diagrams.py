@@ -363,6 +363,48 @@ def make_failed_diagram_placeholder(source_hash: str) -> str:
     )
 
 
+def ensure_diagram_tables_exist(cursor):
+    """
+    Create the diagram tables only if they do not already exist.
+
+    Unlike rebuild_diagram_tables(), this is safe for additive or
+    single-concept diagram processing because it preserves all existing rows.
+    """
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS math_concept_diagrams (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            concept_id INTEGER NOT NULL,
+            block_index INTEGER NOT NULL,
+            source_hash TEXT NOT NULL,
+            source_tex TEXT NOT NULL,
+            svg_path TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(concept_id)
+                REFERENCES math_concepts(id)
+                ON DELETE CASCADE,
+            UNIQUE(concept_id, source_hash)
+        );
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS math_concept_diagram_failures (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            concept_id INTEGER NOT NULL,
+            block_index INTEGER NOT NULL,
+            source_hash TEXT NOT NULL,
+            source_tex TEXT NOT NULL,
+            failure_stage TEXT,
+            error_output TEXT,
+            tex_temp_path TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(concept_id)
+                REFERENCES math_concepts(id)
+                ON DELETE CASCADE,
+            UNIQUE(concept_id, source_hash)
+        );
+    """)
+
+
 def rebuild_diagram_tables(cursor):
     cursor.execute("DROP TABLE IF EXISTS math_concept_diagrams;")
     cursor.execute("""
@@ -531,5 +573,153 @@ def build_math_diagrams():
     print(f"   Failed conversions: {failed_count}")
 
 
+def add_standalone_pstree_diagrams_for_concept(concept_id: int):
+    """
+    Add standalone PSTree diagrams for one concept without rebuilding
+    or clearing existing diagram tables.
+    """
+    print(f"[PSTREE ADDITIVE] Processing concept {concept_id}...")
+
+    MATH_DIAGRAM_DIR.mkdir(parents=True, exist_ok=True)
+    MATH_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    ensure_diagram_tables_exist(cursor)
+
+    cursor.execute("""
+        SELECT id, slug, title, cleaned_tex
+        FROM math_concepts
+        WHERE id = ?;
+    """, (concept_id,))
+
+    row = cursor.fetchone()
+
+    if row is None:
+        conn.close()
+        print(f"Concept {concept_id} was not found.")
+        return
+
+    concept_id, slug, title, cleaned_tex = row
+    cleaned_tex = cleaned_tex or ""
+
+    blocks = list(iter_standalone_pstree_blocks(cleaned_tex))
+
+    print(f"Slug: {slug}")
+    print(f"Title: {title}")
+    print(f"Standalone PSTree blocks found: {len(blocks)}")
+
+    if not blocks:
+        conn.close()
+        print("No standalone PSTree blocks found; nothing changed.")
+        return
+
+    rendered_source = cleaned_tex
+    success_count = 0
+    failure_count = 0
+
+    for block_index, block in reversed(
+        list(enumerate(blocks, start=1))
+    ):
+        conversion_source = block["conversion_source"]
+        source_hash = hash_pstricks_block(conversion_source)
+
+        svg_path, error_output, failure_stage = convert_pstricks_to_svg(
+            conversion_source,
+            source_hash,
+        )
+
+        if svg_path:
+            svg_filename = svg_path.name
+            svg_url_path = f"/api/math/diagrams/{svg_filename}"
+
+            cursor.execute("""
+                INSERT OR IGNORE INTO math_concept_diagrams (
+                    concept_id,
+                    block_index,
+                    source_hash,
+                    source_tex,
+                    svg_path,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?);
+            """, (
+                concept_id,
+                block_index,
+                source_hash,
+                conversion_source,
+                svg_url_path,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            ))
+
+            replacement_html = make_diagram_img_tag(svg_filename)
+
+            rendered_source = (
+                rendered_source[:block["start"]]
+                + replacement_html
+                + rendered_source[block["end"]:]
+            )
+
+            success_count += 1
+
+        else:
+            tex_temp_path = str(
+                MATH_TEMP_DIR / f"{source_hash}.tex"
+            )
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO math_concept_diagram_failures (
+                    concept_id,
+                    block_index,
+                    source_hash,
+                    source_tex,
+                    failure_stage,
+                    error_output,
+                    tex_temp_path,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """, (
+                concept_id,
+                block_index,
+                source_hash,
+                conversion_source,
+                failure_stage,
+                error_output,
+                tex_temp_path,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            ))
+
+            replacement_html = make_failed_diagram_placeholder(
+                source_hash
+            )
+
+            rendered_source = (
+                rendered_source[:block["start"]]
+                + replacement_html
+                + rendered_source[block["end"]:]
+            )
+
+            failure_count += 1
+
+    rendered_tex = render_prose_latex_to_html(rendered_source)
+
+    cursor.execute("""
+        UPDATE math_concepts
+        SET rendered_tex = ?
+        WHERE id = ?;
+    """, (rendered_tex, concept_id))
+
+    conn.commit()
+    conn.close()
+
+    print("[PSTREE ADDITIVE] Complete.")
+    print(f"Successful diagrams: {success_count}")
+    print(f"Failed diagrams: {failure_count}")
+
+
 if __name__ == "__main__":
     build_math_diagrams()
+    # add_standalone_pstree_diagrams_for_concept(696)

@@ -108,9 +108,27 @@
         // Remove setup/control commands that have no useful page meaning.
         output = output.replace(/\\setcounter\{[^{}]*\}\{[^{}]*\}/gi, "");
         output = output.replace(/\\newtheorem\{[^{}]*\}(?:\[[^\]]*\])?\{[^{}]*\}/gi, "");
+
+        // Remove document preamble commands that have no page meaning.
+        output = output.replace(
+            /\\documentclass(?:\[[^\]]*\])?\s*\{[^{}]*\}/gi,
+            ""
+        );
+
+        output = output.replace(
+            /\\usepackage(?:\[[^\]]*\])?\s*\{[^{}]*\}/gi,
+            ""
+        );
+
+        output = output.replace(
+            /\\pagestyle\s*\{[^{}]*\}/gi,
+            ""
+        );
+
         output = output.replace(/\\clearpage\b/gi, "");
         output = output.replace(/\\newpage\b/gi, "");
         output = output.replace(/\\pagebreak\b(?:\[[^\]]*\])?/gi, "");
+        output = output.replace(/\\columnbreak\b/gi, "\n\n");
 
         // Paragraph / vertical layout commands.
         output = output.replace(/\\par\b/gi, "\n\n");
