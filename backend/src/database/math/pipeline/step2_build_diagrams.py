@@ -544,6 +544,99 @@ def process_pstricks_diagrams_in_transaction(
     }
 
 
+def render_pstricks_preview(cleaned_tex: str) -> dict:
+    """
+    Render an unsaved TeX preview with supported PSTricks diagrams.
+
+    This function performs no database reads or writes. Successful SVG files
+    may be created or reused through convert_pstricks_to_svg(), but no concept,
+    diagram, or failure records are persisted.
+
+    Returns:
+        {
+            "rendered_tex": str,
+            "block_count": int,
+            "success_count": int,
+            "failure_count": int,
+            "failures": list[dict],
+        }
+    """
+    cleaned_tex = cleaned_tex or ""
+
+    MATH_DIAGRAM_DIR.mkdir(parents=True, exist_ok=True)
+    MATH_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+    blocks = extract_all_pstricks_diagram_blocks(cleaned_tex)
+
+    if not blocks:
+        return {
+            "rendered_tex": render_prose_latex_to_html(cleaned_tex),
+            "block_count": 0,
+            "success_count": 0,
+            "failure_count": 0,
+            "failures": [],
+        }
+
+    rendered_source = cleaned_tex
+    success_count = 0
+    failures = []
+
+    # Work backward so replacing one block does not invalidate the source
+    # offsets of earlier blocks.
+    for block_index, block in reversed(
+        list(enumerate(blocks, start=1))
+    ):
+        conversion_source = block["conversion_source"]
+        source_hash = block["source_hash"]
+
+        svg_path, error_output, failure_stage = (
+            convert_pstricks_to_svg(
+                conversion_source,
+                source_hash,
+            )
+        )
+
+        if svg_path:
+            replacement_html = make_diagram_img_tag(svg_path.name)
+            success_count += 1
+
+        else:
+            tex_temp_path = str(
+                MATH_TEMP_DIR / f"{source_hash}.tex"
+            )
+
+            failures.append({
+                "block_index": block_index,
+                "source_hash": source_hash,
+                "source_tex": conversion_source,
+                "failure_stage": failure_stage,
+                "error_output": error_output,
+                "tex_temp_path": tex_temp_path,
+            })
+
+            replacement_html = make_failed_diagram_placeholder(
+                source_hash
+            )
+
+        rendered_source = (
+            rendered_source[:block["start"]]
+            + replacement_html
+            + rendered_source[block["end"]:]
+        )
+
+    failures.sort(key=lambda failure: failure["block_index"])
+
+    return {
+        "rendered_tex": render_prose_latex_to_html(
+            rendered_source
+        ),
+        "block_count": len(blocks),
+        "success_count": success_count,
+        "failure_count": len(failures),
+        "failures": failures,
+    }
+
+
 def add_pstricks_diagrams_for_concept(concept_id: int):
     """
     Add supported PSTricks diagrams for one concept without rebuilding
