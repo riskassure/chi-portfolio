@@ -89,6 +89,195 @@ def extract_pstricks_hashes(tex: str) -> list[str]:
     ]
 
 
+VERBATIM_ENVIRONMENT_RE = re.compile(
+    r"""
+    \\begin\{verbatim\*?\}
+    [\s\S]*?
+    \\end\{verbatim\*?\}
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def get_verbatim_ranges(text: str) -> list[tuple[int, int]]:
+    return [
+        (match.start(), match.end())
+        for match in VERBATIM_ENVIRONMENT_RE.finditer(text or "")
+    ]
+
+
+def index_is_inside_ranges(
+    index: int,
+    ranges: list[tuple[int, int]],
+) -> bool:
+    return any(start <= index < end for start, end in ranges)
+
+
+def find_matching_delimiter(
+    text: str,
+    open_index: int,
+    opening: str,
+    closing: str,
+) -> int:
+    if (
+        open_index < 0
+        or open_index >= len(text)
+        or text[open_index] != opening
+    ):
+        return -1
+
+    depth = 0
+
+    for index in range(open_index, len(text)):
+        character = text[index]
+
+        if character not in {opening, closing}:
+            continue
+
+        backslash_count = 0
+        previous = index - 1
+
+        while previous >= 0 and text[previous] == "\\":
+            backslash_count += 1
+            previous -= 1
+
+        if backslash_count % 2 == 1:
+            continue
+
+        if character == opening:
+            depth += 1
+        else:
+            depth -= 1
+
+            if depth == 0:
+                return index
+
+    return -1
+
+
+def skip_whitespace(text: str, index: int) -> int:
+    while index < len(text) and text[index].isspace():
+        index += 1
+
+    return index
+
+
+def parse_standalone_pstree_at(
+    text: str,
+    command_index: int,
+) -> dict | None:
+    command = "\\pstree"
+
+    if not text.startswith(command, command_index):
+        return None
+
+    cursor = skip_whitespace(
+        text,
+        command_index + len(command),
+    )
+
+    options = ""
+
+    if cursor < len(text) and text[cursor] == "[":
+        options_end = find_matching_delimiter(
+            text,
+            cursor,
+            "[",
+            "]",
+        )
+
+        if options_end == -1:
+            return None
+
+        options = text[cursor:options_end + 1]
+        cursor = skip_whitespace(text, options_end + 1)
+
+    if cursor >= len(text) or text[cursor] != "{":
+        return None
+
+    root_end = find_matching_delimiter(
+        text,
+        cursor,
+        "{",
+        "}",
+    )
+
+    if root_end == -1:
+        return None
+
+    root = text[cursor:root_end + 1]
+    cursor = skip_whitespace(text, root_end + 1)
+
+    if cursor >= len(text) or text[cursor] != "{":
+        return None
+
+    children_end = find_matching_delimiter(
+        text,
+        cursor,
+        "{",
+        "}",
+    )
+
+    if children_end == -1:
+        return None
+
+    children = text[cursor:children_end + 1]
+    full_block = text[command_index:children_end + 1]
+    conversion_source = full_block.strip()
+
+    return {
+        "kind": "pstree",
+        "start": command_index,
+        "end": children_end + 1,
+        "full_block": full_block,
+        "conversion_source": conversion_source,
+        "source_hash": hash_pstricks_block(conversion_source),
+        "options": options,
+        "root": root,
+        "children": children,
+    }
+
+
+def extract_standalone_pstree_diagram_blocks(
+    tex: str,
+) -> list[dict]:
+    """
+    Extract top-level standalone PSTree expressions outside verbatim
+    environments. Nested PSTrees remain part of the outer diagram.
+    """
+    text = tex or ""
+    verbatim_ranges = get_verbatim_ranges(text)
+    diagrams = []
+    cursor = 0
+
+    while cursor < len(text):
+        command_index = text.find("\\pstree", cursor)
+
+        if command_index == -1:
+            break
+
+        if index_is_inside_ranges(
+            command_index,
+            verbatim_ranges,
+        ):
+            cursor = command_index + len("\\pstree")
+            continue
+
+        parsed = parse_standalone_pstree_at(
+            text,
+            command_index,
+        )
+
+        if parsed is None:
+            cursor = command_index + len("\\pstree")
+            continue
+
+        diagrams.append(parsed)
+        cursor = parsed["end"]
+
+    return diagrams
+
+
 def get_svg_filename(svg_path: str) -> str | None:
     if not svg_path:
         return None
