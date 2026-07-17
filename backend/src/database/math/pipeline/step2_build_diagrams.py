@@ -14,6 +14,7 @@ if str(SRC_DIR) not in sys.path:
 from config import DB_PATH, MATH_DIAGRAM_DIR, MATH_TEMP_DIR
 
 from services.math.render_helper import (
+    extract_pstricks_diagram_blocks,
     hash_pstricks_block,
     make_diagram_img_tag,
     render_prose_latex_to_html,
@@ -38,51 +39,6 @@ def wrap_pstricks_document(ps_block: str) -> str:
 {ps_block}
 \end{{document}}
 """
-
-
-PSTRICKS_BLOCK_WITH_SETUP_RE = re.compile(
-    r"""
-    (?P<setup>
-        (?:
-            [ \t\r\n]*
-            \\psset\s*\{[^{}]*\}
-        )*
-    )
-    [ \t\r\n]*
-    (?P<picture>
-        \\begin\{pspicture\}
-        [\s\S]*?
-        \\end\{pspicture\}
-    )
-    """,
-    re.IGNORECASE | re.VERBOSE,
-)
-
-
-def iter_pstricks_blocks_with_setup(cleaned_tex: str):
-    """
-    Yield PSTricks conversion blocks.
-
-    If one or more \\psset{...} commands appear immediately before a
-    pspicture block, include them in the conversion source and replacement
-    source. This lets PSTricks scaling/setup affect the generated SVG and
-    prevents the setup command from remaining as visible prose.
-    """
-    text = cleaned_tex or ""
-
-    for match in PSTRICKS_BLOCK_WITH_SETUP_RE.finditer(text):
-        full_block = match.group(0)
-        setup = match.group("setup") or ""
-        picture = match.group("picture") or ""
-
-        conversion_source = f"{setup}\n{picture}".strip()
-
-        yield {
-            "full_block": full_block,
-            "conversion_source": conversion_source,
-            "picture": picture,
-            "setup": setup,
-        }
 
 
 VERBATIM_ENVIRONMENT_RE = re.compile(
@@ -482,7 +438,10 @@ def build_math_diagrams():
         concept_count += 1
         rendered_tex = cleaned_tex
 
-        for block_index, block_info in enumerate(iter_pstricks_blocks_with_setup(cleaned_tex), start=1):
+        for block_index, block_info in enumerate(
+            extract_pstricks_diagram_blocks(cleaned_tex),
+            start=1
+        ):
             full_block = block_info["full_block"]
             conversion_source = block_info["conversion_source"]
 
