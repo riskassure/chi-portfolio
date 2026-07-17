@@ -14,8 +14,7 @@ if str(SRC_DIR) not in sys.path:
 from config import DB_PATH, MATH_DIAGRAM_DIR, MATH_TEMP_DIR
 
 from services.math.render_helper import (
-    extract_pstricks_diagram_blocks,
-    extract_standalone_pstree_diagram_blocks,
+    extract_all_pstricks_diagram_blocks,
     hash_pstricks_block,
     make_diagram_img_tag,
     render_prose_latex_to_html,
@@ -227,7 +226,9 @@ def build_math_diagrams():
     failed_count = 0
 
     for concept_id, cleaned_tex in rows:
-        if not cleaned_tex or "\\begin{pspicture}" not in cleaned_tex:
+        blocks = extract_all_pstricks_diagram_blocks(cleaned_tex)
+            
+        if not blocks:
             rendered_tex = render_prose_latex_to_html(cleaned_tex)
 
             cursor.execute("""
@@ -242,13 +243,13 @@ def build_math_diagrams():
         rendered_tex = cleaned_tex
 
         for block_index, block_info in enumerate(
-            extract_pstricks_diagram_blocks(cleaned_tex),
-            start=1
+            blocks,
+            start=1,
         ):
             full_block = block_info["full_block"]
             conversion_source = block_info["conversion_source"]
 
-            source_hash = hash_pstricks_block(conversion_source)
+            source_hash = block_info["source_hash"]
             svg_path, error_output, failure_stage = convert_pstricks_to_svg(
                 conversion_source,
                 source_hash
@@ -335,12 +336,12 @@ def build_math_diagrams():
     print(f"   Failed conversions: {failed_count}")
 
 
-def add_standalone_pstree_diagrams_for_concept(concept_id: int):
+def add_pstricks_diagrams_for_concept(concept_id: int):
     """
-    Add standalone PSTree diagrams for one concept without rebuilding
+    Add supported PSTricks diagrams for one concept without rebuilding
     or clearing existing diagram tables.
     """
-    print(f"[PSTREE ADDITIVE] Processing concept {concept_id}...")
+    print(f"[PSTRICKS ADDITIVE] Processing concept {concept_id}...")
 
     MATH_DIAGRAM_DIR.mkdir(parents=True, exist_ok=True)
     MATH_TEMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -367,15 +368,15 @@ def add_standalone_pstree_diagrams_for_concept(concept_id: int):
     concept_id, slug, title, cleaned_tex = row
     cleaned_tex = cleaned_tex or ""
 
-    blocks = extract_standalone_pstree_diagram_blocks(cleaned_tex)
+    blocks = extract_all_pstricks_diagram_blocks(cleaned_tex)
 
     print(f"Slug: {slug}")
     print(f"Title: {title}")
-    print(f"Standalone PSTree blocks found: {len(blocks)}")
+    print(f"Supported PSTricks blocks found: {len(blocks)}")
 
     if not blocks:
         conn.close()
-        print("No standalone PSTree blocks found; nothing changed.")
+        print("No supported PSTricks blocks found; nothing changed.")
         return
 
     rendered_source = cleaned_tex
@@ -386,7 +387,7 @@ def add_standalone_pstree_diagrams_for_concept(concept_id: int):
         list(enumerate(blocks, start=1))
     ):
         conversion_source = block["conversion_source"]
-        source_hash = hash_pstricks_block(conversion_source)
+        source_hash = block["source_hash"]
 
         svg_path, error_output, failure_stage = convert_pstricks_to_svg(
             conversion_source,
@@ -477,11 +478,10 @@ def add_standalone_pstree_diagrams_for_concept(concept_id: int):
     conn.commit()
     conn.close()
 
-    print("[PSTREE ADDITIVE] Complete.")
+    print("[PSTRICKS ADDITIVE] Complete.")
     print(f"Successful diagrams: {success_count}")
     print(f"Failed diagrams: {failure_count}")
 
 
 if __name__ == "__main__":
     build_math_diagrams()
-    # add_standalone_pstree_diagrams_for_concept(696)

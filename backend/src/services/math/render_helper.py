@@ -278,6 +278,27 @@ def extract_standalone_pstree_diagram_blocks(
     return diagrams
 
 
+def extract_all_pstricks_diagram_blocks(
+    tex: str,
+) -> list[dict]:
+    """
+    Extract every supported PSTricks diagram in source order.
+
+    Currently supports:
+      - pspicture blocks, including immediately preceding \\psset{...}
+      - standalone top-level \\pstree expressions outside verbatim blocks
+    """
+    diagrams = (
+        extract_pstricks_diagram_blocks(tex)
+        + extract_standalone_pstree_diagram_blocks(tex)
+    )
+
+    return sorted(
+        diagrams,
+        key=lambda block: block["start"],
+    )
+
+
 def get_svg_filename(svg_path: str) -> str | None:
     if not svg_path:
         return None
