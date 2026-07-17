@@ -2094,6 +2094,31 @@ def create_new_math_concept():
 
             concept_id = cursor.lastrowid
 
+            pstricks_result = (
+                process_pstricks_diagrams_in_transaction(
+                    cursor=cursor,
+                    concept_id=concept_id,
+                    cleaned_tex=cleaned_tex,
+                )
+            )
+
+            cursor.execute("""
+                UPDATE math_concepts
+                SET rendered_tex = ?
+                WHERE id = ?;
+            """, (
+                pstricks_result["rendered_tex"],
+                concept_id,
+            ))
+
+            print(
+                "[ADMIN CREATE PSTRICKS]",
+                f"concept_id={concept_id}",
+                f"blocks={pstricks_result['block_count']}",
+                f"successes={pstricks_result['success_count']}",
+                f"failures={pstricks_result['failure_count']}",
+            )            
+
             # Attach classifications.
             for code in classifications:
                 clean_code = code.upper().strip()
@@ -2195,7 +2220,7 @@ def create_new_math_concept():
 
             return jsonify({
                 "success": True,
-                "message": "New concept generated successfully!",
+                "message": "New concept created and rendered successfully!",
                 "concept_id": concept_id,
                 "id": concept_id,
                 "slug": slug
