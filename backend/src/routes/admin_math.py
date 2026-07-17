@@ -24,6 +24,7 @@ from services.math.render_helper import (
 
 from database.math.pipeline.step2_build_diagrams import (
     process_pstricks_diagrams_in_transaction,
+    render_pstricks_preview,
 )
 
 math_bp = Blueprint("math_bp", __name__)
@@ -1696,6 +1697,54 @@ def get_admin_math_concept_detail(concept_id):
                 conn.close()
 
     return process_read()
+
+
+@math_bp.route("/api/admin/math/render-preview", methods=["POST", "OPTIONS"])
+def render_admin_math_preview():
+    """
+    Render unsaved cleaned TeX for the admin editor.
+
+    This route does not create or update concept records or diagram-table rows.
+    It may create or reuse hash-named SVG files for successful PSTricks blocks.
+    """
+    if request.method == "OPTIONS":
+        return jsonify({"status": "CORS preflight ok"}), 200
+
+    from app import admin_required
+
+    @admin_required
+    def process_preview():
+        data = request.get_json() or {}
+        cleaned_tex = data.get("cleaned_tex", "")
+
+        if not cleaned_tex.strip():
+            return jsonify({
+                "success": False,
+                "message": "LaTeX body is required."
+            }), 400
+
+        try:
+            preview_result = render_pstricks_preview(cleaned_tex)
+
+            return jsonify({
+                "success": True,
+                "rendered_tex": preview_result["rendered_tex"],
+                "block_count": preview_result["block_count"],
+                "success_count": preview_result["success_count"],
+                "failure_count": preview_result["failure_count"],
+                "failures": preview_result["failures"],
+            }), 200
+
+        except Exception as e:
+            print("[ADMIN RENDER PREVIEW ERROR]", str(e))
+
+            return jsonify({
+                "success": False,
+                "message": "Unable to render preview.",
+                "error": str(e),
+            }), 500
+
+    return process_preview()
 
 
 @math_bp.route("/api/admin/math/update", methods=["POST", "OPTIONS"])
