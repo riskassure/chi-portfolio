@@ -16,13 +16,14 @@ if str(SRC_DIR) not in sys.path:
 from config import DB_PATH, MATH_DIAGRAM_DIR
 
 from services.math.render_helper import (
-    PSPICTURE_RE,
-    hash_pstricks_block,
-    extract_pstricks_blocks,
-    extract_pstricks_hashes,
+    extract_all_pstricks_diagram_blocks,
     get_svg_filename,
     make_diagram_img_tag,
     render_prose_latex_to_html,
+)
+
+from database.math.pipeline.step2_build_diagrams import (
+    process_pstricks_diagrams_in_transaction,
 )
 
 math_bp = Blueprint("math_bp", __name__)
@@ -77,8 +78,15 @@ def normalize_tex_for_save_compare(tex: str) -> str:
 
 
 def compare_pstricks_hashes(old_tex: str, new_tex: str) -> dict:
-    old_hashes = extract_pstricks_hashes(old_tex)
-    new_hashes = extract_pstricks_hashes(new_tex)
+    old_hashes = [
+        block["source_hash"]
+        for block in extract_all_pstricks_diagram_blocks(old_tex)
+    ]
+
+    new_hashes = [
+        block["source_hash"]
+        for block in extract_all_pstricks_diagram_blocks(new_tex)
+    ]
 
     old_counter = Counter(old_hashes)
     new_counter = Counter(new_hashes)
@@ -132,8 +140,7 @@ def determine_smart_save_mode(old_tex: str, new_tex: str) -> dict:
         "pstricks_changed": True,
         "diagram_compare": diagram_compare,
         "message": (
-            "Saved TeX changes. PSTricks diagram blocks changed; "
-            "diagram rebuild logic will handle this in the next Phase C step."
+            "Saved TeX changes. PSTricks diagram blocks changed and were rebuilt."
         )
     }
 
@@ -366,26 +373,29 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     return "".join(processed_chunks)
 
 
-def render_tex_reusing_existing_diagrams(concept_id: int, cleaned_tex: str, cursor) -> str:
+def render_tex_reusing_existing_diagrams(
+    concept_id: int,
+    cleaned_tex: str,
+    cursor,
+) -> str:
     """
-    Rebuild rendered_tex without running LaTeX/dvisvgm.
+    Rebuild rendered_tex without running LaTeX or dvisvgm.
 
-    For ordinary TeX:
-        render prose using the shared render helper.
+    Existing SVG records are reused for all supported PSTricks blocks:
+      - pspicture, including preceding psset commands
+      - standalone top-level pstree expressions
 
-    For unchanged PSTricks blocks:
-        replace each pspicture block with its existing SVG image tag,
-        then render prose using the shared render helper.
-
-    For missing diagram records:
-        leave a placeholder rather than showing raw PSTricks.
+    Missing diagram records become placeholders rather than visible
+    raw PSTricks source.
     """
     if not cleaned_tex:
         return ""
 
-    ps_blocks = extract_pstricks_blocks(cleaned_tex)
+    diagram_blocks = extract_all_pstricks_diagram_blocks(
+        cleaned_tex
+    )
 
-    if not ps_blocks:
+    if not diagram_blocks:
         return render_prose_latex_to_html(cleaned_tex)
 
     try:
@@ -405,21 +415,29 @@ def render_tex_reusing_existing_diagrams(concept_id: int, cleaned_tex: str, curs
     except sqlite3.OperationalError:
         diagram_lookup = {}
 
-    rendered_tex = cleaned_tex
+    rendered_source = cleaned_tex
 
-    for ps_block in ps_blocks:
-        source_hash = hash_pstricks_block(ps_block)
+    for block in reversed(diagram_blocks):
+        source_hash = block["source_hash"]
         svg_path = diagram_lookup.get(source_hash)
 
         if svg_path:
             svg_filename = get_svg_filename(svg_path)
             replacement = make_diagram_img_tag(svg_filename)
         else:
-            replacement = '<div class="img-placeholder"><em>[Diagram unavailable.]</em></div>'
+            replacement = (
+                '<div class="img-placeholder">'
+                '<em>[Diagram unavailable.]</em>'
+                '</div>'
+            )
 
-        rendered_tex = rendered_tex.replace(ps_block, replacement, 1)
+        rendered_source = (
+            rendered_source[:block["start"]]
+            + replacement
+            + rendered_source[block["end"]:]
+        )
 
-    return render_prose_latex_to_html(rendered_tex)
+    return render_prose_latex_to_html(rendered_source)
 
 
 @math_bp.route("/api/math/classifications", methods=["GET", "OPTIONS"])
@@ -1683,11 +1701,11 @@ def get_admin_math_concept_detail(concept_id):
 @math_bp.route("/api/admin/math/update", methods=["POST", "OPTIONS"])
 def update_math_metadata():
     """
-    Protected transactional endpoint for updates.
+    Protected transactional endpoint for concept updates.
 
-    Only cleaned_tex is editable here. rendered_tex is cleared so the public page
-    falls back to updated cleaned_tex until step2_build_diagrams.py regenerates
-    rendered_tex.
+    Only cleaned_tex is editable here. rendered_tex is refreshed during save:
+    existing diagram SVGs are reused when possible, and changed supported
+    PSTricks diagrams are rebuilt inside the same transaction.
     """
     if request.method == "OPTIONS":
         return jsonify({"status": "CORS preflight ok"}), 200
@@ -1815,16 +1833,27 @@ def update_math_metadata():
                 ))
 
             else:
-                # PSTricks blocks changed.
-                # For now, do not attempt diagram generation in Save.
-                # The next phase will require Render Preview before Save.
+                # PSTricks blocks changed, were added, or were removed.
+                # Rebuild supported diagrams inside this save transaction.
+                pstricks_result = (
+                    process_pstricks_diagrams_in_transaction(
+                        cursor=cursor,
+                        concept_id=concept_id,
+                        cleaned_tex=updated_tex,
+                    )
+                )
+
+                refreshed_rendered_tex = (
+                    pstricks_result["rendered_tex"]
+                )
+
                 cursor.execute("""
                     UPDATE math_concepts
                     SET
                         title = ?,
                         owner = ?,
                         cleaned_tex = ?,
-                        rendered_tex = NULL,
+                        rendered_tex = ?,
                         updated_at = ?,
                         is_cleaned = ?
                     WHERE id = ?;
@@ -1832,10 +1861,19 @@ def update_math_metadata():
                     updated_title,
                     updated_owner,
                     updated_tex,
+                    refreshed_rendered_tex,
                     uniform_timestamp,
                     is_cleaned_flag,
-                    concept_id
+                    concept_id,
                 ))
+
+                print(
+                    "[ADMIN SAVE PSTRICKS]",
+                    f"concept_id={concept_id}",
+                    f"blocks={pstricks_result['block_count']}",
+                    f"successes={pstricks_result['success_count']}",
+                    f"failures={pstricks_result['failure_count']}",
+                )
 
             # Rebuild classifications.
             cursor.execute("""
