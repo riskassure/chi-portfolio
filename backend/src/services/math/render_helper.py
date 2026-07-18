@@ -1199,6 +1199,80 @@ def render_pmlinkexternal_to_html(html: str) -> str:
     return "".join(output_parts)
 
 
+def render_htmladdnormallink_to_html(html: str) -> str:
+    """
+    Convert legacy Hyperref-style external links into HTML anchors.
+
+    Example:
+        \\htmladdnormallink{PlanetMath}{https://planetmath.org}
+
+    becomes:
+        <a class="math-external-link" ...>PlanetMath</a>
+    """
+    command = r"\htmladdnormallink"
+    search_start = 0
+    output_parts = []
+
+    while True:
+        start_index = html.find(command, search_start)
+
+        if start_index == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        cursor = start_index + len(command)
+
+        while cursor < len(html) and html[cursor].isspace():
+            cursor += 1
+
+        if cursor >= len(html) or html[cursor] != "{":
+            output_parts.append(
+                html[search_start:start_index + len(command)]
+            )
+            search_start = start_index + len(command)
+            continue
+
+        text_close = find_matching_latex_brace(html, cursor)
+
+        if text_close == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        link_text = html[cursor + 1:text_close]
+        cursor = text_close + 1
+
+        while cursor < len(html) and html[cursor].isspace():
+            cursor += 1
+
+        if cursor >= len(html) or html[cursor] != "{":
+            output_parts.append(html[search_start:text_close + 1])
+            search_start = text_close + 1
+            continue
+
+        url_close = find_matching_latex_brace(html, cursor)
+
+        if url_close == -1:
+            output_parts.append(html[search_start:])
+            break
+
+        url = html[cursor + 1:url_close].strip()
+        url = url.replace(r"\%", "%")
+        url = url.replace(r"\&", "&")
+
+        output_parts.append(html[search_start:start_index])
+        output_parts.append(
+            '<a class="math-external-link" '
+            f'href="{html_lib.escape(url, quote=True)}" '
+            'target="_blank" '
+            'rel="noopener noreferrer">'
+            f"{link_text}</a>"
+        )
+
+        search_start = url_close + 1
+
+    return "".join(output_parts)
+
+
 def render_pmlinkname_to_html(html: str) -> str:
     command = r"\PMlinkname"
     search_start = 0
@@ -1642,9 +1716,25 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.IGNORECASE,
     )
 
+    # Imported document-header metadata is already represented by the CMS
+    # concept title and should not appear inside the rendered article body.
+    html = re.sub(
+        r"\\(?:title|date)\s*\{[^{}]*\}",
+        "",
+        html,
+        flags=re.IGNORECASE,
+    )
+
+    html = re.sub(
+        r"\\(?:maketitle|today)\b",
+        "",
+        html,
+        flags=re.IGNORECASE,
+    )
+
     # Legacy LaTeX page-layout commands have no visible web equivalent.
     html = re.sub(
-        r"\\(?:vfill|pagebreak|raggedright)\b",
+        r"\\(?:vfill|pagebreak|raggedright|noindent)\b",
         "",
         html,
         flags=re.IGNORECASE,
@@ -1678,7 +1768,8 @@ def render_prose_latex_to_html(tex: str) -> str:
         flags=re.DOTALL,
     )
 
-    # Convert PlanetMath external links, including link text with nested commands.
+    # Convert legacy and PlanetMath external links before text-style wrappers.
+    html = render_htmladdnormallink_to_html(html)
     html = render_pmlinkexternal_to_html(html)
 
     # Convert remaining TeX nonbreaking spaces in prose.
@@ -1706,6 +1797,7 @@ def render_prose_latex_to_html(tex: str) -> str:
     html = replace_latex_text_command_until_stable(html, "textbf", "<strong>", "</strong>")
     html = replace_latex_text_command_until_stable(html, "emph", "<em>", "</em>")
     html = replace_latex_text_command_until_stable(html, "textit", "<em>", "</em>")
+    html = replace_latex_text_command_until_stable(html, "texttt", "<code>", "</code>")
     html = replace_latex_text_command_until_stable(html, "MR", "", "")
 
     # Legacy bibliography field commands.
