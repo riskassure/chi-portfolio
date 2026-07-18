@@ -914,6 +914,26 @@
             .replace(/>/g, "&gt;");
     }
 
+    function stripXyMatrixSetupMacros(tex) {
+        if (!tex) return "";
+
+        return String(tex).replace(/\\UseAllTwocells\b/g, "");
+    }
+
+    function renderXyMatrixConnectorMath(tex) {
+        if (!tex) return "";
+
+        return String(tex)
+            .replace(
+                /\\quad\s*\{:=\}\s*\\quad/g,
+                '<span class="pm-xymatrix-connector">\\({:=}\\)</span>'
+            )
+            .replace(
+                /\\quad\s*\{=\}\s*\\quad/g,
+                '<span class="pm-xymatrix-connector">\\({=}\\)</span>'
+            );
+    }
+
     function convertUnderbracedXyMatrixToHtml(tex) {
         const source = String(tex || "");
 
@@ -3205,12 +3225,17 @@
 
         clean = normalizeLegacyOverFractions(clean);
 
+        // Remove Xy-pic setup commands that have no visible page meaning.
+        clean = stripXyMatrixSetupMacros(clean);
+
         clean = convertUnderbracedXyMatrixToHtml(clean);
         clean = convertXyMatrixToHtml(clean);
 
-        // Remove the original $, $$, \( \), or \[ \] wrappers after the
-        // xymatrix has been replaced with generated HTML.
+        // Remove display wrappers left around generated Xy-pic HTML.
         clean = unwrapConvertedXyMatrixMathWrappers(clean);
+
+        // Render operators stranded between converted xymatrix blocks.
+        clean = renderXyMatrixConnectorMath(clean);
 
         // Temporarily protect generated xymatrix HTML while literal angle brackets
         // in the remaining TeX are normalized.
