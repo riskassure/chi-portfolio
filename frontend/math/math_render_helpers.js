@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "prose-math-protection-v1",
+        debugVersion: "xymatrix-named-references-v2",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -1366,7 +1366,10 @@
                 const gridRow = rowIndex * 2;
                 const gridCol = colIndex * 2;
 
-                grid[gridRow][gridCol] = renderXyObjectCell(cell.objectTex);
+                grid[gridRow][gridCol] = renderXyObjectCell(
+                    cell.objectTex,
+                    cell.twoCellLabel
+                );
 
                 cell.arrows.forEach(arrow => {
                     applyXyArrowToGrid(grid, gridRow, gridCol, arrow, arrowLayout);
@@ -1444,8 +1447,41 @@
     }
 
     function parseXyMatrixCell(rawCell) {
-        const text = String(rawCell || "").trim();
+        let text = String(rawCell || "").trim();
         const arrows = [];
+        let twoCellLabel = "";
+
+        // Invisible Xy-pic arrow used to place a relation between two
+        // previously named arrows:
+        //
+        //   \ar@{}"1";"2"|-{=}
+        //
+        // Preserve the visible relation label, but remove the Xy-pic
+        // reference syntax so it cannot leak into the object text.
+        text = text.replace(
+            /\\ar@\{\}\s*"[^"]+"\s*;\s*"[^"]+"\s*\|\s*-\s*\{([^{}]*)\}/g,
+            function (_, relationLabel) {
+                twoCellLabel = String(relationLabel || "").trim();
+                return "";
+            }
+        );
+
+        // Xy-pic 2-cell between two previously named arrows:
+        //
+        //   \ar@{=>}"1";"2"_{\tau}
+        //
+        // Capture its label separately so the reference syntax does not leak
+        // into the rendered object text.
+        text = text.replace(
+            /\\ar@\{=>\}\s*"[^"]+"\s*;\s*"[^"]+"\s*(?:[_^]\s*(?:\{([^{}]*)\}|(\\?[A-Za-z0-9]+)))?/g,
+            function (_, bracedLabel, unbracedLabel) {
+                twoCellLabel = String(
+                    bracedLabel || unbracedLabel || ""
+                ).trim();
+
+                return "";
+            }
+        );
 
         // Supports common Xy-pic variants:
         //   \ar[r]
@@ -1456,18 +1492,18 @@
         //   \ar@{->}[rd]
         //   \ar@{}[dr]|{=}
         //   \ar@/^1ex/[ddr]
+        //
+        // Also consume optional named-arrow suffixes:
+        //   ="1"
+        //   ="2"
         const arrowPattern =
-            /\\ar(?:@\{[^{}]*\}|@<[^>]*>|@[^\s\[\]&{}]+)*(?:\s*\[([^\]]*)\])?((?:\s*(?:[_^](?:[-+])?(?:\{[^{}]*\}|\\?[A-Za-z0-9]+)|\|(?:\{[^{}]*\}|\\?[A-Za-z0-9=+\-]+)))*)/g;
+            /\\ar(?:@\{[^{}]*\}|@<[^>]*>|@[^\s\[\]&{}]+)*(?:\s*\[([^\]]*)\])?((?:\s*(?:[_^](?:[-+])?(?:\{[^{}]*\}|\\?[A-Za-z0-9]+)|\|(?:\{[^{}]*\}|\\?[A-Za-z0-9=+\-]+)))*)\s*(?:=\s*"[^"]+")?/g;
 
         let match;
 
         while ((match = arrowPattern.exec(text)) !== null) {
             const directionText = match[1] || "r";
 
-            // Examples:
-            //   \ar@{-}[rrrrrrrr]  -> style "-"
-            //   \ar@{->}[r]        -> style "->"
-            //   \ar[r]             -> default style "->"
             const styleMatch = match[0].match(/@\{([^{}]*)\}/);
 
             arrows.push({
@@ -1486,7 +1522,8 @@
 
         return {
             objectTex,
-            arrows
+            arrows,
+            twoCellLabel
         };
     }
 
@@ -1634,12 +1671,39 @@
         }
     }
 
-    function renderXyObjectCell(tex) {
-        if (!tex) {
+    function renderXyObjectCell(tex, twoCellLabel = "") {
+        if (!tex && !twoCellLabel) {
             return "";
         }
 
-        return `\\(${escapeHtmlForMathCell(tex)}\\)`;
+        const objectHtml = tex
+            ? `\\(${escapeHtmlForMathCell(tex)}\\)`
+            : "";
+
+        if (!twoCellLabel) {
+            return objectHtml;
+        }
+
+        return `
+            <div style="
+                display:inline-flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:center;
+                line-height:1;
+            ">
+                <div style="
+                    margin-bottom:0.12em;
+                    font-size:0.82em;
+                ">
+                    \\(${escapeHtmlForMathCell(twoCellLabel)}\\)
+                </div>
+
+                <div>
+                    ${objectHtml}
+                </div>
+            </div>
+        `;
     }
 
     function renderHorizontalArrow(
