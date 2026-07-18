@@ -1734,7 +1734,7 @@ def render_prose_latex_to_html(tex: str) -> str:
 
     # Legacy LaTeX page-layout commands have no visible web equivalent.
     html = re.sub(
-        r"\\(?:vfill|pagebreak|raggedright|noindent)\b",
+        r"\\(?:vfill|pagebreak|raggedright|noindent|smallskip|medskip|bigskip)\b",
         "",
         html,
         flags=re.IGNORECASE,
