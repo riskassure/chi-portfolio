@@ -1118,7 +1118,12 @@ async function updatePreview() {
 }
 
 function hasPstricksBlocks(tex) {
-    return /\\begin\{pspicture\}[\s\S]*?\\end\{pspicture\}/i.test(tex || "");
+    const source = tex || "";
+
+    return (
+        /\\begin\{pspicture\}[\s\S]*?\\end\{pspicture\}/i.test(source)
+        || /\\pstree(?:\s*\[[^\]]*\])?\s*\{/i.test(source)
+    );
 }
 
 
@@ -1152,40 +1157,145 @@ function invalidateRenderedPreviewState() {
 
 async function renderEditorPreviewNow() {
     const status = document.getElementById("renderPreviewStatus");
+    const preview = document.getElementById("editorPreviewCanvas");
     const texInput = document.getElementById("cleanedTexInput");
+    const renderPreviewBtn = document.getElementById("renderPreviewBtn");
 
     if (!texInput) {
         throw new Error("TeX editor box was not found.");
     }
 
+    if (!preview) {
+        throw new Error("Rendered preview canvas was not found.");
+    }
+
     const tex = texInput.value || "";
+
+    if (!tex.trim()) {
+        throw new Error("LaTeX body is required.");
+    }
+
     const texHash = simpleTextHash(tex);
     const hasPstricks = hasPstricksBlocks(tex);
 
     if (status) {
         status.innerText = hasPstricks
-            ? "Rendering browser preview. PSTricks backend rendering will be connected next."
-            : "Rendering browser preview.";
+            ? "Rendering preview and converting supported PSTricks diagrams..."
+            : "Rendering preview...";
     }
 
     showStatus("Rendering preview...", "info");
 
-    await updatePreview();
-
-    latestRenderedPreview = {
-        isCurrent: true,
-        texHash: texHash,
-        previewToken: null,
-        hasPstricks: hasPstricks
-    };
-
-    if (status) {
-        status.innerText = hasPstricks
-            ? "Preview updated. PSTricks blocks are not backend-rendered yet; backend rendering comes next."
-            : "Preview updated and current.";
+    if (renderPreviewBtn) {
+        renderPreviewBtn.disabled = true;
+        renderPreviewBtn.style.opacity = "0.65";
+        renderPreviewBtn.style.cursor = "not-allowed";
     }
 
-    showStatus("Preview updated. Review it, then save when ready.", "success");
+    try {
+        const response = await fetch(
+            `${API_ENDPOINT}/admin/math/render-preview`,
+            {
+                method: "POST",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    cleaned_tex: tex
+                })
+            }
+        );
+
+        const json = await response.json();
+
+        if (!response.ok || json.success !== true) {
+            throw new Error(
+                json.message
+                || json.error
+                || "Backend preview rendering failed."
+            );
+        }
+
+        preview.innerHTML = json.rendered_tex || "";
+
+        if (
+            window.MathCmsMathJax
+            && typeof window.MathCmsMathJax.typesetElement === "function"
+        ) {
+            try {
+                await window.MathCmsMathJax.typesetElement(preview, {
+                    page: "editor_preview",
+                    mode: editorMode,
+                    concept_id:
+                        document.getElementById("conceptIdInput")?.value
+                        || conceptId
+                        || null
+                });
+
+            } catch (err) {
+                console.warn("Preview MathJax render warning:", err);
+            }
+        }
+
+        const blockCount = Number(json.block_count || 0);
+        const successCount = Number(json.success_count || 0);
+        const failureCount = Number(json.failure_count || 0);
+
+        currentDiagramFailures = Array.isArray(json.failures)
+            ? json.failures
+            : [];
+
+        renderDiagramFailureSummary();
+
+        latestRenderedPreview = {
+            isCurrent: true,
+            texHash: texHash,
+            previewToken: null,
+            hasPstricks: blockCount > 0
+        };
+
+        if (status) {
+            if (blockCount === 0) {
+                status.innerText =
+                    "Preview updated and current. No supported PSTricks blocks were found.";
+
+            } else if (failureCount === 0) {
+                status.innerText =
+                    `Preview updated. ${successCount} of ${blockCount} `
+                    + `PSTricks diagram${blockCount === 1 ? "" : "s"} rendered successfully.`;
+
+            } else {
+                status.innerText =
+                    `Preview updated with ${failureCount} diagram conversion `
+                    + `failure${failureCount === 1 ? "" : "s"}. `
+                    + `${successCount} of ${blockCount} diagrams rendered successfully.`;
+            }
+        }
+
+        const successMessage = failureCount === 0
+            ? "Preview updated. Review it, then save when ready."
+            : "Preview updated, but one or more diagram conversions failed.";
+
+        showStatus(
+            successMessage,
+            failureCount === 0 ? "success" : "error"
+        );
+
+        console.log("BACKEND PREVIEW RESULT:", {
+            blockCount,
+            successCount,
+            failureCount,
+            failures: currentDiagramFailures
+        });
+
+    } finally {
+        if (renderPreviewBtn) {
+            renderPreviewBtn.disabled = false;
+            renderPreviewBtn.style.opacity = "1";
+            renderPreviewBtn.style.cursor = "pointer";
+        }
+    }
 }
 
 function cleanEditorPreviewTex(tex) {
