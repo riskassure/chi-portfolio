@@ -25,7 +25,15 @@
                 down: "{\\mathord{\\downarrow}}",
                 dom: "\\operatorname{dom}",
                 sgn: "\\operatorname{sgn}",
+
                 hom: "\\operatorname{Hom}",
+                Hom: "\\operatorname{Hom}",
+                Ker: "\\operatorname{Ker}",
+
+                Prob: "\\mathbb{P}",
+                F: "\\mathcal{F}",
+                T: "\\mathbb{T}",
+
                 ob: "\\operatorname{Ob}",
                 eqv: "\\simeq",
                 Spec: "\\operatorname{Spec}",
