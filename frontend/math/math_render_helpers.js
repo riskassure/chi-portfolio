@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "eqnarray-protection-v6",
+        debugVersion: "prose-math-protection-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -71,6 +71,68 @@
         clean = normalizeDiagramImageUrls(clean, apiEndpoint);
 
         return clean;
+    }
+
+    function protectMathForProseCleanup(value) {
+        let output = String(value || "");
+        const blocks = [];
+
+        const protectBlock = block => {
+            const index = blocks.length;
+            blocks.push(block);
+            return `PMMATHPROSEBLOCK${index}END`;
+        };
+
+        // Protect display forms before inline forms.
+        output = output.replace(
+            /\\\[[\s\S]*?\\\]/g,
+            protectBlock
+        );
+
+        output = output.replace(
+            /\$\$[\s\S]*?\$\$/g,
+            protectBlock
+        );
+
+        output = output.replace(
+            /\\\([\s\S]*?\\\)/g,
+            protectBlock
+        );
+
+        // Protect ordinary single-dollar inline math.
+        output = output.replace(
+            /(^|[^\\$])\$((?:\\.|[^$])*?)\$/g,
+            (match, prefix, body) => {
+                return `${prefix}${protectBlock(`$${body}$`)}`;
+            }
+        );
+
+        return {
+            text: output,
+            blocks
+        };
+    }
+
+
+    function restoreMathAfterProseCleanup(value, blocks) {
+        const items = Array.isArray(blocks) ? blocks : [];
+
+        return String(value || "").replace(
+            /PMMATHPROSEBLOCK(\d+)END/g,
+            (match, indexText) => {
+                const index = Number(indexText);
+
+                if (
+                    !Number.isInteger(index)
+                    || index < 0
+                    || index >= items.length
+                ) {
+                    return match;
+                }
+
+                return items[index];
+            }
+        );
     }
 
     function normalizeProseLayoutMacros(tex) {
@@ -3174,11 +3236,20 @@
             "\\;\\mathrm{and}\\;"
         );
 
-        // Remove/prose-normalize LaTeX layout commands that should not be visible.
+        // Prose layout cleanup must not remove legitimate commands such as
+        // \quad, \text, or \mbox from inside MathJax expressions.
+        const proseMathProtection = protectMathForProseCleanup(clean);
+        clean = proseMathProtection.text;
+
         clean = normalizeProseLayoutMacros(clean);
 
+        clean = restoreMathAfterProseCleanup(
+            clean,
+            proseMathProtection.blocks
+        );
+
         // Convert inline matrices and expressions containing multiple matrices only
-        // after prose wrappers such as \text{where} have been normalized.
+        // after prose wrappers outside math have been normalized.
         clean = convertRemainingMatrixMathSequencesToHtml(clean);
 
         // Restore protected eqnarray blocks only after prose and layout cleanup.
