@@ -318,6 +318,9 @@
         output = output.replace(/\\OE\b/g, "Œ");
         output = output.replace(/\\ss\b/g, "ß");
 
+        // Text prime used in transliterated names.
+        output = output.replace(/\\cprime\b/g, "′");
+
         // A few accent forms that appear in bibliography prose.
         output = output.replace(/\\"a/g, "ä");
         output = output.replace(/\\"o/g, "ö");
