@@ -219,6 +219,9 @@
         // ordinary prose characters and should not display their backslash.
         output = output.replace(/\\%/g, "%");
 
+        // TeX ellipsis used outside math.
+        output = output.replace(/\\dots\b/g, "…");
+
         // Common text wrappers. Keep contents, drop LaTeX command.
         output = unwrapSimpleTextCommand(output, "mbox");
         output = unwrapSimpleTextCommand(output, "text");
