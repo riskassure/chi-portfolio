@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "tabular-multirow-v1",
+        debugVersion: "prose-escaped-percent-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -208,6 +208,10 @@
         output = output.replace(/\\hfill\b/gi, " ");
         output = output.replace(/\\qquad\b/gi, " ");
         output = output.replace(/\\quad\b/gi, " ");
+
+        // Escaped percent signs outside protected MathJax expressions are
+        // ordinary prose characters and should not display their backslash.
+        output = output.replace(/\\%/g, "%");
 
         // Common text wrappers. Keep contents, drop LaTeX command.
         output = unwrapSimpleTextCommand(output, "mbox");
