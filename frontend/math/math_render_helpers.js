@@ -1321,7 +1321,7 @@
 
         return {
             // Same width for every horizontal arrow in this xymatrix.
-            horizontalWidthEm: Math.max(3.2, 2.8 + maxHorizontalLabelLength * 0.38),
+            horizontalWidthEm: Math.max(3.6, 3.2 + maxHorizontalLabelLength * 0.56),
 
             // Same height for every vertical arrow in this xymatrix.
             verticalHeightEm: Math.max(2.7, 2.5 + maxVerticalLabelLength * 0.08),
@@ -1766,7 +1766,7 @@
         //   ="1"
         //   ="2"
         const arrowPattern =
-            /\\ar(?:@\{[^{}]*\}|@<[^>]*>|@[^\s\[\]&{}]+)*(?:\s*\[([^\]]*)\])?((?:\s*(?:[_^](?:[-+])?(?:\{[^{}]*\}|\\?[A-Za-z0-9]+)|\|(?:\{[^{}]*\}|\\?[A-Za-z0-9=+\-]+)))*)\s*(?:=\s*"[^"]+")?/g;
+            /\\ar(?:@\{[^{}]*\}|@<[^>]*>|@[^\s\[\]&{}]+)*(?:\s*\[([^\]]*)\])?((?:\s*(?:[_^](?:[-+])?(?:\{(?:[^{}]|\{[^{}]*\})*\}|\\?[A-Za-z0-9]+)|\|(?:\{(?:[^{}]|\{[^{}]*\})*\}|\\?[A-Za-z0-9=+\-]+)))*)\s*(?:=\s*"[^"]+")?/g;
 
         let match;
 
@@ -1775,12 +1775,15 @@
 
             const styleMatch = match[0].match(/@\{([^{}]*)\}/);
 
+            const labelInfo = extractXyArrowLabel(match[2] || "");
+
             arrows.push({
                 direction: normalizeXyArrowDirection(directionText),
                 directionText,
                 span: getXyArrowSpan(directionText),
                 style: styleMatch ? styleMatch[1] : "->",
-                label: extractXyArrowLabel(match[2] || "")
+                label: labelInfo.text,
+                labelPosition: labelInfo.position
             });
         }
 
@@ -1819,18 +1822,41 @@
         const text = String(modifierText || "");
 
         const bracedMatch = text.match(
-            /(?:[_^](?:[-+])?|\|)\{([^{}]*)\}/
+            /([_^|])(?:[-+])?\s*\{((?:[^{}]|\{[^{}]*\})*)\}/
         );
 
         if (bracedMatch) {
-            return bracedMatch[1].trim();
+            return {
+                text: bracedMatch[2].trim(),
+                position:
+                    bracedMatch[1] === "_"
+                        ? "below"
+                        : bracedMatch[1] === "^"
+                            ? "above"
+                            : "center"
+            };
         }
 
         const unbracedMatch = text.match(
-            /(?:[_^](?:[-+])?|\|)\s*(\\?[A-Za-z0-9=+\-]+)/
+            /([_^|])(?:[-+])?\s*(\\?[A-Za-z0-9=+\-]+)/
         );
 
-        return unbracedMatch ? unbracedMatch[1].trim() : "";
+        if (unbracedMatch) {
+            return {
+                text: unbracedMatch[2].trim(),
+                position:
+                    unbracedMatch[1] === "_"
+                        ? "below"
+                        : unbracedMatch[1] === "^"
+                            ? "above"
+                            : "center"
+            };
+        }
+
+        return {
+            text: "",
+            position: "above"
+        };
     }
 
     function setGridCellIfInBounds(grid, row, col, value) {
@@ -1895,7 +1921,14 @@
                 grid,
                 gridRow,
                 gridCol + 1,
-                renderHorizontalArrow(label, "right", arrowLayout)
+                renderHorizontalArrow(
+                    label,
+                    "right",
+                    arrowLayout,
+                    {
+                        labelPosition: arrow.labelPosition
+                    }
+                )
             );
             return;
         }
@@ -1916,7 +1949,14 @@
                 grid,
                 gridRow,
                 gridCol - 1,
-                renderHorizontalArrow(label, "left", arrowLayout)
+                renderHorizontalArrow(
+                    label,
+                    "left",
+                    arrowLayout,
+                    {
+                        labelPosition: arrow.labelPosition
+                    }
+                )
             );
             return;
         }
@@ -2144,15 +2184,30 @@
         const safeLabel = escapeHtmlForMathCell(label || "");
         const showArrowHead = options.showArrowHead !== false;
 
+        const labelPosition =
+            options.labelPosition || "above";
+
         const widthEm =
             arrowLayout.horizontalWidthEm || 3.2;
+
+        const labelVerticalStyle =
+            labelPosition === "below"
+                ? "top:0.52em;"
+                : labelPosition === "center"
+                    ? "top:50%; transform:translate(-50%, -50%);"
+                    : "top:-0.65em;";
+
+        const labelTransform =
+            labelPosition === "center"
+                ? ""
+                : "transform:translateX(-50%);";
 
         const labelHtml = safeLabel
             ? `<div style="
                     position:absolute;
                     left:50%;
-                    top:-0.65em;
-                    transform:translateX(-50%);
+                    ${labelVerticalStyle}
+                    ${labelTransform}
                     white-space:nowrap;
                     line-height:1;
                 ">\\({\\scriptstyle ${safeLabel}}\\)</div>`
