@@ -1360,8 +1360,31 @@
 
     const XY_PLAIN_HORIZONTAL_LINE = "__PM_XY_PLAIN_HORIZONTAL_LINE__";
 
+    function recoverLostXyMatrixRowSeparators(value) {
+        const source = String(value || "");
+
+        /*
+        * Some legacy PlanetMath xymatrix rows arrive with:
+        *
+        *     \ \mathcal{C}
+        *
+        * instead of:
+        *
+        *     \\ \mathcal{C}
+        *
+        * Recover only this narrow pattern: a TeX spacing slash immediately
+        * before a new \mathcal object inside an xymatrix body.
+        */
+        return source.replace(
+            /\\\s+(?=\\mathcal\s*\{)/g,
+            "\\\\ "
+        );
+    }
+
     function buildHtmlTableFromXyMatrixBody(body) {
-        const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
+        const normalizedBody = recoverLostXyMatrixRowSeparators(
+            normalizeEqnarrayHtmlArtifacts(body)
+        );
 
         const sourceRows = splitEqnarrayRows(normalizedBody)
             .map(row => splitEqnarrayCells(row).map(parseXyMatrixCell))
@@ -1801,7 +1824,15 @@
     }
 
     function normalizeXyArrowDirection(direction) {
-        const clean = String(direction || "r").toLowerCase();
+        const clean = String(direction || "r")
+            .toLowerCase()
+            .replace(/[^rlud]/g, "");
+
+        // Preserve diagonal directions before testing single directions.
+        if (clean.includes("d") && clean.includes("l")) return "dl";
+        if (clean.includes("d") && clean.includes("r")) return "dr";
+        if (clean.includes("u") && clean.includes("l")) return "ul";
+        if (clean.includes("u") && clean.includes("r")) return "ur";
 
         if (clean.includes("d")) return "d";
         if (clean.includes("u")) return "u";
@@ -1899,11 +1930,156 @@
         }
     }
 
+    function renderDiagonalArrow(
+        label,
+        direction = "dr",
+        arrowLayout = {},
+        options = {}
+    ) {
+        const safeLabel = escapeHtmlForMathCell(label || "");
+
+        const widthEm = Math.max(
+            arrowLayout.horizontalWidthEm || 3.6,
+            4.2
+        );
+
+        const heightEm = Math.max(
+            arrowLayout.verticalHeightEm || 2.7,
+            3.2
+        );
+
+        const isDashed = options.isDashed === true;
+        const labelPosition = options.labelPosition || "center";
+
+        const goesRight =
+            direction === "dr" || direction === "ur";
+
+        const goesDown =
+            direction === "dr" || direction === "dl";
+
+        const startX = goesRight ? 4 : 96;
+        const endX = goesRight ? 96 : 4;
+
+        const startY = goesDown ? 4 : 96;
+        const endY = goesDown ? 96 : 4;
+
+        /*
+        * Offset labels slightly away from the diagonal.
+        *
+        * center: centered directly over the diagonal
+        * above:  shifted toward the upper side
+        * below:  shifted toward the lower side
+        */
+        let labelTopPercent = 50;
+        let labelLeftPercent = 50;
+
+        if (labelPosition === "above") {
+            labelTopPercent -= 13;
+        } else if (labelPosition === "below") {
+            labelTopPercent += 13;
+        }
+
+        /*
+        * For left-sloping diagonals, move the label slightly in the opposite
+        * horizontal direction so it does not sit on the arrow shaft.
+        */
+        if (direction === "dl" || direction === "ur") {
+            labelLeftPercent +=
+                labelPosition === "above" ? 7
+                    : labelPosition === "below" ? -7
+                        : 0;
+        } else {
+            labelLeftPercent +=
+                labelPosition === "above" ? -7
+                    : labelPosition === "below" ? 7
+                        : 0;
+        }
+
+        const labelHtml = safeLabel
+            ? `
+                <div style="
+                    position:absolute;
+                    left:${labelLeftPercent}%;
+                    top:${labelTopPercent}%;
+                    transform:translate(-50%, -50%);
+                    padding:0 0.12em;
+                    background:var(--bs-body-bg, white);
+                    white-space:nowrap;
+                    line-height:1;
+                    z-index:2;
+                ">
+                    \\({\\scriptstyle ${safeLabel}}\\)
+                </div>
+            `
+            : "";
+
+        return `
+            <div class="pm-xymatrix-diagonal-arrow" style="
+                position:relative;
+                width:${widthEm}em;
+                height:${heightEm}em;
+                min-width:${widthEm}em;
+                min-height:${heightEm}em;
+                display:inline-block;
+                vertical-align:middle;
+            ">
+                <svg
+                    aria-hidden="true"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    style="
+                        position:absolute;
+                        inset:0;
+                        width:100%;
+                        height:100%;
+                        overflow:visible;
+                    "
+                >
+                    <defs>
+                        <marker
+                            id="pm-xymatrix-diagonal-head-${direction}-${isDashed ? "dashed" : "solid"}"
+                            markerWidth="8"
+                            markerHeight="8"
+                            refX="7"
+                            refY="4"
+                            orient="auto"
+                            markerUnits="strokeWidth"
+                        >
+                            <path
+                                d="M0,0 L8,4 L0,8 Z"
+                                fill="currentColor"
+                            ></path>
+                        </marker>
+                    </defs>
+
+                    <line
+                        x1="${startX}"
+                        y1="${startY}"
+                        x2="${endX}"
+                        y2="${endY}"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        vector-effect="non-scaling-stroke"
+                        ${isDashed
+                            ? 'stroke-dasharray="6 5"'
+                            : ""
+                        }
+                        marker-end="url(#pm-xymatrix-diagonal-head-${direction}-${isDashed ? "dashed" : "solid"})"
+                    ></line>
+                </svg>
+
+                ${labelHtml}
+            </div>
+        `;
+    }
+
     function applyXyArrowToGrid(grid, gridRow, gridCol, arrow, arrowLayout) {
         const label = arrow.label || "";
         const direction = arrow.direction || "r";
         const span = arrow.span || 1;
         const isPlainLine = arrow.style === "-";
+        const isDashed =
+            String(arrow.style || "").includes("--");
 
         if (direction === "r") {
             if (isPlainLine) {
@@ -1958,6 +2134,36 @@
                     }
                 )
             );
+            return;
+        }
+
+        if (
+            direction === "dl"
+            || direction === "dr"
+            || direction === "ul"
+            || direction === "ur"
+        ) {
+            const rowOffset =
+                direction.includes("d") ? 1 : -1;
+
+            const colOffset =
+                direction.includes("r") ? 1 : -1;
+
+            setGridCellIfInBounds(
+                grid,
+                gridRow + rowOffset,
+                gridCol + colOffset,
+                renderDiagonalArrow(
+                    label,
+                    direction,
+                    arrowLayout,
+                    {
+                        isDashed,
+                        labelPosition: arrow.labelPosition
+                    }
+                )
+            );
+
             return;
         }
 
