@@ -926,11 +926,11 @@
         return String(tex)
             .replace(
                 /\\quad\s*\{:=\}\s*\\quad/g,
-                '<span class="pm-xymatrix-connector">\\({:=}\\)</span>'
+                '<span class="pm-xymatrix-connector" style="display:inline-block; margin:0 0.55rem;">\\({:=}\\)</span>'
             )
             .replace(
                 /\\quad\s*\{=\}\s*\\quad/g,
-                '<span class="pm-xymatrix-connector">\\({=}\\)</span>'
+                '<span class="pm-xymatrix-connector" style="display:inline-block; margin:0 0.55rem;">\\({=}\\)</span>'
             );
     }
 
@@ -1367,6 +1367,10 @@
             .map(row => splitEqnarrayCells(row).map(parseXyMatrixCell))
             .filter(row => row.length > 0);
 
+        const hasLegacyTwoCell = sourceRows
+            .flat()
+            .some(cell => cell.legacyTwoCell);
+
         if (sourceRows.length === 0) {
             return makeUnsupportedXyMatrixPlaceholder(body);
         }
@@ -1391,9 +1395,42 @@
                     cell.twoCellLabel
                 );
 
-                cell.arrows.forEach(arrow => {
-                    applyXyArrowToGrid(grid, gridRow, gridCol, arrow, arrowLayout);
-                });
+                if (cell.legacyTwoCell) {
+                    const middleArrow = cell.arrows.find(
+                        arrow =>
+                            arrow.direction === "r"
+                            && arrow.span === 1
+                    );
+
+                    grid[gridRow][gridCol + 1] =
+                        renderLegacyTwoCellArrowGroup(
+                            cell.legacyTwoCell,
+                            middleArrow?.label || "",
+                            arrowLayout
+                        );
+
+                    cell.arrows
+                        .filter(arrow => arrow !== middleArrow)
+                        .forEach(arrow => {
+                            applyXyArrowToGrid(
+                                grid,
+                                gridRow,
+                                gridCol,
+                                arrow,
+                                arrowLayout
+                            );
+                        });
+                } else {
+                    cell.arrows.forEach(arrow => {
+                        applyXyArrowToGrid(
+                            grid,
+                            gridRow,
+                            gridCol,
+                            arrow,
+                            arrowLayout
+                        );
+                    });
+                }
             });
         });
 
@@ -1460,14 +1497,226 @@
         }).join("");
 
         return `
-            <table class="pm-xymatrix-table tex2jax_process" style="border-collapse:collapse; margin:1rem auto;">
+            <table
+                class="pm-xymatrix-table tex2jax_process${hasLegacyTwoCell ? " pm-xymatrix-two-cell-table" : ""}"
+                style="
+                    border-collapse:collapse;
+                    ${hasLegacyTwoCell
+                        ? "display:inline-table; vertical-align:middle; margin:1rem 0.45rem;"
+                        : "margin:1rem auto;"
+                    }
+                "
+            >
                 ${htmlRows}
             </table>
         `;
     }
 
+    function normalizeLegacyTwoCellArrowLabel(value) {
+        let label = String(value || "").trim();
+
+        // \stackrel{R}{}  -> R
+        // \stackrel{}{T}  -> T
+        const stackrelMatch = label.match(
+            /^\\stackrel\s*\{([^{}]*)\}\s*\{([^{}]*)\}$/
+        );
+
+        if (stackrelMatch) {
+            label = (
+                String(stackrelMatch[1] || "").trim()
+                || String(stackrelMatch[2] || "").trim()
+            );
+        }
+
+        return label;
+    }
+
+
+    function normalizeLegacyTwoCellInnerLabel(value) {
+        let label = String(value || "").trim();
+
+        if (/^\\omit\b/i.test(label)) {
+            return "";
+        }
+
+        // Remove Xy-pic positioning prefix:
+        //   <0>_{\quad \tau}
+        //   <-2.5>_{\mbox{ } \tau}
+        //   <2.5>^{\mbox{ } \eta}
+        label = label.replace(/^<[^>]*>\s*/, "");
+
+        const positionedMatch = label.match(
+            /^[_^]\s*\{([\s\S]*)\}$/
+        );
+
+        if (positionedMatch) {
+            label = positionedMatch[1].trim();
+        }
+
+        label = label
+            .replace(/\\(?:quad|qquad)\b/g, " ")
+            .replace(/\\mbox\s*\{([^{}]*)\}/g, "$1")
+            .replace(/\s+/g, " ")
+            .trim();
+
+        return label;
+    }
+
+
+    function parseLegacyTwoCellCommandAt(text, commandIndex, commandName) {
+        const source = String(text || "");
+        const command = `\\${commandName}`;
+
+        if (!source.startsWith(command, commandIndex)) {
+            return null;
+        }
+
+        let cursor = commandIndex + command.length;
+
+        while (cursor < source.length && /\s/.test(source[cursor])) {
+            cursor += 1;
+        }
+
+        // Optional Xy-pic offset such as <4.5>, <-5>, or <9>.
+        if (source[cursor] === "<") {
+            const offsetEnd = source.indexOf(">", cursor + 1);
+
+            if (offsetEnd === -1) {
+                return null;
+            }
+
+            cursor = offsetEnd + 1;
+        }
+
+        while (cursor < source.length && /\s/.test(source[cursor])) {
+            cursor += 1;
+        }
+
+        // Upper commands use ^{...}; lower commands use _{...}.
+        if (source[cursor] !== "^" && source[cursor] !== "_") {
+            return null;
+        }
+
+        cursor += 1;
+
+        while (cursor < source.length && /\s/.test(source[cursor])) {
+            cursor += 1;
+        }
+
+        if (source[cursor] !== "{") {
+            return null;
+        }
+
+        const arrowLabelEnd = findMatchingBrace(source, cursor);
+
+        if (arrowLabelEnd === -1) {
+            return null;
+        }
+
+        const rawArrowLabel = source.slice(cursor + 1, arrowLabelEnd);
+        cursor = arrowLabelEnd + 1;
+
+        while (cursor < source.length && /\s/.test(source[cursor])) {
+            cursor += 1;
+        }
+
+        if (source[cursor] !== "{") {
+            return null;
+        }
+
+        const innerLabelEnd = findMatchingBrace(source, cursor);
+
+        if (innerLabelEnd === -1) {
+            return null;
+        }
+
+        const rawInnerLabel = source.slice(cursor + 1, innerLabelEnd);
+
+        return {
+            commandName,
+            start: commandIndex,
+            end: innerLabelEnd + 1,
+            arrowLabel: normalizeLegacyTwoCellArrowLabel(rawArrowLabel),
+            innerLabel: normalizeLegacyTwoCellInnerLabel(rawInnerLabel)
+        };
+    }
+
+
+    function extractLegacyTwoCellCommands(value) {
+        const source = String(value || "");
+        const commands = [];
+
+        let cursor = 0;
+
+        while (cursor < source.length) {
+            const upperIndex = source.indexOf("\\ruppertwocell", cursor);
+            const lowerIndex = source.indexOf("\\rlowertwocell", cursor);
+
+            const candidateIndexes = [upperIndex, lowerIndex]
+                .filter(index => index !== -1);
+
+            if (candidateIndexes.length === 0) {
+                break;
+            }
+
+            const commandIndex = Math.min(...candidateIndexes);
+            const commandName =
+                commandIndex === upperIndex
+                    ? "ruppertwocell"
+                    : "rlowertwocell";
+
+            const parsed = parseLegacyTwoCellCommandAt(
+                source,
+                commandIndex,
+                commandName
+            );
+
+            if (!parsed) {
+                cursor = commandIndex + 1;
+                continue;
+            }
+
+            commands.push(parsed);
+            cursor = parsed.end;
+        }
+
+        let cleanText = source;
+
+        [...commands]
+            .sort((left, right) => right.start - left.start)
+            .forEach(command => {
+                cleanText =
+                    cleanText.slice(0, command.start)
+                    + cleanText.slice(command.end);
+            });
+
+        const upper = commands.find(
+            command => command.commandName === "ruppertwocell"
+        );
+
+        const lower = commands.find(
+            command => command.commandName === "rlowertwocell"
+        );
+
+        return {
+            text: cleanText,
+            legacyTwoCell: upper || lower
+                ? {
+                    upperArrowLabel: upper?.arrowLabel || "",
+                    upperInnerLabel: upper?.innerLabel || "",
+                    lowerArrowLabel: lower?.arrowLabel || "",
+                    lowerInnerLabel: lower?.innerLabel || ""
+                }
+                : null
+        };
+    }
+
     function parseXyMatrixCell(rawCell) {
-        let text = String(rawCell || "").trim();
+        const legacyTwoCellResult = extractLegacyTwoCellCommands(rawCell);
+
+        let text = legacyTwoCellResult.text.trim();
+        const legacyTwoCell = legacyTwoCellResult.legacyTwoCell;
+
         const arrows = [];
         let twoCellLabel = "";
 
@@ -1543,7 +1792,8 @@
         return {
             objectTex,
             arrows,
-            twoCellLabel
+            twoCellLabel,
+            legacyTwoCell
         };
     }
 
@@ -1689,6 +1939,165 @@
                 renderVerticalArrow(label, "up", arrowLayout)
             );
         }
+    }
+
+    function renderLegacyTwoCellArrowGroup(
+        legacyTwoCell,
+        middleArrowLabel = "",
+        arrowLayout = {}
+    ) {
+        if (!legacyTwoCell) {
+            return "";
+        }
+
+        const upperArrowLabel =
+            legacyTwoCell.upperArrowLabel || "";
+
+        const upperInnerLabel =
+            legacyTwoCell.upperInnerLabel || "";
+
+        const lowerArrowLabel =
+            legacyTwoCell.lowerArrowLabel || "";
+
+        const lowerInnerLabel =
+            legacyTwoCell.lowerInnerLabel || "";
+
+        const widthEm =
+            Math.max(arrowLayout.horizontalWidthEm || 3.2, 4.6);
+
+        const renderLine = (
+            label,
+            verticalOffsetEm,
+            labelPosition = "above"
+        ) => {
+            const safeLabel = escapeHtmlForMathCell(label);
+
+            const labelPositionStyle =
+                labelPosition === "below"
+                    ? "top:0.28em;"
+                    : "bottom:0.28em;";
+
+            return `
+                <div style="
+                    position:absolute;
+                    left:0;
+                    top:${verticalOffsetEm}em;
+                    width:${widthEm}em;
+                    height:0;
+                    border-top:1.5px solid currentColor;
+                ">
+                    <span aria-hidden="true" style="
+                        position:absolute;
+                        right:-0.02em;
+                        top:-0.31em;
+                        width:0;
+                        height:0;
+                        border-top:0.30em solid transparent;
+                        border-bottom:0.30em solid transparent;
+                        border-left:0.48em solid currentColor;
+                    "></span>
+
+                    ${
+                        safeLabel
+                            ? `
+                                <span style="
+                                    position:absolute;
+                                    left:50%;
+                                    ${labelPositionStyle}
+                                    transform:translateX(-50%);
+                                    white-space:nowrap;
+                                    line-height:1;
+                                ">
+                                    \\({\\scriptstyle ${safeLabel}}\\)
+                                </span>
+                            `
+                            : ""
+                    }
+                </div>
+            `;
+        };
+
+        const transformationLabels = [
+            upperInnerLabel,
+            lowerInnerLabel
+        ].filter(Boolean);
+
+        const transformationHtml = transformationLabels.length
+            ? `
+                <div style="
+                    position:absolute;
+                    left:50%;
+                    top:50%;
+                    transform:translate(-50%, -50%);
+                    display:flex;
+                    flex-direction:column;
+                    align-items:center;
+                    gap:0.32em;
+                    white-space:nowrap;
+                    line-height:1;
+                    background:var(--bs-body-bg, white);
+                    padding:0 0.18em;
+                ">
+                    ${transformationLabels.map(label => `
+                        <span>
+                            \\({\\scriptstyle ${escapeHtmlForMathCell(label)}}\\)
+                        </span>
+                    `).join("")}
+                </div>
+            `
+            : "";
+
+        const middleArrowHtml = middleArrowLabel
+            ? `
+                <div style="
+                    position:absolute;
+                    left:0;
+                    top:50%;
+                    width:${widthEm}em;
+                    height:0;
+                    border-top:1.5px solid currentColor;
+                    transform:translateY(-50%);
+                ">
+                    <span aria-hidden="true" style="
+                        position:absolute;
+                        right:-0.02em;
+                        top:-0.31em;
+                        width:0;
+                        height:0;
+                        border-top:0.30em solid transparent;
+                        border-bottom:0.30em solid transparent;
+                        border-left:0.48em solid currentColor;
+                    "></span>
+
+                    <span style="
+                        position:absolute;
+                        left:50%;
+                        bottom:0.22em;
+                        transform:translateX(-50%);
+                        white-space:nowrap;
+                        line-height:1;
+                    ">
+                        \\({\\scriptstyle ${escapeHtmlForMathCell(
+                            middleArrowLabel
+                        )}}\\)
+                    </span>
+                </div>
+            `
+            : "";
+
+        return `
+            <div class="pm-xymatrix-two-cell" style="
+                position:relative;
+                width:${widthEm}em;
+                height:4.8em;
+                min-width:${widthEm}em;
+            ">
+                ${renderLine(upperArrowLabel, 0.70, "above")}
+                ${middleArrowHtml}
+                ${renderLine(lowerArrowLabel, 4.10, "below")}
+                ${transformationHtml}
+            </div>
+        `;
     }
 
     function renderXyObjectCell(tex, twoCellLabel = "") {
