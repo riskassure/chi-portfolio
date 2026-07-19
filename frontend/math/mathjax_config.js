@@ -26,6 +26,11 @@
                 dom: "\\operatorname{dom}",
                 sgn: "\\operatorname{sgn}",
 
+                setOf: [
+                    "\\left\\{#1\\;\\middle|\\;#2\\right\\}",
+                    2
+                ],
+
                 hom: "\\operatorname{Hom}",
                 Hom: "\\operatorname{Hom}",
                 Ker: "\\operatorname{Ker}",
