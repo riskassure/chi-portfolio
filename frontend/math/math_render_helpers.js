@@ -1361,24 +1361,34 @@
     const XY_PLAIN_HORIZONTAL_LINE = "__PM_XY_PLAIN_HORIZONTAL_LINE__";
 
     function recoverLostXyMatrixRowSeparators(value) {
-        const source = String(value || "");
+        let source = String(value || "");
 
         /*
-        * Some legacy PlanetMath xymatrix rows arrive with:
+        * Some legacy xymatrix row separators arrive as one backslash
+        * immediately before a physical newline:
         *
-        *     \ \mathcal{C}
+        *     ... \ar[d] \ 
+        *     NextRow
         *
-        * instead of:
-        *
-        *     \\ \mathcal{C}
-        *
-        * Recover only this narrow pattern: a TeX spacing slash immediately
-        * before a new \mathcal object inside an xymatrix body.
+        * Recover that lone slash as the intended TeX row separator.
         */
-        return source.replace(
+        source = source.replace(
+            /\\[ \t]*\r?\n(?=[ \t]*\S)/g,
+            "\\\\\n"
+        );
+
+        /*
+        * Other legacy rows lose both the second slash and the physical
+        * newline, commonly before a new \mathcal object:
+        *
+        *     ... \ \mathcal{C}
+        */
+        source = source.replace(
             /\\\s+(?=\\mathcal\s*\{)/g,
             "\\\\ "
         );
+
+        return source;
     }
 
     function buildHtmlTableFromXyMatrixBody(body) {
@@ -1414,9 +1424,30 @@
                 const gridCol = colIndex * 2;
 
                 grid[gridRow][gridCol] = renderXyObjectCell(
-                    cell.objectTex,
-                    cell.twoCellLabel
+                    cell.objectTex
                 );
+
+                if (
+                    cell.twoCellLabel
+                    && gridRow >= 1
+                    && gridCol >= 2
+                ) {
+                    /*
+                    * Named-reference two-cells such as:
+                    *
+                    *   \ar@{=>}"1";"2"_{\eta}
+                    *
+                    * occur in the lower-right source cell, while the two named
+                    * diagonal arrows occupy the expanded cells above-left and
+                    * above-right. Place the transformation in the center between them.
+                    */
+                    setGridCellIfInBounds(
+                        grid,
+                        gridRow - 1,
+                        gridCol - 2,
+                        renderNamedReferenceTwoCell(cell.twoCellLabel)
+                    );
+                }
 
                 if (cell.legacyTwoCell) {
                     const middleArrow = cell.arrows.find(
@@ -2346,39 +2377,33 @@
         `;
     }
 
-    function renderXyObjectCell(tex, twoCellLabel = "") {
-        if (!tex && !twoCellLabel) {
+    function renderNamedReferenceTwoCell(label) {
+        const safeLabel = escapeHtmlForMathCell(label || "");
+
+        if (!safeLabel) {
             return "";
         }
 
-        const objectHtml = tex
-            ? `\\(${escapeHtmlForMathCell(tex)}\\)`
-            : "";
-
-        if (!twoCellLabel) {
-            return objectHtml;
-        }
-
         return `
-            <div style="
+            <div class="pm-xymatrix-named-two-cell" style="
                 display:inline-flex;
-                flex-direction:column;
                 align-items:center;
                 justify-content:center;
-                line-height:1;
+                min-width:2.8em;
+                min-height:2.2em;
+                white-space:nowrap;
             ">
-                <div style="
-                    margin-bottom:0.12em;
-                    font-size:0.82em;
-                ">
-                    \\(${escapeHtmlForMathCell(twoCellLabel)}\\)
-                </div>
-
-                <div>
-                    ${objectHtml}
-                </div>
+                \\(\\overset{${safeLabel}}{\\Rightarrow}\\)
             </div>
         `;
+    }
+
+    function renderXyObjectCell(tex) {
+        if (!tex) {
+            return "";
+        }
+
+        return `\\(${escapeHtmlForMathCell(tex)}\\)`;
     }
 
     function renderHorizontalArrow(
@@ -2398,7 +2423,7 @@
 
         const labelVerticalStyle =
             labelPosition === "below"
-                ? "top:0.52em;"
+                ? "top:0.72em;"
                 : labelPosition === "center"
                     ? "top:50%; transform:translate(-50%, -50%);"
                     : "top:-0.65em;";
