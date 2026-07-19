@@ -3904,7 +3904,9 @@
             ""
         );
 
-        clean = clean.replace(/^[ \t]*%+[ \t]*$/gm, "");
+        // In TeX, a line whose first non-whitespace character is %
+        // is entirely commented out and must not reach the rendered page.
+        clean = clean.replace(/^[ \t]*%.*(?:\r?\n|$)/gm, "");
 
         // Backend prose conversion can produce invalid constructs such as:
         //
