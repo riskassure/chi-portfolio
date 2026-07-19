@@ -167,6 +167,37 @@
             return cleanLabel ? cleanLabel : "";
         });
 
+        // Normalize backend citation placeholders:
+        //   [citation: Newman] -> [Newman]
+        output = output.replace(
+            /\[\s*citation\s*:\s*([^\]]+?)\s*\]/gi,
+            function (_, citationKey) {
+                const cleanKey = String(citationKey || "")
+                    .replace(/\s+/g, " ")
+                    .trim();
+
+                return cleanKey ? `[${cleanKey}]` : "";
+            }
+        );
+
+        // Handle any surviving raw \cite commands.
+        output = output.replace(
+            /\\cite\s*\{([^{}]+)\}/gi,
+            function (_, citationKeys) {
+                const cleanKeys = String(citationKeys || "")
+                    .split(",")
+                    .map(key => key.trim())
+                    .filter(Boolean)
+                    .join(", ");
+
+                return cleanKeys ? `[${cleanKeys}]` : "";
+            }
+        );
+
+        // A TeX nonbreaking-space marker before a citation should become
+        // an ordinary space in HTML prose.
+        output = output.replace(/~\s*(?=\[[^\]]+\])/g, " ");
+
         // Remove setup/control commands that have no useful page meaning.
         output = output.replace(/\\setcounter\{[^{}]*\}\{[^{}]*\}/gi, "");
         output = output.replace(/\\newtheorem\{[^{}]*\}(?:\[[^\]]*\])?\{[^{}]*\}/gi, "");
