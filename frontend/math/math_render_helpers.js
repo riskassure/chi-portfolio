@@ -3932,6 +3932,9 @@
 
         clean = normalizeLegacyOverFractions(clean);
 
+        // TeX line-break control has no visible HTML or MathJax meaning.
+        clean = clean.replace(/\\nobreak\b/g, "");
+
         // Remove Xy-pic setup commands that have no visible page meaning.
         clean = stripXyMatrixSetupMacros(clean);
 
