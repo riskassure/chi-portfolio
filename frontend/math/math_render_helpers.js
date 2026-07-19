@@ -209,6 +209,12 @@
         output = output.replace(/\\qquad\b/gi, " ");
         output = output.replace(/\\quad\b/gi, " ");
 
+        // PlanetMath prose dash macros.
+        output = output.replace(/\s*\\(?:Ldash|Dash)\b\s*/g, " — ");
+
+        // TeX sentence-spacing marker has no visible HTML equivalent.
+        output = output.replace(/\\@/g, "");
+
         // Escaped percent signs outside protected MathJax expressions are
         // ordinary prose characters and should not display their backslash.
         output = output.replace(/\\%/g, "%");
