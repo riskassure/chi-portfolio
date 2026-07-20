@@ -194,9 +194,12 @@
             }
         );
 
-        // A TeX nonbreaking-space marker before a citation should become
-        // an ordinary space in HTML prose.
-        output = output.replace(/~\s*(?=\[[^\]]+\])/g, " ");
+        // TeX nonbreaking spaces in visible prose.
+        // Avoid changing tildes inside generated HTML tags or attributes.
+        output = output.replace(
+            /~(?![^<]*>)/g,
+            "\u00A0"
+        );
 
         // Remove setup/control commands that have no useful page meaning.
         output = output.replace(/\\setcounter\{[^{}]*\}\{[^{}]*\}/gi, "");
@@ -239,6 +242,10 @@
         output = output.replace(/\\hfill\b/gi, " ");
         output = output.replace(/\\qquad\b/gi, " ");
         output = output.replace(/\\quad\b/gi, " ");
+
+        // TeX control space:
+        //   Adv.\ Math. -> Adv. Math.
+        output = output.replace(/\\(?=[ \t])/g, "");
 
         // PlanetMath prose dash macros.
         output = output.replace(/\s*\\(?:Ldash|Dash)\b\s*/g, " — ");
