@@ -253,6 +253,13 @@
         // TeX ellipsis used outside math.
         output = output.replace(/\\dots\b/g, "…");
 
+        // Paired TeX prose quotation marks:
+        //   ``quoted text'' -> “quoted text”
+        output = output.replace(
+            /``([^<>]*?)''/g,
+            "“$1”"
+        );
+
         // Common text wrappers. Keep contents, drop LaTeX command.
         output = unwrapSimpleTextCommand(output, "mbox");
         output = unwrapSimpleTextCommand(output, "text");
