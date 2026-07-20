@@ -26,6 +26,7 @@
                 dom: "\\operatorname{dom}",
                 sgn: "\\operatorname{sgn}",
                 NN: "\\mathbb{N}",
+                closure: ["\\overline{#1}", 1],
 
                 setOf: [
                     "\\left\\{#1\\;\\middle|\\;#2\\right\\}",
