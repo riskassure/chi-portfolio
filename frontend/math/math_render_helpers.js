@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "prose-emph-metadata-v1",
+        debugVersion: "restore-latex-verb-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -4206,6 +4206,11 @@
 
         // Restore protected \verb contents only after all structural parsing
         // and HTML-sensitive processing has completed.
+        clean = restoreLatexVerbCommands(
+            clean,
+            verbProtection.verbValues
+        );
+
         clean = restoreMboxInsideMath(
             clean,
             mboxProtection.values
