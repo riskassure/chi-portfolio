@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-framed-states-v1",
+        debugVersion: "xymatrix-self-loops-svg-labels-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -1501,9 +1501,14 @@
                 const gridRow = rowIndex * 2;
                 const gridCol = colIndex * 2;
 
+                const selfLoops = cell.arrows.filter(
+                    arrow => arrow.isSelfLoop
+                );
+
                 grid[gridRow][gridCol] = renderXyObjectCell(
                     cell.objectTex,
-                    cell.objectFrame
+                    cell.objectFrame,
+                    selfLoops
                 );
 
                 if (
@@ -1531,7 +1536,8 @@
                 if (cell.legacyTwoCell) {
                     const middleArrow = cell.arrows.find(
                         arrow =>
-                            arrow.direction === "r"
+                            !arrow.isSelfLoop
+                            && arrow.direction === "r"
                             && arrow.span === 1
                     );
 
@@ -1543,7 +1549,11 @@
                         );
 
                     cell.arrows
-                        .filter(arrow => arrow !== middleArrow)
+                        .filter(
+                            arrow =>
+                                arrow !== middleArrow
+                                && !arrow.isSelfLoop
+                        )
                         .forEach(arrow => {
                             applyXyArrowToGrid(
                                 grid,
@@ -1554,7 +1564,9 @@
                             );
                         });
                 } else {
-                    cell.arrows.forEach(arrow => {
+                    cell.arrows
+                        .filter(arrow => !arrow.isSelfLoop)
+                        .forEach(arrow => {
                         applyXyArrowToGrid(
                             grid,
                             gridRow,
@@ -1929,13 +1941,31 @@
 
             const labelInfo = extractXyArrowLabel(match[2] || "");
 
+                        const selfLoopMatch = match[0].match(
+                /@\(\s*([rl])\s*,\s*([ud])\s*\)/i
+            );
+
             arrows.push({
                 direction: normalizeXyArrowDirection(directionText),
                 directionText,
                 span: getXyArrowSpan(directionText),
                 style: styleMatch ? styleMatch[1] : "->",
                 label: labelInfo.text,
-                labelPosition: labelInfo.position
+                labelPosition: labelInfo.position,
+
+                isSelfLoop: Boolean(selfLoopMatch),
+
+                loopSide:
+                    selfLoopMatch
+                    && selfLoopMatch[1].toLowerCase() === "l"
+                        ? "left"
+                        : "right",
+
+                loopPlacement:
+                    selfLoopMatch
+                    && selfLoopMatch[2].toLowerCase() === "d"
+                        ? "below"
+                        : "above"
             });
         }
 
@@ -2497,7 +2527,130 @@
         `;
     }
 
-    function renderXyObjectCell(tex, frame = null) {
+    function renderXySelfLoop(arrow) {
+        const placement =
+            arrow?.loopPlacement === "below"
+                ? "below"
+                : "above";
+
+        const side =
+            arrow?.loopSide === "left"
+                ? "left"
+                : "right";
+
+        const safeLabel =
+            escapeHtmlForMathCell(arrow?.label || "");
+
+        const isAbove = placement === "above";
+        const isLeft = side === "left";
+
+        /*
+         * Draw from left to right for a right-side loop and from right
+         * to left for a left-side loop. The arrowhead is placed at endX.
+         */
+        const startX = isLeft ? 80 : 20;
+        const endX = isLeft ? 20 : 80;
+
+        const anchorY = isAbove ? 52 : 8;
+        const controlY = isAbove ? 6 : 54;
+
+        /*
+         * The polygon overlaps the final section of the curve, so the
+         * arrowhead and arc appear to be one continuous stroke.
+         */
+        const arrowTipY = isAbove ? 59 : 1;
+        const arrowBaseY = isAbove ? 47 : 13;
+
+        const arrowPoints = [
+            `${endX},${arrowTipY}`,
+            `${endX - 6},${arrowBaseY}`,
+            `${endX + 6},${arrowBaseY}`
+        ].join(" ");
+
+        const wrapperPosition = isAbove
+            ? "top:0;"
+            : "bottom:0;";
+
+        const labelPosition = isAbove
+            ? "top:0.7em;"
+            : "bottom:0.7em;";
+
+        return `
+            <span
+                class="
+                    pm-xymatrix-self-loop
+                    pm-xymatrix-self-loop-${placement}
+                "
+                style="
+                    position:absolute;
+                    left:50%;
+                    ${wrapperPosition}
+                    transform:translateX(-50%);
+                    width:3.6em;
+                    height:2.2em;
+                    pointer-events:none;
+                    overflow:visible;
+                    z-index:1;
+                "
+            >
+                <svg
+                    aria-hidden="true"
+                    viewBox="0 0 100 60"
+                    preserveAspectRatio="xMidYMid meet"
+                    style="
+                        position:absolute;
+                        inset:0;
+                        width:100%;
+                        height:100%;
+                        overflow:visible;
+                    "
+                >
+                    <path
+                        d="
+                            M ${startX} ${anchorY}
+                            C ${startX} ${controlY},
+                              ${endX} ${controlY},
+                              ${endX} ${anchorY}
+                        "
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        vector-effect="non-scaling-stroke"
+                    ></path>
+
+                    <polygon
+                        points="${arrowPoints}"
+                        fill="currentColor"
+                    ></polygon>
+                </svg>
+
+                ${
+                    safeLabel
+                        ? `
+                            <span style="
+                                position:absolute;
+                                left:50%;
+                                ${labelPosition}
+                                transform:translateX(-50%);
+                                white-space:nowrap;
+                                line-height:1;
+                                z-index:2;
+                            ">
+                                \\({\\scriptstyle ${safeLabel}}\\)
+                            </span>
+                        `
+                        : ""
+                }
+            </span>
+        `;
+    }
+
+    function renderXyObjectCell(
+        tex,
+        frame = null,
+        selfLoops = []
+    ) {
         if (!tex) {
             return "";
         }
@@ -2505,22 +2658,25 @@
         const mathHtml =
             `\\(${escapeHtmlForMathCell(tex)}\\)`;
 
-        if (!frame || frame.shape !== "circle") {
-            return mathHtml;
-        }
+        let objectHtml;
 
-        if (frame.doubleBorder) {
-            return `
-                <span class="pm-xymatrix-state pm-xymatrix-state-accepting" style="
-                    display:inline-flex;
-                    align-items:center;
-                    justify-content:center;
-                    width:2.25em;
-                    height:2.25em;
-                    border:1.5px solid currentColor;
-                    border-radius:50%;
-                    box-sizing:border-box;
-                ">
+        if (!frame || frame.shape !== "circle") {
+            objectHtml = mathHtml;
+        } else if (frame.doubleBorder) {
+            objectHtml = `
+                <span
+                    class="pm-xymatrix-state pm-xymatrix-state-accepting"
+                    style="
+                        display:inline-flex;
+                        align-items:center;
+                        justify-content:center;
+                        width:2.25em;
+                        height:2.25em;
+                        border:1.5px solid currentColor;
+                        border-radius:50%;
+                        box-sizing:border-box;
+                    "
+                >
                     <span style="
                         display:inline-flex;
                         align-items:center;
@@ -2535,20 +2691,65 @@
                     </span>
                 </span>
             `;
+        } else {
+            objectHtml = `
+                <span
+                    class="pm-xymatrix-state"
+                    style="
+                        display:inline-flex;
+                        align-items:center;
+                        justify-content:center;
+                        width:2.05em;
+                        height:2.05em;
+                        border:1.5px solid currentColor;
+                        border-radius:50%;
+                        box-sizing:border-box;
+                    "
+                >
+                    ${mathHtml}
+                </span>
+            `;
         }
 
+        const loops = Array.isArray(selfLoops)
+            ? selfLoops.filter(
+                arrow => arrow?.isSelfLoop
+            )
+            : [];
+
+        if (loops.length === 0) {
+            return objectHtml;
+        }
+
+        const hasAboveLoop = loops.some(
+            arrow => arrow.loopPlacement !== "below"
+        );
+
+        const hasBelowLoop = loops.some(
+            arrow => arrow.loopPlacement === "below"
+        );
+
         return `
-            <span class="pm-xymatrix-state" style="
-                display:inline-flex;
-                align-items:center;
-                justify-content:center;
-                width:2.05em;
-                height:2.05em;
-                border:1.5px solid currentColor;
-                border-radius:50%;
-                box-sizing:border-box;
-            ">
-                ${mathHtml}
+            <span
+                class="pm-xymatrix-object-with-loops"
+                style="
+                    position:relative;
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    padding-top:${hasAboveLoop ? "2.55em" : "0"};
+                    padding-bottom:${hasBelowLoop ? "2.55em" : "0"};
+                "
+            >
+                <span style="
+                    position:relative;
+                    display:inline-flex;
+                    z-index:2;
+                ">
+                    ${objectHtml}
+                </span>
+
+                ${loops.map(renderXySelfLoop).join("")}
             </span>
         `;
     }
