@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "prose-latex-logo-v1",
+        debugVersion: "prose-qed-symbol-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -263,6 +263,9 @@
         // Standard LaTeX logo command used in prose.
         output = output.replace(/\\LaTeX\b\s*\{\}/g, "LaTeX");
         output = output.replace(/\\LaTeX\b/g, "LaTeX");
+
+        // End-of-proof marker used in prose.
+        output = output.replace(/\\qed\b/gi, "∎");
 
         // Paired TeX prose quotation marks:
         //   ``quoted text'' -> “quoted text”
