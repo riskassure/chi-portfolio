@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "prose-escaped-percent-v1",
+        debugVersion: "algorithm-encoded-backslash-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -4438,9 +4438,19 @@
     function normalizeAlgorithmCodeBlocks(value) {
         const source = String(value || "");
 
+        const decodeBackslashEntities = text =>
+            String(text || "")
+                .replace(/&#(?:0*92|x0*5c);/gi, "\\")
+                .replace(/&bsol;/gi, "\\");
+
+        const detectableSource =
+            decodeBackslashEntities(source);
+
         if (
             !source.includes("math-code-block-alg")
-            || !source.includes("\\begin{description}")
+            || !/\\begin\s*\{description\}/i.test(
+                detectableSource
+            )
         ) {
             return source;
         }
@@ -4448,9 +4458,13 @@
         return source.replace(
             /<pre\b[^>]*class=["'][^"']*\bmath-code-block-alg\b[^"']*["'][^>]*>\s*<code\b[^>]*>([\s\S]*?)<\/code>\s*<\/pre>/gi,
             function (originalHtml, codeHtml) {
-                const cleanCode = String(codeHtml || "")
-                    .replace(/\\label\s*\{[^{}]*\}/gi, "")
-                    .trim();
+                const cleanCode =
+                    decodeBackslashEntities(codeHtml)
+                        .replace(
+                            /\\label\s*\{[^{}]*\}/gi,
+                            ""
+                        )
+                        .trim();
 
                 const descriptionMatch = cleanCode.match(
                     /^([\s\S]*?)\\begin\s*\{description\}([\s\S]*?)\\end\s*\{description\}([\s\S]*)$/i
