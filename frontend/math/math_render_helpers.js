@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-self-loops-svg-labels-v1",
+        debugVersion: "prose-latex-logo-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -259,6 +259,10 @@
 
         // TeX ellipsis used outside math.
         output = output.replace(/\\dots\b/g, "…");
+
+        // Standard LaTeX logo command used in prose.
+        output = output.replace(/\\LaTeX\b\s*\{\}/g, "LaTeX");
+        output = output.replace(/\\LaTeX\b/g, "LaTeX");
 
         // Paired TeX prose quotation marks:
         //   ``quoted text'' -> “quoted text”
