@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "restore-latex-verb-v1",
+        debugVersion: "verbatim-typewriter-style-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -4837,22 +4837,53 @@
             let contents = String(values[index] || "");
 
             if (insideMath) {
-                // TeX ignores ordinary spaces in math mode. Convert each
-                // literal verbatim space into an explicit mathematical space.
-                contents = contents.replace(/ /g, "\\;");
+                const mathContents = Array.from(contents)
+                    .map(character => {
+                        switch (character) {
+                            case "\\":
+                                return "\\backslash ";
+                            case "{":
+                                return "\\{";
+                            case "}":
+                                return "\\}";
+                            case "&":
+                                return "\\&";
+                            case "%":
+                                return "\\%";
+                            case "#":
+                                return "\\#";
+                            case "_":
+                                return "\\_";
+                            case "<":
+                                return "\\lt ";
+                            case ">":
+                                return "\\gt ";
+                            case " ":
+                                return "\\;";
+                            default:
+                                return character;
+                        }
+                    })
+                    .join("");
 
-                // Keep literal angle brackets from being interpreted as HTML.
-                return contents
-                    .replace(/&/g, "\\mathbin{\\&}")
-                    .replace(/</g, "\\lt ")
-                    .replace(/>/g, "\\gt ");
+                return `\\mathtt{${mathContents}}`;
             }
 
-            // Outside MathJax, restore ordinary HTML-safe literal text.
-            return contents
+            const htmlContents = contents
                 .replace(/&/g, "&amp;")
                 .replace(/</g, "&lt;")
                 .replace(/>/g, "&gt;");
+
+            return `
+                <code class="pm-inline-verbatim" style="
+                    padding:0;
+                    border:0;
+                    background:transparent;
+                    color:inherit;
+                    font-size:0.95em;
+                    white-space:nowrap;
+                ">${htmlContents}</code>
+            `;
         };
 
         const restoreInsideMathChunk = (chunk) => {
