@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "algorithm-encoded-backslash-v1",
+        debugVersion: "xymatrix-computer-modern-tips-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -978,7 +978,9 @@
     function stripXyMatrixSetupMacros(tex) {
         if (!tex) return "";
 
-        return String(tex).replace(/\\UseAllTwocells\b/g, "");
+        return String(tex)
+            .replace(/\\UseAllTwocells\b/g, "")
+            .replace(/\\UseComputerModernTips\b/g, "");
     }
 
     function renderXyMatrixConnectorMath(tex) {
