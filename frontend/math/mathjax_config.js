@@ -25,6 +25,7 @@
                 down: "{\\mathord{\\downarrow}}",
                 dom: "\\operatorname{dom}",
                 sgn: "\\operatorname{sgn}",
+                NN: "\\mathbb{N}",
 
                 setOf: [
                     "\\left\\{#1\\;\\middle|\\;#2\\right\\}",
