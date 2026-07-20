@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "prose-qed-symbol-v1",
+        debugVersion: "legacy-font-circumflex-accent-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -135,10 +135,63 @@
         );
     }
 
+    function formatLegacyFontGroup(command, content) {
+        const cleanContent =
+            String(content || "").trim();
+
+        if (!cleanContent) {
+            return "";
+        }
+
+        switch (String(command || "").toLowerCase()) {
+            case "em":
+            case "it":
+                return `<em>${cleanContent}</em>`;
+
+            case "bf":
+                return `<strong>${cleanContent}</strong>`;
+
+            case "rm":
+            case "sc":
+            default:
+                return cleanContent;
+        }
+    }
+
     function normalizeProseLayoutMacros(tex) {
         if (!tex) return "";
 
         let output = String(tex || "");
+
+        /*
+         * Legacy font commands may already be wrapped by the backend
+         * autolinker:
+         *
+         *   {<span class="math-no-autolink">\rm</span>
+         *      (Tychonoff's Theorem)}
+         */
+        output = output.replace(
+            /\{\s*<span\b[^>]*class=["'][^"']*\bmath-no-autolink\b[^"']*["'][^>]*>\s*\\(rm|em|it|bf|sc)\s*<\/span>\s*((?:[^{}]|\{[^{}]*\})*)\}/gi,
+            function (_, command, content) {
+                return formatLegacyFontGroup(
+                    command,
+                    content
+                );
+            }
+        );
+
+        /*
+         * Legacy font commands sometimes occur inside a PlanetMath escape:
+         *
+         *   {\PMlinkescapetext{\rm} (Tychonoff's Theorem)}
+         *
+         * Consume the entire construction before the generic escape rule
+         * turns it into a visible {\rm ...} fragment.
+         */
+        output = output.replace(
+            /\{\s*\\PMlinkescapetext\{\s*\\(?:bf|em|it|rm|sc)\s*\}\s*([^{}]*)\}/gi,
+            "$1"
+        );
 
         // PlanetMath link-ish macros that should not leak visibly.
         output = output.replace(/\\PMlinkescapetext\{([^{}]*)\}/gi, "$1");
@@ -306,8 +359,13 @@
         // Some old-style font groups contain accent macros with braces, so run this
         // again after accent normalization.
         output = output.replace(
-            /\{\\(?:bf|em|it|rm|sc)\b\s*([^{}]*)\}/gi,
-            "$1"
+            /\{\s*\\(bf|em|it|rm|sc)\b\s*((?:[^{}]|\{[^{}]*\})*)\}/gi,
+            function (_, command, content) {
+                return formatLegacyFontGroup(
+                    command,
+                    content
+                );
+            }
         );
         output = output.replace(/\{\\em\s*\{([^{}]*)\}\}/gi, "$1");
 
@@ -433,6 +491,36 @@
         output = output.replace(/\\"A/g, "Ä");
         output = output.replace(/\\"O/g, "Ö");
         output = output.replace(/\\"U/g, "Ü");
+
+        // TeX circumflex accents used in prose and bibliography text:
+        //   C\^{o}nes -> Cônes
+        const circumflexCharacters = {
+            A: "Â",
+            E: "Ê",
+            I: "Î",
+            O: "Ô",
+            U: "Û",
+            a: "â",
+            e: "ê",
+            i: "î",
+            o: "ô",
+            u: "û"
+        };
+
+        output = output.replace(
+            /\\\^\s*\{([AEIOUaeiou])\}/g,
+            function (_, letter) {
+                return circumflexCharacters[letter] || letter;
+            }
+        );
+
+        // Also support the unbraced TeX form: \^o
+        output = output.replace(
+            /\\\^\s*([AEIOUaeiou])/g,
+            function (_, letter) {
+                return circumflexCharacters[letter] || letter;
+            }
+        );
 
         return output;
     }
