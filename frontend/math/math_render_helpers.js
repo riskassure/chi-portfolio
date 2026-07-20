@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-computer-modern-tips-v1",
+        debugVersion: "prose-emph-metadata-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -265,6 +265,21 @@
         output = output.replace(
             /``([^<>]*?)''/g,
             "“$1”"
+        );
+
+        // Remove legacy PlanetMath canonical-name metadata attached to
+        // formatted prose:
+        //   \emph{...}{EpsilonTransitions} -> \emph{...}
+        output = output.replace(
+            /\\emph\s*\{([^{}]*)\}\s*\{[A-Za-z][A-Za-z0-9_-]*\}/g,
+            "\\emph{$1}"
+        );
+
+        // Also handle the backend-rendered HTML form:
+        //   <em>...</em>{EpsilonTransitions} -> <em>...</em>
+        output = output.replace(
+            /(<em\b[^>]*>[\s\S]*?<\/em>)\s*\{[A-Za-z][A-Za-z0-9_-]*\}/gi,
+            "$1"
         );
 
         // Common text wrappers. Keep contents, drop LaTeX command.
