@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "verbatim-typewriter-style-v1",
+        debugVersion: "xymatrix-framed-states-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -1502,7 +1502,8 @@
                 const gridCol = colIndex * 2;
 
                 grid[gridRow][gridCol] = renderXyObjectCell(
-                    cell.objectTex
+                    cell.objectTex,
+                    cell.objectFrame
                 );
 
                 if (
@@ -1851,6 +1852,25 @@
 
         const arrows = [];
         let twoCellLabel = "";
+        let objectFrame = null;
+
+        /*
+        * Xy-pic framed automaton states:
+        *
+        *   *+[o][F-]{0}   single-circle state
+        *   *++[o][F=]{2}  double-circle accepting state
+        */
+        text = text.replace(
+            /^\s*\*\+*\[o\]\[F([-=])\]\s*\{([^{}]*)\}/,
+            function (_, frameStyle, objectLabel) {
+                objectFrame = {
+                    shape: "circle",
+                    doubleBorder: frameStyle === "="
+                };
+
+                return String(objectLabel || "").trim();
+            }
+        );
 
         // Invisible Xy-pic arrow used to place a relation between two
         // previously named arrows:
@@ -1926,6 +1946,7 @@
 
         return {
             objectTex,
+            objectFrame,
             arrows,
             twoCellLabel,
             legacyTwoCell
@@ -2476,12 +2497,60 @@
         `;
     }
 
-    function renderXyObjectCell(tex) {
+    function renderXyObjectCell(tex, frame = null) {
         if (!tex) {
             return "";
         }
 
-        return `\\(${escapeHtmlForMathCell(tex)}\\)`;
+        const mathHtml =
+            `\\(${escapeHtmlForMathCell(tex)}\\)`;
+
+        if (!frame || frame.shape !== "circle") {
+            return mathHtml;
+        }
+
+        if (frame.doubleBorder) {
+            return `
+                <span class="pm-xymatrix-state pm-xymatrix-state-accepting" style="
+                    display:inline-flex;
+                    align-items:center;
+                    justify-content:center;
+                    width:2.25em;
+                    height:2.25em;
+                    border:1.5px solid currentColor;
+                    border-radius:50%;
+                    box-sizing:border-box;
+                ">
+                    <span style="
+                        display:inline-flex;
+                        align-items:center;
+                        justify-content:center;
+                        width:1.76em;
+                        height:1.76em;
+                        border:1.5px solid currentColor;
+                        border-radius:50%;
+                        box-sizing:border-box;
+                    ">
+                        ${mathHtml}
+                    </span>
+                </span>
+            `;
+        }
+
+        return `
+            <span class="pm-xymatrix-state" style="
+                display:inline-flex;
+                align-items:center;
+                justify-content:center;
+                width:2.05em;
+                height:2.05em;
+                border:1.5px solid currentColor;
+                border-radius:50%;
+                box-sizing:border-box;
+            ">
+                ${mathHtml}
+            </span>
+        `;
     }
 
     function renderHorizontalArrow(
