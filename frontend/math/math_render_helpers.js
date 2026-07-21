@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "legacy-theorem-heading-v1",
+        debugVersion: "legacy-proof-heading-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -296,6 +296,26 @@
                     </span>
                 `;
             }
+        );
+
+        // Legacy PlanetMath proof marker:
+        //
+        //   \proof
+        //
+        // The proof contents remain in their existing paragraphs and blocks.
+        output = output.replace(
+            /\\proof\b/gi,
+            `
+                <span
+                    class="pm-legacy-proof-heading"
+                    style="
+                        display:block;
+                        margin:0.75rem 0 0.3rem;
+                    "
+                >
+                    <em>Proof.</em>
+                </span>
+            `
         );
 
         // Remove document preamble commands that have no page meaning.
