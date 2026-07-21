@@ -742,3 +742,17 @@
     width: max-content;
     margin: 0;
 }
+
+.pm-footnote {
+    display: block;
+    margin: 0.65rem 0 0.9rem 1rem;
+    padding: 0.65rem 0.8rem;
+    border-left: 2px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 0.95em;
+    line-height: 1.5;
+}
+
+.pm-footnote-label {
+    font-weight: 700;
+}
