@@ -756,3 +756,19 @@
 .pm-footnote-label {
     font-weight: 700;
 }
+
+.pm-textcolor-red {
+    color: red;
+}
+
+.pm-textcolor-blue {
+    color: blue;
+}
+
+.pm-textcolor-green {
+    color: green;
+}
+
+.pm-textcolor-magenta {
+    color: magenta;
+}

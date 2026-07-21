@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "legacy-font-circumflex-accent-v1",
+        debugVersion: "prose-textcolor-legend-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -162,6 +162,10 @@
         if (!tex) return "";
 
         let output = String(tex || "");
+
+        // Preserve meaningful legend colors while removing raw
+        // \textcolor commands and autolinks around color names.
+        output = normalizeTextColorMacros(output);
 
         // Convert LaTeX \url{...} commands into safe external links.
         output = normalizeUrlMacros(output);
@@ -847,196 +851,196 @@
         `;
     }
 
-function splitProofLeadParagraphs(value) {
-    const source = String(value || "");
+    function splitProofLeadParagraphs(value) {
+        const source = String(value || "");
 
-    if (
-        !/<strong\b/i.test(source)
-        && !source.includes("∎")
-    ) {
-        return source;
-    }
-
-    const template = document.createElement("template");
-    template.innerHTML = source;
-
-    const proofLeadPattern =
-        /^(?:Statement|Existential proof|Constructive proof):$/i;
-
-    function hasMeaningfulContentBefore(element) {
-        let sibling = element.previousSibling;
-
-        while (sibling) {
-            if (
-                sibling.nodeType === Node.TEXT_NODE
-                && String(sibling.nodeValue || "").trim()
-            ) {
-                return true;
-            }
-
-            if (
-                sibling.nodeType === Node.ELEMENT_NODE
-                && String(sibling.textContent || "").trim()
-            ) {
-                return true;
-            }
-
-            sibling = sibling.previousSibling;
+        if (
+            !/<strong\b/i.test(source)
+            && !source.includes("∎")
+        ) {
+            return source;
         }
 
-        return false;
-    }
+        const template = document.createElement("template");
+        template.innerHTML = source;
 
-    /*
-     * Move startNode and all following siblings from paragraph into
-     * a newly inserted paragraph.
-     */
-    function splitParagraphAtNode(paragraph, startNode) {
-        const newParagraph =
-            document.createElement("p");
+        const proofLeadPattern =
+            /^(?:Statement|Existential proof|Constructive proof):$/i;
 
-        let node = startNode;
+        function hasMeaningfulContentBefore(element) {
+            let sibling = element.previousSibling;
 
-        while (node) {
-            const nextNode = node.nextSibling;
-            newParagraph.appendChild(node);
-            node = nextNode;
-        }
-
-        paragraph.after(newParagraph);
-
-        return newParagraph;
-    }
-
-    /*
-     * Split flattened proof lead-ins:
-     *
-     *   preceding prose. <strong>Statement:</strong> ...
-     *
-     * becomes two paragraphs.
-     */
-    template.content
-        .querySelectorAll("p")
-        .forEach(originalParagraph => {
-            let paragraph = originalParagraph;
-
-            while (paragraph) {
-                const proofLead = Array.from(
-                    paragraph.children
-                ).find(element =>
-                    element.tagName === "STRONG"
-                    && proofLeadPattern.test(
-                        String(element.textContent || "").trim()
-                    )
-                    && hasMeaningfulContentBefore(element)
-                );
-
-                if (!proofLead) {
-                    break;
-                }
-
-                paragraph = splitParagraphAtNode(
-                    paragraph,
-                    proofLead
-                );
-            }
-        });
-
-    /*
-     * Split prose that follows a QED marker:
-     *
-     *   ... proof text. ∎ Notice, ...
-     *
-     * becomes:
-     *
-     *   ... proof text. ∎
-     *   Notice, ...
-     */
-    template.content
-        .querySelectorAll("p")
-        .forEach(originalParagraph => {
-            let paragraph = originalParagraph;
-
-            while (paragraph) {
-                const markerNode = Array.from(
-                    paragraph.childNodes
-                ).find(node => {
-                    if (node.nodeType !== Node.TEXT_NODE) {
-                        return false;
-                    }
-
-                    const text =
-                        String(node.nodeValue || "");
-
-                    const markerIndex =
-                        text.indexOf("∎");
-
-                    if (markerIndex < 0) {
-                        return false;
-                    }
-
-                    const trailingText =
-                        text.slice(markerIndex + 1).trim();
-
-                    return (
-                        Boolean(trailingText)
-                        || Boolean(node.nextSibling)
-                    );
-                });
-
-                if (!markerNode) {
-                    break;
-                }
-
-                const markerText =
-                    String(markerNode.nodeValue || "");
-
-                const markerIndex =
-                    markerText.indexOf("∎");
-
-                const proofEnding =
-                    markerText
-                        .slice(0, markerIndex + 1)
-                        .replace(/\s+$/g, "");
-
-                const followingText =
-                    markerText
-                        .slice(markerIndex + 1)
-                        .replace(/^\s+/g, "");
-
-                markerNode.nodeValue = proofEnding;
-
-                const newParagraph =
-                    document.createElement("p");
-
-                if (followingText) {
-                    newParagraph.appendChild(
-                        document.createTextNode(followingText)
-                    );
-                }
-
-                let sibling = markerNode.nextSibling;
-
-                while (sibling) {
-                    const nextSibling = sibling.nextSibling;
-                    newParagraph.appendChild(sibling);
-                    sibling = nextSibling;
+            while (sibling) {
+                if (
+                    sibling.nodeType === Node.TEXT_NODE
+                    && String(sibling.nodeValue || "").trim()
+                ) {
+                    return true;
                 }
 
                 if (
-                    String(newParagraph.textContent || "").trim()
-                    || newParagraph.children.length
+                    sibling.nodeType === Node.ELEMENT_NODE
+                    && String(sibling.textContent || "").trim()
                 ) {
-                    paragraph.after(newParagraph);
-                    paragraph = newParagraph;
-                } else {
-                    break;
+                    return true;
                 }
-            }
-        });
 
-    return template.innerHTML;
-}
+                sibling = sibling.previousSibling;
+            }
+
+            return false;
+        }
+
+        /*
+        * Move startNode and all following siblings from paragraph into
+        * a newly inserted paragraph.
+        */
+        function splitParagraphAtNode(paragraph, startNode) {
+            const newParagraph =
+                document.createElement("p");
+
+            let node = startNode;
+
+            while (node) {
+                const nextNode = node.nextSibling;
+                newParagraph.appendChild(node);
+                node = nextNode;
+            }
+
+            paragraph.after(newParagraph);
+
+            return newParagraph;
+        }
+
+        /*
+        * Split flattened proof lead-ins:
+        *
+        *   preceding prose. <strong>Statement:</strong> ...
+        *
+        * becomes two paragraphs.
+        */
+        template.content
+            .querySelectorAll("p")
+            .forEach(originalParagraph => {
+                let paragraph = originalParagraph;
+
+                while (paragraph) {
+                    const proofLead = Array.from(
+                        paragraph.children
+                    ).find(element =>
+                        element.tagName === "STRONG"
+                        && proofLeadPattern.test(
+                            String(element.textContent || "").trim()
+                        )
+                        && hasMeaningfulContentBefore(element)
+                    );
+
+                    if (!proofLead) {
+                        break;
+                    }
+
+                    paragraph = splitParagraphAtNode(
+                        paragraph,
+                        proofLead
+                    );
+                }
+            });
+
+        /*
+        * Split prose that follows a QED marker:
+        *
+        *   ... proof text. ∎ Notice, ...
+        *
+        * becomes:
+        *
+        *   ... proof text. ∎
+        *   Notice, ...
+        */
+        template.content
+            .querySelectorAll("p")
+            .forEach(originalParagraph => {
+                let paragraph = originalParagraph;
+
+                while (paragraph) {
+                    const markerNode = Array.from(
+                        paragraph.childNodes
+                    ).find(node => {
+                        if (node.nodeType !== Node.TEXT_NODE) {
+                            return false;
+                        }
+
+                        const text =
+                            String(node.nodeValue || "");
+
+                        const markerIndex =
+                            text.indexOf("∎");
+
+                        if (markerIndex < 0) {
+                            return false;
+                        }
+
+                        const trailingText =
+                            text.slice(markerIndex + 1).trim();
+
+                        return (
+                            Boolean(trailingText)
+                            || Boolean(node.nextSibling)
+                        );
+                    });
+
+                    if (!markerNode) {
+                        break;
+                    }
+
+                    const markerText =
+                        String(markerNode.nodeValue || "");
+
+                    const markerIndex =
+                        markerText.indexOf("∎");
+
+                    const proofEnding =
+                        markerText
+                            .slice(0, markerIndex + 1)
+                            .replace(/\s+$/g, "");
+
+                    const followingText =
+                        markerText
+                            .slice(markerIndex + 1)
+                            .replace(/^\s+/g, "");
+
+                    markerNode.nodeValue = proofEnding;
+
+                    const newParagraph =
+                        document.createElement("p");
+
+                    if (followingText) {
+                        newParagraph.appendChild(
+                            document.createTextNode(followingText)
+                        );
+                    }
+
+                    let sibling = markerNode.nextSibling;
+
+                    while (sibling) {
+                        const nextSibling = sibling.nextSibling;
+                        newParagraph.appendChild(sibling);
+                        sibling = nextSibling;
+                    }
+
+                    if (
+                        String(newParagraph.textContent || "").trim()
+                        || newParagraph.children.length
+                    ) {
+                        paragraph.after(newParagraph);
+                        paragraph = newParagraph;
+                    } else {
+                        break;
+                    }
+                }
+            });
+
+        return template.innerHTML;
+    }
 
     function splitAlignRows(body) {
         const normalized = String(body || "").trim();
@@ -4619,6 +4623,39 @@ function splitProofLeadParagraphs(value) {
                 anchor.rel = "noopener noreferrer";
 
                 return anchor.outerHTML;
+            }
+        );
+    }
+
+    function normalizeTextColorMacros(value) {
+        const source = String(value || "");
+
+        if (!/\\textcolor\s*\{/i.test(source)) {
+            return source;
+        }
+
+        const supportedColors = new Set([
+            "red",
+            "blue",
+            "green",
+            "magenta"
+        ]);
+
+        return source.replace(
+            /\\textcolor\s*\{\s*(?:<a\b[^>]*>\s*)?([a-z]+)(?:\s*<\/a>)?\s*\}\s*\{([^{}]*)\}/gi,
+            function (original, rawColor, content) {
+                const color =
+                    String(rawColor || "").trim().toLowerCase();
+
+                if (!supportedColors.has(color)) {
+                    return original;
+                }
+
+                return `
+                    <span
+                        class="pm-textcolor pm-textcolor-${color} tex2jax_process"
+                    >${content}</span>
+                `;
             }
         );
     }
