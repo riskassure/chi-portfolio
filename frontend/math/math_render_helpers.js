@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "starred-includegraphics-v1",
+        debugVersion: "legacy-theorem-heading-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -264,6 +264,39 @@
         // Remove setup/control commands that have no useful page meaning.
         output = output.replace(/\\setcounter\{[^{}]*\}\{[^{}]*\}/gi, "");
         output = output.replace(/\\newtheorem\{[^{}]*\}(?:\[[^\]]*\])?\{[^{}]*\}/gi, "");
+
+        // Legacy PlanetMath theorem headings:
+        //
+        //   \theorem{}
+        //   \theorem{The Reflector Law}
+        //
+        // Keep the following theorem statement in place. The block-level span
+        // separates the heading visually from the preceding introductory prose.
+        output = output.replace(
+            /\\theorem\s*\{([^{}]*)\}/gi,
+            function (_, title) {
+                const cleanTitle =
+                    String(title || "")
+                        .replace(/\s+/g, " ")
+                        .trim();
+
+                const headingText = cleanTitle
+                    ? `Theorem (${cleanTitle}).`
+                    : "Theorem.";
+
+                return `
+                    <span
+                        class="pm-legacy-theorem-heading"
+                        style="
+                            display:block;
+                            margin:1rem 0 0.3rem;
+                        "
+                    >
+                        <strong>${headingText}</strong>
+                    </span>
+                `;
+            }
+        );
 
         // Remove document preamble commands that have no page meaning.
         output = output.replace(
