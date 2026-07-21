@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "placeholder-arrow-pairs-v1",
+        debugVersion: "starred-includegraphics-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -5092,6 +5092,55 @@
         return output;
     }
 
+    function normalizeLegacyRomanList(value) {
+        const source = String(value || "");
+
+        if (
+            !source.includes("math-generic-list")
+            || !source.includes("\\roman")
+            || !source.includes("\\addtocounter")
+        ) {
+            return source;
+        }
+
+        const template = document.createElement("template");
+        template.innerHTML = source;
+
+        template.content
+            .querySelectorAll("ol.math-generic-list")
+            .forEach(list => {
+                const firstItem = Array.from(list.children)
+                    .find(element =>
+                        element.tagName === "LI"
+                    );
+
+                if (!firstItem) {
+                    return;
+                }
+
+                const firstItemText =
+                    String(firstItem.textContent || "");
+
+                if (
+                    !firstItemText.includes("\\roman")
+                    || !firstItemText.includes("\\addtocounter")
+                ) {
+                    return;
+                }
+
+                // The backend turned the legacy list-label definition into
+                // a bogus first list item. Remove it and style the remaining
+                // eight real items as lower-Roman numerals.
+                firstItem.remove();
+
+                list.classList.add("pm-roman-list");
+                list.setAttribute("type", "i");
+                list.style.listStyleType = "lower-roman";
+            });
+
+        return template.innerHTML;
+    }
+
     function cleanLaTeXEnvironments(tex) {
         if (!tex) return "";
 
@@ -5242,6 +5291,13 @@
         // Text-level underline used in PlanetMath prose.
         clean = clean.replace(/\\underline\{([^{}]+)\}/gi, "<u>$1</u>");
 
+        // Normalize the starred legacy form so the existing image converter
+        // handles both \includegraphics and \includegraphics*.
+        clean = clean.replace(
+            /\\includegraphics\*/gi,
+            "\\includegraphics"
+        );
+
         // Replace old LaTeX/EPS image commands with readable placeholders.
         clean = normalizeLatexImageArtifacts(clean);
         
@@ -5260,6 +5316,10 @@
         // Convert TeX footnotes into visible note blocks while preserving
         // any MathJax expressions contained inside them.
         clean = normalizeFootnoteMacros(clean);
+
+        // Convert legacy custom Roman-numbered lists before the generic
+        // \item conversion later in this pipeline.
+        clean = normalizeLegacyRomanList(clean);
 
         // Prose layout cleanup must not remove legitimate commands such as
         // \quad, \text, or \mbox from inside MathJax expressions.
