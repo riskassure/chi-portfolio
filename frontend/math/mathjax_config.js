@@ -28,6 +28,7 @@
                 NN: "\\mathbb{N}",
                 bbZ: "\\mathbb{Z}",
                 closure: ["\\overline{#1}", 1],
+                hdots: "\\dots",
 
                 setOf: [
                     "\\left\\{#1\\;\\middle|\\;#2\\right\\}",

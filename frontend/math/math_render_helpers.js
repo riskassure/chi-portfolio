@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "prose-textcolor-legend-v1",
+        debugVersion: "placeholder-arrow-pairs-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -299,9 +299,29 @@
 
         // Horizontal layout commands.
         output = output.replace(/\\hspace\*?\s*\{[^{}]*\}/gi, " ");
+        output = output.replace(/\\hfil\b/gi, " ");
         output = output.replace(/\\hfill\b/gi, " ");
         output = output.replace(/\\qquad\b/gi, " ");
         output = output.replace(/\\quad\b/gi, " ");
+
+        // Old skip commands used around picture arrows.
+        output = output.replace(/\\hskip\s+[^\s{}]+/gi, " ");
+
+        // Old centered caption macro.
+        output = output.replace(
+            /\\centerline\s*\{([\s\S]*?)\}/gi,
+            '<div class="math-center">$1</div>'
+        );
+
+        // Common old math dots variant.
+        output = output.replace(/\\hdots\b/g, "\\dots");
+
+        // Preserve the contents of legacy raisebox commands while discarding
+        // their print-layout positioning.
+        output = output.replace(
+            /\\raisebox\s*\{[^{}]*\}\s*\{([^{}]*)\}/gi,
+            "$1"
+        );
 
         // TeX control space:
         //   Adv.\ Math. -> Adv. Math.
@@ -4143,6 +4163,387 @@
         );
     }
 
+    function normalizePlaceholderImageLayouts(value) {
+        const source = String(value || "");
+
+        if (!source.includes("pm-latex-image-placeholder")) {
+            return source;
+        }
+
+        const template = document.createElement("template");
+        template.innerHTML = source;
+
+        function isPlaceholderBlock(node) {
+            if (
+                !node
+                || node.nodeType !== Node.ELEMENT_NODE
+            ) {
+                return false;
+            }
+
+            if (
+                node.classList.contains(
+                    "pm-latex-image-placeholder"
+                )
+            ) {
+                return true;
+            }
+
+            /*
+            * Accept a simple wrapper around one placeholder, but do not
+            * treat a larger container holding several placeholders as
+            * one image block.
+            */
+            return (
+                node.querySelectorAll(
+                    ".pm-latex-image-placeholder"
+                ).length === 1
+            );
+        }
+
+        function isEmptyParagraph(node) {
+            return (
+                node &&
+                node.nodeType === Node.ELEMENT_NODE &&
+                node.tagName === "P" &&
+                !String(node.textContent || "").trim()
+            );
+        }
+
+        function isPlaceholderArrow(node) {
+            if (!node) {
+                return false;
+            }
+
+            const text = String(
+                node.nodeType === Node.TEXT_NODE
+                    ? node.nodeValue
+                    : node.textContent
+            ).trim();
+
+            return (
+                (
+                    node.nodeType === Node.ELEMENT_NODE
+                    && node.classList.contains("pm-image-arrow")
+                )
+                || /\\raisebox\b/i.test(text)
+                || /\\longleftrightarrow\b/i.test(text)
+                || text.includes("↔")
+            );
+        }
+
+        function isOnlyHfilParagraph(node) {
+            return (
+                node &&
+                node.nodeType === Node.ELEMENT_NODE &&
+                node.tagName === "P" &&
+                /^\\hfil\s*$/i.test(String(node.textContent || "").trim())
+            );
+        }
+
+        function isCenterlineParagraph(node) {
+            return (
+                node &&
+                node.nodeType === Node.ELEMENT_NODE &&
+                node.tagName === "P" &&
+                /\\centerline\s*\{/.test(String(node.textContent || ""))
+            );
+        }
+
+        function isArrowParagraph(node) {
+            const text = String(node?.textContent || "").trim();
+            return (
+                node &&
+                node.nodeType === Node.ELEMENT_NODE &&
+                node.tagName === "P" &&
+                /\\raisebox/i.test(text) &&
+                /\\longleftrightarrow/i.test(text)
+            );
+        }
+
+        // Remove raw \hfil-only paragraphs.
+        Array.from(template.content.querySelectorAll("p")).forEach(p => {
+            if (isOnlyHfilParagraph(p)) {
+                p.remove();
+            }
+        });
+
+        // Convert raw \centerline{...} paragraph to a real centered caption.
+        Array.from(template.content.querySelectorAll("p")).forEach(p => {
+            const text = String(p.textContent || "");
+            const match = text.match(/\\centerline\s*\{([\s\S]*?)\}/i);
+
+            if (!match) return;
+
+            const div = document.createElement("div");
+            div.className = "math-center pm-image-caption";
+            div.innerHTML = match[1];
+            p.replaceWith(div);
+        });
+
+        // Convert raw arrow paragraph to a clean centered arrow.
+        Array.from(template.content.querySelectorAll("p")).forEach(p => {
+            if (!isArrowParagraph(p)) return;
+
+            const div = document.createElement("div");
+            div.className = "math-center pm-image-arrow";
+            div.innerHTML = "\\(\\longleftrightarrow\\)";
+            p.replaceWith(div);
+        });
+
+        // Wrap consecutive placeholder blocks into centered rows.
+        const container = document.createElement("div");
+        container.appendChild(template.content.cloneNode(true));
+
+        function isIgnorablePlaceholderLayoutNode(node) {
+            if (!node) {
+                return false;
+            }
+
+            if (node.nodeType === Node.TEXT_NODE) {
+                const text = String(node.nodeValue || "")
+                    .replace(/\\(?:hfil|hfill)\b/gi, "")
+                    .trim();
+
+                return !text;
+            }
+
+            if (node.nodeType !== Node.ELEMENT_NODE) {
+                return false;
+            }
+
+            if (isEmptyParagraph(node)) {
+                return true;
+            }
+
+            const text = String(node.textContent || "")
+                .replace(/\\(?:hfil|hfill)\b/gi, "")
+                .trim();
+
+            return (
+                !text
+                && !isPlaceholderBlock(node)
+            );
+        }
+
+        function collectPlaceholderRuns(parent) {
+            const nodes = Array.from(parent.childNodes);
+            const runs = [];
+
+            let current = [];
+
+            function flush() {
+                const placeholders =
+                    current.filter(isPlaceholderBlock);
+
+                if (placeholders.length >= 2) {
+                    runs.push(current);
+                }
+
+                current = [];
+            }
+
+            nodes.forEach(node => {
+                if (
+                    isPlaceholderBlock(node)
+                    || isIgnorablePlaceholderLayoutNode(node)
+                ) {
+                    current.push(node);
+                    return;
+                }
+
+                flush();
+            });
+
+            flush();
+
+            return runs;
+        }
+
+        function nextMeaningfulSibling(node) {
+            let sibling = node?.nextSibling || null;
+
+            while (
+                sibling
+                && isIgnorablePlaceholderLayoutNode(sibling)
+            ) {
+                sibling = sibling.nextSibling;
+            }
+
+            return sibling;
+        }
+
+        function groupPlaceholderArrowPairs(parent) {
+            let node = parent.firstChild;
+
+            while (node) {
+                if (!isPlaceholderBlock(node)) {
+                    node = node.nextSibling;
+                    continue;
+                }
+
+                const arrow =
+                    nextMeaningfulSibling(node);
+
+                const rightPlaceholder =
+                    nextMeaningfulSibling(arrow);
+
+                if (
+                    !isPlaceholderArrow(arrow)
+                    || !isPlaceholderBlock(rightPlaceholder)
+                ) {
+                    node = node.nextSibling;
+                    continue;
+                }
+
+                const nextNode =
+                    rightPlaceholder.nextSibling;
+
+                // Remember all nodes between the two images so leftover
+                // empty paragraphs can be removed too.
+                const consumedNodes = [];
+                let consumedNode = node;
+
+                while (consumedNode) {
+                    consumedNodes.push(consumedNode);
+
+                    if (consumedNode === rightPlaceholder) {
+                        break;
+                    }
+
+                    consumedNode =
+                        consumedNode.nextSibling;
+                }
+
+                const row =
+                    document.createElement("div");
+
+                row.className =
+                    "pm-placeholder-row pm-placeholder-arrow-row";
+
+                row.style.display = "grid";
+                row.style.gridTemplateColumns =
+                    "minmax(0, 1fr) auto minmax(0, 1fr)";
+                row.style.alignItems = "center";
+                row.style.gap = "1rem";
+                row.style.margin = "1rem auto";
+                row.style.maxWidth = "44rem";
+
+                const leftItem =
+                    document.createElement("div");
+
+                leftItem.className =
+                    "pm-placeholder-item";
+
+                const rightItem =
+                    document.createElement("div");
+
+                rightItem.className =
+                    "pm-placeholder-item";
+
+                parent.insertBefore(row, node);
+
+                leftItem.appendChild(node);
+                row.appendChild(leftItem);
+
+                row.appendChild(arrow);
+
+                rightItem.appendChild(rightPlaceholder);
+                row.appendChild(rightItem);
+
+                consumedNodes.forEach(consumed => {
+                    if (
+                        consumed !== node
+                        && consumed !== arrow
+                        && consumed !== rightPlaceholder
+                    ) {
+                        consumed.remove();
+                    }
+                });
+
+                node = nextNode;
+            }
+        }
+
+        container
+            .querySelectorAll(".math-center")
+            .forEach(parent => {
+                groupPlaceholderArrowPairs(parent);
+            });
+
+        const placeholderParents = [
+            container,
+            ...container.querySelectorAll(".math-center")
+        ];
+
+        placeholderParents.forEach(parent => {
+            collectPlaceholderRuns(parent).forEach(run => {
+                const placeholders =
+                    run.filter(isPlaceholderBlock);
+
+                /*
+                * Build rows of at most two placeholders. This turns four
+                * consecutive knot examples into two rows rather than one
+                * oversized four-item row.
+                */
+                const rows = [];
+
+                for (
+                    let index = 0;
+                    index < placeholders.length;
+                    index += 2
+                ) {
+                    rows.push(
+                        placeholders.slice(index, index + 2)
+                    );
+                }
+
+                const firstNode = run[0];
+                const insertionParent = firstNode.parentNode;
+
+                if (!insertionParent) {
+                    return;
+                }
+
+                rows.forEach(items => {
+                    const row = document.createElement("div");
+
+                    row.className = "pm-placeholder-row";
+                    row.style.display = "flex";
+                    row.style.justifyContent = "center";
+                    row.style.alignItems = "center";
+                    row.style.gap = "1rem";
+                    row.style.flexWrap = "wrap";
+                    row.style.margin = "1rem 0";
+
+                    items.forEach(block => {
+                        const item =
+                            document.createElement("div");
+
+                        item.className =
+                            "pm-placeholder-item";
+
+                        item.style.flex = "0 1 18rem";
+                        item.appendChild(
+                            block.cloneNode(true)
+                        );
+
+                        row.appendChild(item);
+                    });
+
+                    insertionParent.insertBefore(
+                        row,
+                        firstNode
+                    );
+                });
+
+                run.forEach(node => node.remove());
+            });
+        });
+
+        return container.innerHTML;
+    }
+
     function convertPiecewiseArraysToHtml(tex) {
         if (!tex) return "";
 
@@ -4843,6 +5244,10 @@
 
         // Replace old LaTeX/EPS image commands with readable placeholders.
         clean = normalizeLatexImageArtifacts(clean);
+        
+        // Arrange related placeholders while legacy layout markers
+        // such as \raisebox and \hskip are still present.
+        clean = normalizePlaceholderImageLayouts(clean);
 
         // Preserve visible spacing around prose conjunctions inside math.
         // Plain "and" is treated as math identifiers, so its surrounding
