@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "mixed-tex-prose-quotes-v1",
+        debugVersion: "inline-math-punctuation-join-v2",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -5206,6 +5206,39 @@
         return template.innerHTML;
     }
 
+    function preventInlineMathPunctuationWrap(value) {
+        let output = String(value || "");
+
+        // MathJax inline form:
+        //   \(x\). -> <span ...>\(x\).</span>
+        output = output.replace(
+            /(\\\((?:\\.|[\s\S])*?\\\))([.,;:!?])/g,
+            function (_, math, punctuation) {
+                return `
+                    <span
+                        class="pm-inline-math-punctuation"
+                        style="white-space:nowrap;"
+                    >${math}${punctuation}</span>
+                `;
+            }
+        );
+
+        // Legacy single-dollar inline math. Exclude $$ display math.
+        output = output.replace(
+            /(^|[^\\$])(\$(?!\$)(?:\\.|[^$])*?\$(?!\$))([.,;:!?])/g,
+            function (_, prefix, math, punctuation) {
+                return `${prefix}
+                    <span
+                        class="pm-inline-math-punctuation"
+                        style="white-space:nowrap;"
+                    >${math}${punctuation}</span>
+                `;
+            }
+        );
+
+        return output;
+    }
+
     function cleanLaTeXEnvironments(tex) {
         if (!tex) return "";
 
@@ -5501,6 +5534,10 @@
 
         // Remove theorem/definition wrappers whose bodies became empty
         clean = removeEmptyMathEnvironmentSections(clean);
+
+        // Keep punctuation attached to the inline MathJax expression that
+        // immediately precedes it.
+        clean = preventInlineMathPunctuationWrap(clean);
 
         return clean;
     }
