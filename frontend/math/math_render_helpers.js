@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "legacy-proof-heading-v1",
+        debugVersion: "mixed-tex-prose-quotes-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -404,6 +404,18 @@
         //   ``quoted text'' -> “quoted text”
         output = output.replace(
             /``([^<>]*?)''/g,
+            "“$1”"
+        );
+
+        // Some legacy PlanetMath prose starts a quotation with TeX
+        // backticks but ends it with an ordinary double quote:
+        //
+        //   ``quoted text"
+        //
+        // Allow generated HTML inside the quotation, but do not cross
+        // a paragraph boundary or consume another opening quote.
+        output = output.replace(
+            /``((?:(?!``|<\/p>)[\s\S])*?)"/g,
             "“$1”"
         );
 
