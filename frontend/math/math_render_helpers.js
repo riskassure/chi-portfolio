@@ -2515,6 +2515,16 @@
         const objectTex = text
             .replace(arrowPattern, "")
             .replace(/\s+/g, " ")
+
+            /*
+            * A recovered or partially preserved xymatrix row separator can
+            * leave one or more backslashes in an otherwise empty object cell.
+            *
+            * Without this cleanup, renderXyObjectCell() wraps that residue in
+            * generated \( ... \) delimiters, which can display literally.
+            */
+            .replace(/\\+\s*$/, "")
+
             .trim();
 
         return {
