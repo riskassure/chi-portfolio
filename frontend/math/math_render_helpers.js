@@ -588,11 +588,13 @@
         //   C\^{o}nes -> Cônes
         const circumflexCharacters = {
             A: "Â",
+            C: "Ĉ",
             E: "Ê",
             I: "Î",
             O: "Ô",
             U: "Û",
             a: "â",
+            c: "ĉ",
             e: "ê",
             i: "î",
             o: "ô",
@@ -600,7 +602,7 @@
         };
 
         output = output.replace(
-            /\\\^\s*\{([AEIOUaeiou])\}/g,
+            /\\\^\s*\{([ACEIOUaceiou])\}/g,
             function (_, letter) {
                 return circumflexCharacters[letter] || letter;
             }
@@ -608,7 +610,7 @@
 
         // Also support the unbraced TeX form: \^o
         output = output.replace(
-            /\\\^\s*([AEIOUaeiou])/g,
+            /\\\^\s*([ACEIOUaceiou])/g,
             function (_, letter) {
                 return circumflexCharacters[letter] || letter;
             }
