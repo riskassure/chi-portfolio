@@ -5009,7 +5009,7 @@
 
         // Display-wrapped cases environment.
         output = output.replace(
-            /\\\[\s*([\s\S]*?)\\begin\s*\{cases\}([\s\S]*?)\\end\s*\{cases\}\s*\\\]/gi,
+            /\\\[\s*((?:(?!\\\])[\s\S])*?)\\begin\s*\{cases\}([\s\S]*?)\\end\s*\{cases\}\s*\\\]/gi,
             function(_, prefix, body) {
                 return buildPiecewiseArrayHtml(prefix, body);
             }
@@ -5097,8 +5097,6 @@
             .map(splitEqnarrayCells)
             .filter(cells => cells.some(cell => cell.trim().length > 0));
 
-        const braceFontSizeRem = Math.max(2.8, rows.length * 1.48);
-
         if (rows.length === 0) {
             return cleanPrefix ? `\\[${cleanPrefix}\\]` : "";
         }
@@ -5132,10 +5130,10 @@
 
         const prefixHtml = cleanPrefix
             ? `<span style="
-                    display:inline-block;
-                    vertical-align:baseline;
-                    margin-right:0.12rem;
-                    transform:${isInline ? "translateY(0)" : "translateY(0.16em)"};
+                    display:inline-flex;
+                    align-items:center;
+                    align-self:center;
+                    margin-right:0.18rem;
                 ">\\(${escapeHtmlForMathCell(cleanPrefix)}\\)</span>`
             : "";
 
@@ -5196,18 +5194,23 @@
             <div
                 class="pm-piecewise-block tex2jax_process"
                 style="
-                    text-align:center;
+                    display:flex;
+                    align-items:stretch;
+                    justify-content:center;
                     margin:1rem 0;
                 "
             >
                 ${prefixHtml}
 
                 <span style="
-                    display:inline-block;
+                    display:inline-flex;
+                    align-items:stretch;
+                    align-self:stretch;
                     vertical-align:middle;
-                    font-size:${braceFontSizeRem.toFixed(2)}rem;
-                    line-height:0.9;
-                ">{</span>
+                    margin-right:0.10rem;
+                ">
+                    ${renderMatrixDelimiter("{", "left")}
+                </span>
 
                 <table style="
                     display:inline-table;
@@ -6432,7 +6435,7 @@
         const values = [];
 
         const protectBody = body => String(body || "").replace(
-            /\\(?:mbox|text)\s*\{([\s\S]*?)\}/gi,
+            /\\(?:mbox|text)\s*\{([^{}]*)\}/gi,
             (match, content) => {
                 const value = String(content || "");
 
