@@ -30,7 +30,11 @@
                 closure: ["\\overline{#1}", 1],
                 hdots: "\\dots",
                 derive: "\\stackrel{*}{\\Rightarrow}",
-
+                tmop: ["\\operatorname{#1}", 1],
+                assign: ":=",
+                mathbbm: ["#1", 1],
+                Span: "\\operatorname{span}",
+                
                 setOf: [
                     "\\left\\{#1\\;\\middle|\\;#2\\right\\}",
                     2
