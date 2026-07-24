@@ -5565,11 +5565,23 @@
             }
         );
 
-        // Legacy single-dollar inline math. Exclude $$ display math.
+        /*
+        * Process every legitimate single-dollar expression from left to right,
+        * even when it has no trailing punctuation.
+        *
+        * Making punctuation optional prevents the closing dollar of one
+        * expression from being mistaken for the opening dollar of the next:
+        *
+        *   $u\leftarrow v$ ($:=v\to u$),
+        */
         output = output.replace(
-            /(^|[^\\$])(\$(?!\$)(?:[^\\$]|\\[\s\S])*?\$(?!\$))([.,;:!?])/g,
-            function (_, prefix, math, punctuation) {
-                return `${prefix}
+            /(?<!\\)(?<!\$)(\$(?!\$)(?:\\[^\r\n]|[^\\$\r\n])*?(?<!\\)\$(?!\$))([.,;:!?])?/g,
+            function (_, math, punctuation) {
+                if (!punctuation) {
+                    return math;
+                }
+
+                return `
                     <span
                         class="pm-inline-math-punctuation"
                         style="white-space:nowrap;"
