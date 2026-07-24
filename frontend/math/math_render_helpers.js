@@ -5064,7 +5064,15 @@
     }
 
     function containsPiecewiseArray(value) {
-        return /\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\s*\{array\}/i
+        /*
+        * Only intercept genuinely one-sided piecewise arrays:
+        *
+        *   \left\{ \begin{array} ... \end{array} \right.
+        *
+        * Paired arrays ending in \right\} belong to the ordinary matrix
+        * sequence renderer, which can draw matching scalable braces.
+        */
+        return /\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\s*\{array\}\s*\{[^{}]*\}[\s\S]*?\\end\s*\{array\}\s*\\right\s*\./i
             .test(String(value || ""));
     }
 
@@ -5072,7 +5080,7 @@
         const source = String(displayBody || "");
 
         const piecewisePattern =
-            /\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\s*\{array\}\s*\{([^{}]*)\}([\s\S]*?)\\end\s*\{array\}\s*\\right\s*\.?/gi;
+            /\\left\s*(?:\\?\{|\\lbrace)\s*\\begin\s*\{array\}\s*\{([^{}]*)\}([\s\S]*?)\\end\s*\{array\}\s*\\right\s*\./gi;
 
         const pieces = [];
         let cursor = 0;
