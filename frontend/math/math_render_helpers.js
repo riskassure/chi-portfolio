@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-sequence-layout-v3",
+        debugVersion: "gradient-equation-align-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -4562,10 +4562,47 @@
     function normalizeDisplayMathEnvironments(tex) {
         if (!tex) return "";
 
+        /*
+        * Math environments are already in math mode. Repair legacy source
+        * that embeds another $...$ expression inside \text{...}:
+        *
+        *   \text{for all vectors $\vv \in \real^n$.}
+        *
+        * becomes:
+        *
+        *   \text{for all vectors }\vv \in \real^n\text{.}
+        */
+        const normalizeBody = body =>
+            String(body || "").replace(
+                /\\(?:text|mbox|textrm)\s*\{([^{}$]*?)\$([^$]+)\$([^{}$]*?)\}/gi,
+                function (_, beforeText, mathBody, afterText) {
+                    return (
+                        (beforeText
+                            ? `\\text{${beforeText}}`
+                            : ""
+                        ) +
+                        String(mathBody || "").trim() +
+                        (afterText
+                            ? `\\text{${afterText}}`
+                            : ""
+                        )
+                    );
+                }
+            );
+
         return String(tex)
-            .replace(/\\begin\{displaymath\}([\s\S]*?)\\end\{displaymath\}/gi, "\\[$1\\]")
-            .replace(/\\begin\{equation\*\}([\s\S]*?)\\end\{equation\*\}/gi, "\\[$1\\]")
-            .replace(/\\begin\{equation\}([\s\S]*?)\\end\{equation\}/gi, "\\[$1\\]");
+            .replace(
+                /\\begin\{displaymath\}([\s\S]*?)\\end\{displaymath\}/gi,
+                (_, body) => `\\[${normalizeBody(body)}\\]`
+            )
+            .replace(
+                /\\begin\{equation\*\}([\s\S]*?)\\end\{equation\*\}/gi,
+                (_, body) => `\\[${normalizeBody(body)}\\]`
+            )
+            .replace(
+                /\\begin\{equation\}([\s\S]*?)\\end\{equation\}/gi,
+                (_, body) => `\\[${normalizeBody(body)}\\]`
+            );
     }
 
     function normalizeDollarDisplayMath(tex) {
@@ -5622,6 +5659,23 @@
         clean = clean.replace(
             /<p[^>]*>\s*(?:%+\s*)+<\/p>/gi,
             ""
+        );
+
+        /*
+        * The backend can combine a commented legacy heading with live content
+        * inside the same paragraph:
+        *
+        *   <p>%<strong>Differential identities..</strong>
+        *   <h2>Differential identities</h2>
+        *   Several properties ...
+        *
+        * Remove only the commented legacy heading. Preserve the paragraph and
+        * everything following it so structural environments such as align*
+        * retain their opening marker and first row.
+        */
+        clean = clean.replace(
+            /(<p\b[^>]*>)\s*%+\s*<strong\b[^>]*>[\s\S]*?<\/strong>\s*/gi,
+            "$1"
         );
 
         /*
