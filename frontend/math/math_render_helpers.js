@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-mixed-wrapper-v1",
+        debugVersion: "xymatrix-sequence-layout-v3",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -1931,6 +1931,8 @@
 
     const XY_PLAIN_HORIZONTAL_LINE = "__PM_XY_PLAIN_HORIZONTAL_LINE__";
 
+    const XY_VERTICAL_ROWSPAN_COVERED = "__PM_XY_VERTICAL_ROWSPAN_COVERED__";
+
     function recoverLostXyMatrixRowSeparators(value) {
         let source = String(value || "");
 
@@ -1998,11 +2000,32 @@
                     arrow => arrow.isSelfLoop
                 );
 
-                grid[gridRow][gridCol] = renderXyObjectCell(
+                const objectHtml = renderXyObjectCell(
                     cell.objectTex,
                     cell.objectFrame,
                     selfLoops
                 );
+
+                const hasVisibleObject =
+                    String(cell.objectTex || "").trim() !== ""
+                    || Boolean(cell.objectFrame)
+                    || selfLoops.length > 0;
+
+                /*
+                * Do not let an empty source cell overwrite part of a spanning arrow
+                * that was placed earlier by an arrow from a preceding row.
+                *
+                * Example:
+                *
+                *   C\ar[dd]_h\\
+                *   &A\\
+                *   K
+                *
+                * The empty cell before A occupies the middle of the C-to-K arrow.
+                */
+                if (hasVisibleObject || !grid[gridRow][gridCol]) {
+                    grid[gridRow][gridCol] = objectHtml;
+                }
 
                 if (
                     cell.twoCellLabel
@@ -2079,6 +2102,11 @@
             while (colIndex < row.length) {
                 const cellHtml = row[colIndex];
 
+                if (cellHtml === XY_VERTICAL_ROWSPAN_COVERED) {
+                    colIndex += 1;
+                    continue;
+                }
+
                 if (cellHtml === XY_PLAIN_HORIZONTAL_LINE) {
                     let runEnd = colIndex + 1;
 
@@ -2112,17 +2140,39 @@
                     continue;
                 }
 
-                const padding = getXyMatrixCellPadding(
-                    rowIndex,
-                    colIndex
-                );
+                const isVerticalSegmentCell =
+                    /\bpm-xymatrix-vertical-segment\b/.test(cellHtml);
+
+                const padding = isVerticalSegmentCell
+                    ? "0"
+                    : getXyMatrixCellPadding(rowIndex, colIndex);
+
+                const cellLineHeight = isVerticalSegmentCell
+                    ? "line-height:0;"
+                    : "";
+
+                const verticalRowSpanMatch =
+                    String(cellHtml || "").match(
+                        /\bdata-pm-rowspan="(\d+)"/
+                    );
+
+                const verticalRowSpan =
+                    verticalRowSpanMatch
+                        ? Math.max(Number(verticalRowSpanMatch[1]) || 1, 1)
+                        : 1;
+
+                const rowSpanAttribute =
+                    verticalRowSpan > 1
+                        ? ` rowspan="${verticalRowSpan}"`
+                        : "";
 
                 htmlCells.push(`
-                    <td style="
+                    <td${rowSpanAttribute} style="
                         padding:${padding};
                         text-align:center;
                         vertical-align:middle;
                         white-space:nowrap;
+                        ${cellLineHeight}
                     ">
                         ${cellHtml}
                     </td>
@@ -2726,6 +2776,72 @@
         `;
     }
 
+    function applySpanningVerticalArrowToGrid(
+        grid,
+        gridRow,
+        gridCol,
+        label,
+        direction,
+        span,
+        arrowLayout
+    ) {
+        const sourceSpan = Math.max(Number(span) || 1, 1);
+
+        /*
+        * One source-row jump occupies one expanded arrow row.
+        * Additional jumps also cross the intervening object rows.
+        *
+        *   span 1 -> rowspan 1
+        *   span 2 -> rowspan 3
+        *   span 3 -> rowspan 5
+        */
+        const rowSpan = sourceSpan * 2 - 1;
+
+        const startRow =
+            direction === "up"
+                ? gridRow - rowSpan
+                : gridRow + 1;
+
+        const ordinaryArrowHeight =
+            arrowLayout.verticalHeightEm || 2.7;
+
+        const intermediateObjectHeight = 1.25;
+
+        const totalHeightEm =
+            sourceSpan * ordinaryArrowHeight
+            + (sourceSpan - 1) * intermediateObjectHeight;
+
+        setGridCellIfInBounds(
+            grid,
+            startRow,
+            gridCol,
+            renderVerticalArrow(
+                label,
+                direction,
+                arrowLayout,
+                {
+                    rowSpan,
+                    heightEm: totalHeightEm,
+                    showArrowHead: true,
+                    extendLine: false
+                }
+            )
+        );
+
+        /*
+        * These grid positions are occupied by the rowspan cell and must
+        * not produce their own table cells.
+        */
+        for (let offset = 1; offset < rowSpan; offset += 1) {
+            setGridCellIfInBounds(
+                grid,
+                startRow + offset,
+                gridCol,
+                XY_VERTICAL_ROWSPAN_COVERED
+            );
+        }
+    }
+
     function applyXyArrowToGrid(grid, gridRow, gridCol, arrow, arrowLayout) {
         const label = arrow.label || "";
         const direction = arrow.direction || "r";
@@ -2821,21 +2937,27 @@
         }
 
         if (direction === "d") {
-            setGridCellIfInBounds(
+            applySpanningVerticalArrowToGrid(
                 grid,
-                gridRow + 1,
+                gridRow,
                 gridCol,
-                renderVerticalArrow(label, "down", arrowLayout)
+                label,
+                "down",
+                span,
+                arrowLayout
             );
             return;
         }
 
         if (direction === "u") {
-            setGridCellIfInBounds(
+            applySpanningVerticalArrowToGrid(
                 grid,
-                gridRow - 1,
+                gridRow,
                 gridCol,
-                renderVerticalArrow(label, "up", arrowLayout)
+                label,
+                "up",
+                span,
+                arrowLayout
             );
         }
     }
@@ -3338,10 +3460,43 @@
         `;
     }
 
-    function renderVerticalArrow(label, direction = "down", arrowLayout = {}) {
+    function renderVerticalArrow(
+        label,
+        direction = "down",
+        arrowLayout = {},
+        options = {}
+    ) {
         const safeLabel = escapeHtmlForMathCell(label || "");
-        const heightEm = arrowLayout.verticalHeightEm || 2.7;
-        const widthEm = arrowLayout.verticalWidthEm || 2.4;
+
+        const heightEm =
+            Number(options.heightEm)
+            || arrowLayout.verticalHeightEm
+            || 2.7;
+
+        const widthEm =
+            arrowLayout.verticalWidthEm
+            || 2.4;
+
+        const showArrowHead =
+            options.showArrowHead !== false;
+
+        const rowSpan =
+            Math.max(Number(options.rowSpan) || 1, 1);
+
+        const rowSpanAttribute =
+            rowSpan > 1
+                ? ` data-pm-rowspan="${rowSpan}"`
+                : "";
+
+        const wrapperClass =
+            rowSpan > 1
+                ? "pm-xymatrix-vertical-segment pm-xymatrix-vertical-span"
+                : "pm-xymatrix-vertical-segment";
+
+        const lineEdge =
+            options.extendLine === true
+                ? "-0.22rem"
+                : "0";
 
         const labelHtml = safeLabel
             ? `<div style="
@@ -3356,33 +3511,37 @@
                 ">\\({\\scriptstyle ${safeLabel}}\\)</div>`
             : "";
 
-        const arrowHead =
-            direction === "up"
-                ? `<span style="
-                        position:absolute;
-                        left:50%;
-                        top:0;
-                        transform:translateX(-50%);
-                        width:0;
-                        height:0;
-                        border-left:0.30em solid transparent;
-                        border-right:0.30em solid transparent;
-                        border-bottom:0.48em solid currentColor;
-                    "></span>`
-                : `<span style="
-                        position:absolute;
-                        left:50%;
-                        bottom:0;
-                        transform:translateX(-50%);
-                        width:0;
-                        height:0;
-                        border-left:0.30em solid transparent;
-                        border-right:0.30em solid transparent;
-                        border-top:0.48em solid currentColor;
-                    "></span>`;
+        let arrowHead = "";
+
+        if (showArrowHead) {
+            arrowHead =
+                direction === "up"
+                    ? `<span style="
+                            position:absolute;
+                            left:50%;
+                            top:${lineEdge};
+                            transform:translateX(-50%);
+                            width:0;
+                            height:0;
+                            border-left:0.30em solid transparent;
+                            border-right:0.30em solid transparent;
+                            border-bottom:0.48em solid currentColor;
+                        "></span>`
+                    : `<span style="
+                            position:absolute;
+                            left:50%;
+                            bottom:${lineEdge};
+                            transform:translateX(-50%);
+                            width:0;
+                            height:0;
+                            border-left:0.30em solid transparent;
+                            border-right:0.30em solid transparent;
+                            border-top:0.48em solid currentColor;
+                        "></span>`;
+        }
 
         return `
-            <div style="
+            <div class="${wrapperClass}"${rowSpanAttribute} style="
                 position:relative;
                 width:${widthEm}em;
                 height:${heightEm}em;
@@ -3392,11 +3551,12 @@
                 <span style="
                     position:absolute;
                     left:50%;
-                    top:0;
-                    bottom:0;
+                    top:${lineEdge};
+                    bottom:${lineEdge};
                     transform:translateX(-50%);
                     border-left:1.5px solid currentColor;
                 "></span>
+
                 ${arrowHead}
                 ${labelHtml}
             </div>
@@ -3413,7 +3573,18 @@
         const tableRegex =
             /<table\b[^>]*class=["'][^"']*\bpm-xymatrix-table\b[^"']*["'][^>]*>[\s\S]*?<\/table>/gi;
 
-        const parts = [];
+        const tokens = [];
+
+        const normalizeSequenceTableHtml = tableHtml =>
+            String(tableHtml || "")
+                .replace(
+                    /margin\s*:\s*1rem\s+auto\s*;/i,
+                    "margin:0;"
+                )
+                .replace(
+                    /margin\s*:\s*1rem\s+0\.45rem\s*;/i,
+                    "margin:0;"
+                );
 
         const pushMathText = text => {
             const normalized = String(text || "")
@@ -3424,22 +3595,47 @@
                 return;
             }
 
-            const punctuationMatch = normalized.match(/^(.*?)([.,;:!?])$/);
+            const punctuationMatch =
+                normalized.match(/^(.*?)([.,;:!?])$/);
+
             const core = punctuationMatch
                 ? punctuationMatch[1].trim()
                 : normalized;
+
             const trailingPunctuation = punctuationMatch
                 ? punctuationMatch[2]
                 : "";
 
             if (core) {
-                parts.push(
-                    `<span class="pm-xymatrix-connector" style="display:inline-block; margin:0 0.55rem;">\\(${core}\\)</span>`
-                );
+                tokens.push({
+                    type: "math",
+                    core,
+                    punctuation: trailingPunctuation
+                });
+                return;
             }
 
+            /*
+            * A punctuation-only fragment after the final table belongs
+            * to that table:
+            *
+            *   table = table .
+            *
+            * It must not become the first character of the next paragraph.
+            */
             if (trailingPunctuation) {
-                parts.push(trailingPunctuation);
+                const lastToken = tokens[tokens.length - 1];
+
+                if (lastToken?.type === "table") {
+                    lastToken.punctuation =
+                        `${lastToken.punctuation || ""}${trailingPunctuation}`;
+                    return;
+                }
+
+                tokens.push({
+                    type: "punctuation",
+                    text: trailingPunctuation
+                });
             }
         };
 
@@ -3448,13 +3644,98 @@
 
         while ((match = tableRegex.exec(source)) !== null) {
             pushMathText(source.slice(cursor, match.index));
-            parts.push(match[0]);
+
+            tokens.push({
+                type: "table",
+                html: match[0],
+                punctuation: ""
+            });
+
             cursor = match.index + match[0].length;
         }
 
         pushMathText(source.slice(cursor));
 
-        return parts.join("");
+        const tableCount =
+            tokens.filter(token => token.type === "table").length;
+
+        const hasConnector =
+            tokens.some(token => token.type === "math");
+
+        const hasAttachedPunctuation =
+            tokens.some(
+                token =>
+                    token.type === "table"
+                    && Boolean(token.punctuation)
+            );
+
+        const needsSequenceLayout =
+            tableCount > 1
+            || hasConnector
+            || hasAttachedPunctuation;
+
+        const renderToken = token => {
+            if (token.type === "math") {
+                return `
+                    <span
+                        class="pm-xymatrix-connector"
+                        style="
+                            display:inline-block;
+                            margin:0;
+                            white-space:nowrap;
+                        "
+                    >\\({}${token.core}{}\\)${token.punctuation || ""}</span>
+                `;
+            }
+
+            if (token.type === "table") {
+                const tableHtml = needsSequenceLayout
+                    ? normalizeSequenceTableHtml(token.html)
+                    : token.html;
+
+                if (!token.punctuation) {
+                    return tableHtml;
+                }
+
+                return `
+                    <div style="
+                        display:inline-flex;
+                        align-items:center;
+                        white-space:nowrap;
+                    ">
+                        ${tableHtml}
+                        <span style="margin-left:0.08rem;">
+                            ${token.punctuation}
+                        </span>
+                    </div>
+                `;
+            }
+
+            return token.text || "";
+        };
+
+        const renderedTokens =
+            tokens.map(renderToken).join("");
+
+        if (!needsSequenceLayout) {
+            return renderedTokens;
+        }
+
+        return `
+            <div
+                class="pm-xymatrix-sequence"
+                style="
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    flex-wrap:wrap;
+                    gap:0.55rem;
+                    margin:1rem 0;
+                "
+            >
+                ${renderedTokens}
+            </div>
+        `;
     }
 
     function unwrapConvertedXyMatrixMathWrappers(value) {
