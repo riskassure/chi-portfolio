@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "inline-math-punctuation-join-v2",
+        debugVersion: "xymatrix-mixed-wrapper-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -3403,56 +3403,116 @@
         `;
     }
 
+    function renderMixedXyMatrixWrapperContent(content) {
+        const source = String(content || "");
+
+        if (!/pm-xymatrix-table/.test(source)) {
+            return source;
+        }
+
+        const tableRegex =
+            /<table\b[^>]*class=["'][^"']*\bpm-xymatrix-table\b[^"']*["'][^>]*>[\s\S]*?<\/table>/gi;
+
+        const parts = [];
+
+        const pushMathText = text => {
+            const normalized = String(text || "")
+                .replace(/\s+/g, " ")
+                .trim();
+
+            if (!normalized) {
+                return;
+            }
+
+            const punctuationMatch = normalized.match(/^(.*?)([.,;:!?])$/);
+            const core = punctuationMatch
+                ? punctuationMatch[1].trim()
+                : normalized;
+            const trailingPunctuation = punctuationMatch
+                ? punctuationMatch[2]
+                : "";
+
+            if (core) {
+                parts.push(
+                    `<span class="pm-xymatrix-connector" style="display:inline-block; margin:0 0.55rem;">\\(${core}\\)</span>`
+                );
+            }
+
+            if (trailingPunctuation) {
+                parts.push(trailingPunctuation);
+            }
+        };
+
+        let cursor = 0;
+        let match;
+
+        while ((match = tableRegex.exec(source)) !== null) {
+            pushMathText(source.slice(cursor, match.index));
+            parts.push(match[0]);
+            cursor = match.index + match[0].length;
+        }
+
+        pushMathText(source.slice(cursor));
+
+        return parts.join("");
+    }
+
     function unwrapConvertedXyMatrixMathWrappers(value) {
         let output = String(value || "");
 
         const tablePattern =
-            '(<table\\b[^>]*class=["\'][^"\']*\\bpm-xymatrix-table\\b[^"\']*["\'][^>]*>[\\s\\S]*?<\\/table>)';
+            '<table\\b[^>]*class=["\'][^"\']*\\bpm-xymatrix-table\\b[^"\']*["\'][^>]*>[\\s\\S]*?<\\/table>';
 
-        // Allow ordinary sentence punctuation immediately after a diagram.
-        // For example:
-        //
-        //   $$\xymatrix{...},$$
-        //
-        // becomes:
-        //
-        //   <table>...</table>,
-        const trailingPunctuation = "([,.;:!?]?)";
-
-        // Display dollar wrappers: $$ <table> [, punctuation] $$
+        /*
+        * Display wrappers may legitimately contain:
+        *
+        *   table = table
+        *   table = 0
+        *
+        * Process those as mixed xymatrix sequences.
+        */
         output = output.replace(
             new RegExp(
-                `\\$\\$\\s*${tablePattern}\\s*${trailingPunctuation}\\s*\\$\\$`,
+                `\\$\\$\\s*([\\s\\S]*?${tablePattern}[\\s\\S]*?)\\s*\\$\\$`,
                 "gi"
             ),
-            "$1$2"
+            (_, inner) =>
+                renderMixedXyMatrixWrapperContent(inner)
         );
 
-        // Inline dollar wrappers: $ <table> [, punctuation] $
         output = output.replace(
             new RegExp(
-                `\\$\\s*${tablePattern}\\s*${trailingPunctuation}\\s*\\$`,
+                `\\\\\\[\\s*([\\s\\S]*?${tablePattern}[\\s\\S]*?)\\s*\\\\\\]`,
                 "gi"
             ),
-            "$1$2"
+            (_, inner) =>
+                renderMixedXyMatrixWrapperContent(inner)
         );
 
-        // LaTeX display wrappers: \[ <table> [, punctuation] \]
+        /*
+        * Inline dollar wrappers must contain only one converted table,
+        * plus optional punctuation. Do not search broadly through prose
+        * for a later xymatrix table.
+        */
         output = output.replace(
             new RegExp(
-                `\\\\\\[\\s*${tablePattern}\\s*${trailingPunctuation}\\s*\\\\\\]`,
+                `(^|[^\\\\$])\\$(?!\\$)\\s*(${tablePattern})\\s*([,.;:!?]?)\\s*\\$(?!\\$)`,
                 "gi"
             ),
-            "$1$2"
+            (_, prefix, tableHtml, punctuation) =>
+                `${prefix}${tableHtml}${punctuation || ""}`
         );
 
-        // LaTeX inline wrappers: \( <table> [, punctuation] \)
+        /*
+        * Same narrow rule for \( ... \).
+        */
         output = output.replace(
             new RegExp(
-                `\\\\\\(\\s*${tablePattern}\\s*${trailingPunctuation}\\s*\\\\\\)`,
+                `\\\\\\(\\s*(${tablePattern})\\s*([,.;:!?]?)\\s*\\\\\\)`,
                 "gi"
             ),
-            "$1$2"
+            (_, tableHtml, punctuation) =>
+                `${tableHtml}${punctuation || ""}`
         );
 
         return output;
@@ -4303,15 +4363,6 @@
                 node.nodeType === Node.ELEMENT_NODE &&
                 node.tagName === "P" &&
                 /^\\hfil\s*$/i.test(String(node.textContent || "").trim())
-            );
-        }
-
-        function isCenterlineParagraph(node) {
-            return (
-                node &&
-                node.nodeType === Node.ELEMENT_NODE &&
-                node.tagName === "P" &&
-                /\\centerline\s*\{/.test(String(node.textContent || ""))
             );
         }
 
@@ -5212,7 +5263,7 @@
         // MathJax inline form:
         //   \(x\). -> <span ...>\(x\).</span>
         output = output.replace(
-            /(\\\((?:\\.|[\s\S])*?\\\))([.,;:!?])/g,
+            /(\\\((?:[^\\]|\\(?!\)))*?\\\))([.,;:!?])/g,
             function (_, math, punctuation) {
                 return `
                     <span
@@ -5225,7 +5276,7 @@
 
         // Legacy single-dollar inline math. Exclude $$ display math.
         output = output.replace(
-            /(^|[^\\$])(\$(?!\$)(?:\\.|[^$])*?\$(?!\$))([.,;:!?])/g,
+            /(^|[^\\$])(\$(?!\$)(?:[^\\$]|\\[\s\S])*?\$(?!\$))([.,;:!?])/g,
             function (_, prefix, math, punctuation) {
                 return `${prefix}
                     <span
@@ -5280,6 +5331,17 @@
         clean = clean.replace(
             /\$\s*<(strong|em|b|i)>([^<>$]*)<\/\1>\s*\$/gi,
             "<$1>$2</$1>"
+        );
+
+        // Remove a stray dollar sign left immediately after backend-rendered
+        // prose formatting at the end of a sentence:
+        //
+        //   <em>module homomorphism</em>$.</p>
+        //   ->
+        //   <em>module homomorphism</em>.</p>
+        clean = clean.replace(
+            /(<\/(?:em|strong|b|i)>)\s*\$(?=\s*[.,;:!?]\s*(?:<\/p>|<\/li>|<\/div>|$))/gi,
+            "$1"
         );
 
         // Keep bold symbols inside math as TeX instead of later converting
