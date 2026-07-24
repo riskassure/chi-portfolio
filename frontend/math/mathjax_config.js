@@ -38,6 +38,10 @@
                 hom: "\\operatorname{Hom}",
                 Hom: "\\operatorname{Hom}",
                 Ker: "\\operatorname{Ker}",
+                Univ: "\\mathscr{U}",
+                liminv: "\\varprojlim",
+                limdir: "\\varinjlim",
+                Funct: "\\operatorname{Funct}",
 
                 Prob: "\\mathbb{P}",
                 F: "\\mathcal{F}",

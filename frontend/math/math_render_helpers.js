@@ -5609,6 +5609,23 @@
             ""
         );
 
+        /*
+        * The backend may wrap an entire commented TeX line in an HTML
+        * paragraph before the frontend receives it:
+        *
+        *   <p>%At this point ...</p>
+        *   <p>%&= \lim_{h\to 0} ...</p>
+        *
+        * Since the first non-whitespace source character is %, the entire
+        * paragraph is a TeX comment and must be discarded.
+        *
+        * Escaped percentages such as \% do not match this rule.
+        */
+        clean = clean.replace(
+            /<p\b[^>]*>\s*%[\s\S]*?<\/p>/gi,
+            ""
+        );
+
         // In TeX, a line whose first non-whitespace character is %
         // is entirely commented out and must not reach the rendered page.
         clean = clean.replace(/^[ \t]*%.*(?:\r?\n|$)/gm, "");
