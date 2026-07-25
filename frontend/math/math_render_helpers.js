@@ -4682,6 +4682,26 @@
             }
             
             /*
+            * A connector between converted xymatrix tables will be placed
+            * inside its own MathJax wrapper below. Remove the surrounding
+            * TeX spacing commands now so the later legacy connector cleanup
+            * does not replace HTML inside that MathJax wrapper.
+            */
+            const sequenceConnectorMatch = normalized.match(
+                /^\\quad\s*\{\s*(:?=)\s*\}\s*\\quad$/i
+            );
+
+            if (sequenceConnectorMatch) {
+                tokens.push({
+                    type: "math",
+                    core: sequenceConnectorMatch[1],
+                    punctuation: ""
+                });
+
+                return;
+            }
+
+            /*
             * Preserve an explicit TeX gap between adjacent diagrams as a CSS
             * spacer rather than sending \hspace to MathJax.
             */
