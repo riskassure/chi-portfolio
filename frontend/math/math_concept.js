@@ -93,6 +93,15 @@ async function renderConceptPage(concept) {
             });
         }
 
+        if (
+            window.MathCmsRender
+            && typeof window.MathCmsRender
+                .renderXyMatrixDiagonalOverlays === "function"
+        ) {
+            await window.MathCmsRender
+                .renderXyMatrixDiagonalOverlays(canvas);
+        }
+
         await hydrateConceptAdminControls(concept);
 
     } catch (renderError) {

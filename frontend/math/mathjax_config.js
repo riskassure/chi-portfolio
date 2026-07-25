@@ -49,6 +49,7 @@
                 liminv: "\\varprojlim",
                 limdir: "\\varinjlim",
                 Funct: "\\operatorname{Funct}",
+                from: "\\leftarrow",
 
                 Prob: "\\mathbb{P}",
                 F: "\\mathcal{F}",

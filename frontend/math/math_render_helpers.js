@@ -4,11 +4,12 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "gradient-equation-align-v1",
+        debugVersion: "xymatrix-diagonal-overlay-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
-        normalizeDiagramImageUrls
+        normalizeDiagramImageUrls,
+        renderXyMatrixDiagonalOverlays
     };
 
     function getDisplayTex(concept) {
@@ -1986,13 +1987,97 @@
         const sourceColumnCount = Math.max(...sourceRows.map(row => row.length));
         const arrowLayout = calculateXyMatrixArrowLayout(sourceRows);
 
+        const hasNamedReferenceTwoCell = sourceRows
+            .flat()
+            .some(cell => Boolean(cell.twoCellLabel));
+
+        /*
+        * Preserve the existing cell-based renderer for specialized
+        * two-cell diagrams. Ordinary xymatrix diagonals use the new
+        * table-level SVG overlay.
+        */
+        const useDiagonalOverlay =
+            !hasLegacyTwoCell
+            && !hasNamedReferenceTwoCell;
+
+        const diagonalArrows = [];
+
+        if (useDiagonalOverlay) {
+            sourceRows.forEach((row, sourceRow) => {
+                row.forEach((cell, sourceCol) => {
+                    (cell.arrows || []).forEach(arrow => {
+                        if (!isXyDiagonalDirection(arrow.direction)) {
+                            return;
+                        }
+
+                        const {
+                            rowDelta,
+                            colDelta
+                        } = getXyArrowCoordinateDelta(
+                            arrow.directionText
+                        );
+
+                        const targetRow =
+                            sourceRow + rowDelta;
+
+                        const targetCol =
+                            sourceCol + colDelta;
+
+                        if (
+                            targetRow < 0
+                            || targetRow >= sourceRows.length
+                            || targetCol < 0
+                            || targetCol >= sourceColumnCount
+                        ) {
+                            return;
+                        }
+
+                        diagonalArrows.push({
+                            sourceRow,
+                            sourceCol,
+                            targetRow,
+                            targetCol,
+
+                            label:
+                                arrow.label || "",
+
+                            labelPosition:
+                                arrow.labelPosition || "center",
+
+                            style:
+                                arrow.style || "->",
+
+                            curveSide:
+                                arrow.curveSide || "",
+
+                            curveAmount:
+                                arrow.curveAmount || ""
+                        });
+                    });
+                });
+            });
+        }
+
+        const diagonalDataAttribute =
+            diagonalArrows.length > 0
+                ? (
+                    ` data-pm-diagonal-arrows="`
+                    + encodeURIComponent(
+                        JSON.stringify(diagonalArrows)
+                    )
+                    + `"`
+                )
+                : "";
+
         /*
         * Long diagonals such as [lld] and [rrd] cross empty inter-object
         * columns. Reserve those column gaps so the SVG overlays remain inside
         * the measured xymatrix width and neighboring object labels do not
         * collapse together.
         */
-        const hasWideDiagonal = sourceRows
+        const hasWideDiagonal =
+            !useDiagonalOverlay
+            && sourceRows
             .flat()
             .some(cell =>
                 (cell.arrows || []).some(arrow =>
@@ -2108,16 +2193,24 @@
                         });
                 } else {
                     cell.arrows
-                        .filter(arrow => !arrow.isSelfLoop)
+                        .filter(arrow =>
+                            !arrow.isSelfLoop
+                            && !(
+                                useDiagonalOverlay
+                                && isXyDiagonalDirection(
+                                    arrow.direction
+                                )
+                            )
+                        )
                         .forEach(arrow => {
-                        applyXyArrowToGrid(
-                            grid,
-                            gridRow,
-                            gridCol,
-                            arrow,
-                            arrowLayout
-                        );
-                    });
+                            applyXyArrowToGrid(
+                                grid,
+                                gridRow,
+                                gridCol,
+                                arrow,
+                                arrowLayout
+                            );
+                        });
                 }
             });
         });
@@ -2219,9 +2312,18 @@
                     verticalRowSpan > 1
                         ? ` rowspan="${verticalRowSpan}"`
                         : "";
+                
+                const sourceCoordinateAttributes =
+                    rowIndex % 2 === 0
+                    && colIndex % 2 === 0
+                        ? (
+                            ` data-pm-source-row="${rowIndex / 2}"`
+                            + ` data-pm-source-col="${colIndex / 2}"`
+                        )
+                        : "";
 
                 htmlCells.push(`
-                    <td${rowSpanAttribute} style="
+                    <td${rowSpanAttribute}${sourceCoordinateAttributes} style="
                         padding:${padding};
                         text-align:center;
                         vertical-align:middle;
@@ -2240,7 +2342,7 @@
         }).join("");
 
         return `
-            <table
+            <table${diagonalDataAttribute}
                 class="pm-xymatrix-table tex2jax_process${hasLegacyTwoCell ? " pm-xymatrix-two-cell-table" : ""}"
                 style="
                     border-collapse:collapse;
@@ -2253,6 +2355,858 @@
                 ${htmlRows}
             </table>
         `;
+    }
+
+    let xyMatrixOverlayMarkerSerial = 0;
+
+    function parseXyCurveAmountToPixels(value, element) {
+        const text =
+            String(value || "").trim();
+
+        const fontSize =
+            Number.parseFloat(
+                window.getComputedStyle(element).fontSize
+            ) || 16;
+
+        if (!text) {
+            return fontSize * 0.5;
+        }
+
+        const match = text.match(
+            /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(ex|em|px|pt|pc|cm|mm|in)?$/i
+        );
+
+        if (!match) {
+            return fontSize * 0.5;
+        }
+
+        const amount =
+            Number(match[1]) || 0;
+
+        const unit =
+            String(match[2] || "ex").toLowerCase();
+
+        switch (unit) {
+            case "px":
+                return amount;
+
+            case "em":
+                return amount * fontSize;
+
+            case "pt":
+                return amount * 96 / 72;
+
+            case "pc":
+                return amount * 16;
+
+            case "cm":
+                return amount * 96 / 2.54;
+
+            case "mm":
+                return amount * 96 / 25.4;
+
+            case "in":
+                return amount * 96;
+
+            case "ex":
+            default:
+                return amount * fontSize * 0.5;
+        }
+    }
+
+    function getXyRectangleBoundaryDistance(
+        rect,
+        unitX,
+        unitY
+    ) {
+        const halfWidth =
+            Math.max(rect.width / 2, 1);
+
+        const halfHeight =
+            Math.max(rect.height / 2, 1);
+
+        const horizontalDistance =
+            Math.abs(unitX) > 0.0001
+                ? halfWidth / Math.abs(unitX)
+                : Number.POSITIVE_INFINITY;
+
+        const verticalDistance =
+            Math.abs(unitY) > 0.0001
+                ? halfHeight / Math.abs(unitY)
+                : Number.POSITIVE_INFINITY;
+
+        return Math.min(
+            horizontalDistance,
+            verticalDistance
+        );
+    }
+
+    function createXyOverlayArrowMarker(
+        svg,
+        markerId
+    ) {
+        const namespace =
+            "http://www.w3.org/2000/svg";
+
+        let defs =
+            svg.querySelector("defs");
+
+        if (!defs) {
+            defs =
+                document.createElementNS(
+                    namespace,
+                    "defs"
+                );
+
+            svg.appendChild(defs);
+        }
+
+        const marker =
+            document.createElementNS(
+                namespace,
+                "marker"
+            );
+
+        marker.setAttribute("id", markerId);
+        marker.setAttribute("markerWidth", "5.5");
+        marker.setAttribute("markerHeight", "5.5");
+        marker.setAttribute("refX", "5.1");
+        marker.setAttribute("refY", "2.75");
+        marker.setAttribute("orient", "auto");
+        marker.setAttribute(
+            "markerUnits",
+            "strokeWidth"
+        );
+
+        const markerPath =
+            document.createElementNS(
+                namespace,
+                "path"
+            );
+
+        markerPath.setAttribute(
+            "d",
+            "M0,0 L5.5,2.75 L0,5.5 Z"
+        );
+
+        markerPath.setAttribute(
+            "fill",
+            "currentColor"
+        );
+
+        marker.appendChild(markerPath);
+        defs.appendChild(marker);
+    }
+
+    function getOverlayCellCenter(
+        cellRect,
+        tableRect,
+        sourceRow,
+        sourceCol,
+        maxSourceRow,
+        maxSourceCol,
+        diagonalEndpointKeys
+    ) {
+        let x =
+            cellRect.left
+            + cellRect.width / 2
+            - tableRect.left;
+
+        let y =
+            cellRect.top
+            + cellRect.height / 2
+            - tableRect.top;
+
+        const key = `${sourceRow}:${sourceCol}`;
+        const isDiagonalEndpoint =
+            diagonalEndpointKeys.has(key);
+
+        const atTop = sourceRow === 0;
+        const atBottom = sourceRow === maxSourceRow;
+        const atLeft = sourceCol === 0;
+        const atRight = sourceCol === maxSourceCol;
+
+        /*
+        * Only push truly outer diagonal endpoints such as
+        * the Z in pullback/pushout universal-property diagrams.
+        */
+        if (isDiagonalEndpoint) {
+            if (atLeft) x -= 22;
+            if (atRight) x += 22;
+            if (atTop) y -= 16;
+            if (atBottom) y += 16;
+        }
+
+        return { x, y };
+    }
+
+    function getXyOverlayObjectAnchor(cell) {
+        if (!cell) {
+            return null;
+        }
+
+        /*
+        * After MathJax typesets a plain object, its mjx-container is
+        * normally the direct child of the coordinate <td>.
+        *
+        * Framed objects and self-loop objects use our own wrappers.
+        */
+        return (
+            cell.querySelector(
+                ":scope > .pm-xymatrix-object-with-loops,"
+                + ":scope > .pm-xymatrix-state,"
+                + ":scope > mjx-container"
+            )
+            || cell
+        );
+    }
+
+    function getXyOverlayCoordinateKey(row, col) {
+        return `${Number(row)}:${Number(col)}`;
+    }
+
+    async function renderXyMatrixDiagonalOverlays(
+        root = document
+    ) {
+        const scope =
+            root && typeof root.querySelectorAll === "function"
+                ? root
+                : document;
+
+        const tables = Array.from(
+            scope.querySelectorAll(
+                "table.pm-xymatrix-table"
+                + "[data-pm-diagonal-arrows]"
+            )
+        );
+
+        const labelsToTypeset = [];
+
+        for (const table of tables) {
+            let arrows = [];
+
+            try {
+                arrows = JSON.parse(
+                    decodeURIComponent(
+                        table.getAttribute(
+                            "data-pm-diagonal-arrows"
+                        ) || ""
+                    )
+                );
+            } catch (error) {
+                console.warn(
+                    "Unable to decode xymatrix diagonal metadata:",
+                    error
+                );
+
+                continue;
+            }
+
+            if (!Array.isArray(arrows) || arrows.length === 0) {
+                continue;
+            }
+
+            /*
+            * Identify an outer universal-property node such as Z.
+            *
+            * In the pullback and pushout diagrams, Z participates in three
+            * diagonal arrows:
+            *
+            *     h together with r and s
+            *     h together with u and v
+            *
+            * Move that actual rendered object slightly outside the original
+            * commutative square, without changing the table's layout.
+            */
+            const objectCells = Array.from(
+                table.querySelectorAll(
+                    "td[data-pm-source-row][data-pm-source-col]"
+                )
+            );
+
+            const sourceRows = objectCells.map(cell =>
+                Number(
+                    cell.getAttribute("data-pm-source-row")
+                )
+            );
+
+            const sourceCols = objectCells.map(cell =>
+                Number(
+                    cell.getAttribute("data-pm-source-col")
+                )
+            );
+
+            const minSourceRow =
+                Math.min(...sourceRows);
+
+            const maxSourceRow =
+                Math.max(...sourceRows);
+
+            const minSourceCol =
+                Math.min(...sourceCols);
+
+            const maxSourceCol =
+                Math.max(...sourceCols);
+
+            const diagonalDegree = new Map();
+
+            arrows.forEach(arrow => {
+                const sourceKey =
+                    getXyOverlayCoordinateKey(
+                        arrow.sourceRow,
+                        arrow.sourceCol
+                    );
+
+                const targetKey =
+                    getXyOverlayCoordinateKey(
+                        arrow.targetRow,
+                        arrow.targetCol
+                    );
+
+                diagonalDegree.set(
+                    sourceKey,
+                    (diagonalDegree.get(sourceKey) || 0) + 1
+                );
+
+                diagonalDegree.set(
+                    targetKey,
+                    (diagonalDegree.get(targetKey) || 0) + 1
+                );
+            });
+
+            /*
+            * Reset earlier positioning first. This matters when the overlay
+            * function is called again after previewing or resizing.
+            */
+            objectCells.forEach(cell => {
+                const anchor =
+                    getXyOverlayObjectAnchor(cell);
+
+                if (!anchor) {
+                    return;
+                }
+
+                anchor.style.position = "relative";
+                anchor.style.left = "0px";
+                anchor.style.top = "0px";
+            });
+
+            objectCells.forEach(cell => {
+                const row =
+                    Number(
+                        cell.getAttribute("data-pm-source-row")
+                    );
+
+                const col =
+                    Number(
+                        cell.getAttribute("data-pm-source-col")
+                    );
+
+                const key =
+                    getXyOverlayCoordinateKey(row, col);
+
+                /*
+                * Ordinary square corners participate in at most one overlay
+                * diagonal. The external Z participates in three.
+                */
+                if ((diagonalDegree.get(key) || 0) < 3) {
+                    return;
+                }
+
+                let shiftX = 0;
+                let shiftY = 0;
+
+                if (col === minSourceCol) {
+                    shiftX = -26;
+                } else if (col === maxSourceCol) {
+                    shiftX = 26;
+                }
+
+                if (row === minSourceRow) {
+                    shiftY = -18;
+                } else if (row === maxSourceRow) {
+                    shiftY = 18;
+                }
+
+                const anchor =
+                    getXyOverlayObjectAnchor(cell);
+
+                if (!anchor) {
+                    return;
+                }
+
+                anchor.style.position = "relative";
+                anchor.style.left = `${shiftX}px`;
+                anchor.style.top = `${shiftY}px`;
+            });
+
+            let wrapper =
+                table.parentElement
+                && table.parentElement.classList.contains(
+                    "pm-xymatrix-overlay-wrapper"
+                )
+                    ? table.parentElement
+                    : null;
+
+            if (!wrapper) {
+                wrapper =
+                    document.createElement("div");
+
+                wrapper.className =
+                    "pm-xymatrix-overlay-wrapper";
+
+                const isInlineSequence =
+                    Boolean(
+                        table.closest(
+                            ".pm-xymatrix-sequence"
+                        )
+                    );
+
+                wrapper.style.position = "relative";
+                wrapper.style.display =
+                    isInlineSequence
+                        ? "inline-block"
+                        : "block";
+
+                wrapper.style.width = "max-content";
+                wrapper.style.maxWidth = "100%";
+                wrapper.style.verticalAlign = "middle";
+                wrapper.style.overflow = "visible";
+                wrapper.style.margin =
+                    isInlineSequence
+                        ? "0"
+                        : "1rem auto";
+
+                table.parentNode.insertBefore(
+                    wrapper,
+                    table
+                );
+
+                wrapper.appendChild(table);
+
+                /*
+                * The wrapper now owns the outer margin.
+                */
+                table.style.margin = "0";
+            }
+
+            wrapper
+                .querySelectorAll(
+                    ":scope > .pm-xymatrix-diagonal-overlay,"
+                    + ":scope > .pm-xymatrix-diagonal-label"
+                )
+                .forEach(node => node.remove());
+
+            const tableRect =
+                table.getBoundingClientRect();
+
+            const wrapperRect =
+                wrapper.getBoundingClientRect();
+
+            const namespace =
+                "http://www.w3.org/2000/svg";
+
+            const svg =
+                document.createElementNS(
+                    namespace,
+                    "svg"
+                );
+
+            svg.classList.add(
+                "pm-xymatrix-diagonal-overlay"
+            );
+
+            svg.setAttribute(
+                "viewBox",
+                `0 0 ${tableRect.width} ${tableRect.height}`
+            );
+
+            svg.setAttribute(
+                "width",
+                String(tableRect.width)
+            );
+
+            svg.setAttribute(
+                "height",
+                String(tableRect.height)
+            );
+
+            svg.style.position = "absolute";
+            svg.style.left =
+                `${tableRect.left - wrapperRect.left}px`;
+
+            svg.style.top =
+                `${tableRect.top - wrapperRect.top}px`;
+
+            svg.style.width =
+                `${tableRect.width}px`;
+
+            svg.style.height =
+                `${tableRect.height}px`;
+
+            svg.style.overflow = "visible";
+            svg.style.pointerEvents = "none";
+            svg.style.zIndex = "2";
+            svg.style.color = "currentColor";
+
+            wrapper.appendChild(svg);
+
+            const orderedArrows = [...arrows].sort(
+                (leftArrow, rightArrow) => {
+                    const leftIsDotted =
+                        String(leftArrow.style || "")
+                            .includes(".");
+
+                    const rightIsDotted =
+                        String(rightArrow.style || "")
+                            .includes(".");
+
+                    /*
+                    * Solid arrows first; dotted universal arrow h last.
+                    */
+                    return (
+                        Number(leftIsDotted)
+                        - Number(rightIsDotted)
+                    );
+                }
+            );
+
+            orderedArrows.forEach(arrow => {
+                const sourceCell =
+                    table.querySelector(
+                        `td[data-pm-source-row="${arrow.sourceRow}"]`
+                        + `[data-pm-source-col="${arrow.sourceCol}"]`
+                    );
+
+                const targetCell =
+                    table.querySelector(
+                        `td[data-pm-source-row="${arrow.targetRow}"]`
+                        + `[data-pm-source-col="${arrow.targetCol}"]`
+                    );
+
+                if (!sourceCell || !targetCell) {
+                    return;
+                }
+
+                const sourceAnchor =
+                    getXyOverlayObjectAnchor(sourceCell);
+
+                const targetAnchor =
+                    getXyOverlayObjectAnchor(targetCell);
+
+                if (!sourceAnchor || !targetAnchor) {
+                    return;
+                }
+
+                const sourceRect =
+                    sourceAnchor.getBoundingClientRect();
+
+                const targetRect =
+                    targetAnchor.getBoundingClientRect();
+
+                const sourceCenterX =
+                    sourceRect.left
+                    + sourceRect.width / 2
+                    - tableRect.left;
+
+                const sourceCenterY =
+                    sourceRect.top
+                    + sourceRect.height / 2
+                    - tableRect.top;
+
+                const targetCenterX =
+                    targetRect.left
+                    + targetRect.width / 2
+                    - tableRect.left;
+
+                const targetCenterY =
+                    targetRect.top
+                    + targetRect.height / 2
+                    - tableRect.top;
+
+                const deltaX =
+                    targetCenterX - sourceCenterX;
+
+                const deltaY =
+                    targetCenterY - sourceCenterY;
+
+                const length =
+                    Math.hypot(deltaX, deltaY);
+
+                if (length < 1) {
+                    return;
+                }
+
+                const unitX =
+                    deltaX / length;
+
+                const unitY =
+                    deltaY / length;
+
+                const sourceBoundary =
+                    getXyRectangleBoundaryDistance(
+                        sourceRect,
+                        unitX,
+                        unitY
+                    );
+
+                const targetBoundary =
+                    getXyRectangleBoundaryDistance(
+                        targetRect,
+                        unitX,
+                        unitY
+                    );
+
+                const sourceKey =
+                    getXyOverlayCoordinateKey(
+                        arrow.sourceRow,
+                        arrow.sourceCol
+                    );
+
+                const targetKey =
+                    getXyOverlayCoordinateKey(
+                        arrow.targetRow,
+                        arrow.targetCol
+                    );
+
+                /*
+                * The outer universal-property node Z participates in three
+                * diagonal arrows. Give arrows slightly more breathing room
+                * where they meet that node.
+                */
+                const sourceEndpointPadding =
+                    (diagonalDegree.get(sourceKey) || 0) >= 3
+                        ? 6
+                        : 3;
+
+                const targetEndpointPadding =
+                    (diagonalDegree.get(targetKey) || 0) >= 3
+                        ? 6
+                        : 3;
+
+                const startX =
+                    sourceCenterX
+                    + unitX * (
+                        sourceBoundary
+                        + sourceEndpointPadding
+                    );
+
+                const startY =
+                    sourceCenterY
+                    + unitY * (
+                        sourceBoundary
+                        + sourceEndpointPadding
+                    );
+
+                const endX =
+                    targetCenterX
+                    - unitX * (
+                        targetBoundary
+                        + targetEndpointPadding
+                    );
+
+                const endY =
+                    targetCenterY
+                    - unitY * (
+                        targetBoundary
+                        + targetEndpointPadding
+                    );
+
+                const normalX = -unitY;
+                const normalY = unitX;
+
+                const curveSign =
+                    arrow.curveSide === "^"
+                        ? -1
+                        : arrow.curveSide === "_"
+                            ? 1
+                            : 0;
+
+                const curveAmount =
+                    curveSign === 0
+                        ? 0
+                        : parseXyCurveAmountToPixels(
+                            arrow.curveAmount,
+                            table
+                        );
+
+                const controlX =
+                    (startX + endX) / 2
+                    + normalX
+                        * curveAmount
+                        * curveSign;
+
+                const controlY =
+                    (startY + endY) / 2
+                    + normalY
+                        * curveAmount
+                        * curveSign;
+
+                const style =
+                    String(arrow.style || "->");
+
+                const isInvisible =
+                    style === "";
+
+                const isPlainLine =
+                    style === "-";
+
+                const isDotted =
+                    style.includes(".");
+
+                const isDashed =
+                    style.includes("--");
+
+                if (!isInvisible) {
+                    const path =
+                        document.createElementNS(
+                            namespace,
+                            "path"
+                        );
+
+                    path.setAttribute(
+                        "d",
+                        curveSign === 0
+                            ? (
+                                `M ${startX} ${startY}`
+                                + ` L ${endX} ${endY}`
+                            )
+                            : (
+                                `M ${startX} ${startY}`
+                                + ` Q ${controlX} ${controlY}`
+                                + ` ${endX} ${endY}`
+                            )
+                    );
+
+                    path.setAttribute("fill", "none");
+                    path.setAttribute(
+                        "stroke",
+                        "currentColor"
+                    );
+
+                    path.setAttribute(
+                        "stroke-width",
+                        isDotted ? "1.9" : "1.6"
+                    );
+
+                    path.setAttribute(
+                        "vector-effect",
+                        "non-scaling-stroke"
+                    );
+
+                    if (isDotted) {
+                        path.setAttribute(
+                            "stroke-dasharray",
+                            "2 4"
+                        );
+                    } else if (isDashed) {
+                        path.setAttribute(
+                            "stroke-dasharray",
+                            "7 5"
+                        );
+                    }
+
+                    if (!isPlainLine) {
+                        const markerId =
+                            `pm-xymatrix-overlay-head-`
+                            + (
+                                ++xyMatrixOverlayMarkerSerial
+                            );
+
+                        createXyOverlayArrowMarker(
+                            svg,
+                            markerId
+                        );
+
+                        path.setAttribute(
+                            "marker-end",
+                            `url(#${markerId})`
+                        );
+                    }
+
+                    svg.appendChild(path);
+                }
+
+                if (!arrow.label) {
+                    return;
+                }
+
+                /*
+                * Quadratic Bézier midpoint at t = 0.5.
+                */
+                const pathMidX =
+                    0.25 * startX
+                    + 0.5 * controlX
+                    + 0.25 * endX;
+
+                const pathMidY =
+                    0.25 * startY
+                    + 0.5 * controlY
+                    + 0.25 * endY;
+
+                const labelSide =
+                    arrow.labelPosition === "above"
+                        ? -1
+                        : arrow.labelPosition === "below"
+                            ? 1
+                            : 0;
+
+                const labelOffset =
+                    labelSide * 11;
+
+                const label =
+                    document.createElement("div");
+
+                label.className =
+                    "pm-xymatrix-diagonal-label tex2jax_process";
+
+                label.style.position = "absolute";
+
+                label.style.left =
+                    `${
+                        tableRect.left
+                        - wrapperRect.left
+                        + pathMidX
+                        + normalX * labelOffset
+                    }px`;
+
+                label.style.top =
+                    `${
+                        tableRect.top
+                        - wrapperRect.top
+                        + pathMidY
+                        + normalY * labelOffset
+                    }px`;
+
+                label.style.transform =
+                    "translate(-50%, -50%)";
+
+                label.style.padding = "0 0.12em";
+                label.style.background =
+                    "var(--bs-body-bg, white)";
+
+                label.style.whiteSpace = "nowrap";
+                label.style.lineHeight = "1";
+                label.style.pointerEvents = "none";
+                label.style.zIndex = "3";
+
+                label.textContent =
+                    `\\({\\scriptstyle ${arrow.label}}\\)`;
+
+                wrapper.appendChild(label);
+                labelsToTypeset.push(label);
+            });
+        }
+
+        if (
+            labelsToTypeset.length > 0
+            && window.MathJax
+            && typeof window.MathJax.typesetPromise === "function"
+        ) {
+            await window.MathJax.typesetPromise(
+                labelsToTypeset
+            );
+        }
     }
 
     function normalizeLegacyTwoCellArrowLabel(value) {
@@ -2535,9 +3489,16 @@
         while ((match = arrowPattern.exec(text)) !== null) {
             const directionText = match[1] || "r";
 
-            const styleMatch = match[0].match(/@\{([^{}]*)\}/);
+            const styleMatch =
+                match[0].match(/@\{([^{}]*)\}/);
 
-            const labelInfo = extractXyArrowLabel(match[2] || "");
+            const curveMatch =
+                match[0].match(
+                    /@\/\s*([_^])\s*([^/]*)\//i
+                );
+
+            const labelInfo =
+                extractXyArrowLabel(match[2] || "");
 
                         const selfLoopMatch = match[0].match(
                 /@\(\s*([rl])\s*,\s*([ud])\s*\)/i
@@ -2550,6 +3511,16 @@
                 style: styleMatch ? styleMatch[1] : "->",
                 label: labelInfo.text,
                 labelPosition: labelInfo.position,
+
+                curveSide:
+                    curveMatch
+                        ? curveMatch[1]
+                        : "",
+
+                curveAmount:
+                    curveMatch
+                        ? String(curveMatch[2] || "").trim()
+                        : "",
 
                 isSelfLoop: Boolean(selfLoopMatch),
 
@@ -2626,6 +3597,42 @@
             (clean.match(/[lr]/g) || []).length;
 
         return Math.max(horizontalSteps, 1);
+    }
+
+    function getXyArrowVerticalSpan(directionText) {
+        const clean = String(directionText || "")
+            .toLowerCase()
+            .replace(/[^rlud]/g, "");
+
+        const verticalSteps =
+            (clean.match(/[ud]/g) || []).length;
+
+        return Math.max(verticalSteps, 1);
+    }
+
+    function isXyDiagonalDirection(direction) {
+        return (
+            direction === "dl"
+            || direction === "dr"
+            || direction === "ul"
+            || direction === "ur"
+        );
+    }
+
+    function getXyArrowCoordinateDelta(directionText) {
+        const clean = String(directionText || "")
+            .toLowerCase()
+            .replace(/[^rlud]/g, "");
+
+        return {
+            rowDelta:
+                (clean.match(/d/g) || []).length
+                - (clean.match(/u/g) || []).length,
+
+            colDelta:
+                (clean.match(/r/g) || []).length
+                - (clean.match(/l/g) || []).length
+        };
     }
 
     function extractXyArrowLabel(modifierText) {
@@ -2725,6 +3732,14 @@
         const horizontalSpan =
             Math.max(Number(options.horizontalSpan) || 1, 1);
 
+        const rowSpan =
+            Math.max(Number(options.rowSpan) || 1, 1);
+
+        const rowSpanAttribute =
+            rowSpan > 1
+                ? ` data-pm-rowspan="${rowSpan}"`
+                : "";
+
         /*
         * A wide diagonal such as [lld] or [rrd] crosses more than one
         * source-column gap. Keep the owning table cell at zero width so the
@@ -2740,10 +3755,12 @@
                 ? 0
                 : widthEm;
 
-        const heightEm = Math.max(
-            arrowLayout.verticalHeightEm || 2.7,
-            3.2
-        );
+        const heightEm =
+            Number(options.heightEm)
+            || Math.max(
+                arrowLayout.verticalHeightEm || 2.7,
+                3.2
+            );
 
         const isDashed = options.isDashed === true;
 
@@ -2833,7 +3850,7 @@
             : "";
 
         return `
-            <div class="pm-xymatrix-diagonal-arrow" style="
+            <div class="pm-xymatrix-diagonal-arrow"${rowSpanAttribute} style="
                 position:relative;
                 width:${layoutWidthEm}em;
                 height:${heightEm}em;
@@ -3026,21 +4043,56 @@
             || direction === "ul"
             || direction === "ur"
         ) {
-            const rowOffset =
-                direction.includes("d") ? 1 : -1;
-
             const horizontalSpan =
                 getXyArrowHorizontalSpan(arrow.directionText);
+
+            const verticalSpan =
+                getXyArrowVerticalSpan(arrow.directionText);
+
+            /*
+            * Expanded-grid rows are:
+            *
+            *   object row, arrow row, object row, arrow row, object row
+            *
+            * Therefore a two-source-row diagonal occupies three expanded rows.
+            */
+            const visualRowSpan =
+                verticalSpan * 2 - 1;
+
+            /*
+            * Do not reserve the final diagonal row in the table structure.
+            * That last gap cell may need to host another short diagonal
+            * arrow ending at the same target (for example [dr] next to [ddr]).
+            */
+            const reservedRowSpan =
+                Math.max(visualRowSpan - 1, 1);
+
+            const startRow =
+                direction.includes("d")
+                    ? gridRow + 1
+                    : gridRow - reservedRowSpan;
 
             const colOffset =
                 direction.includes("r")
                     ? horizontalSpan
                     : -horizontalSpan;
 
+            const arrowCol =
+                gridCol + colOffset;
+
+            const ordinaryDiagonalHeightEm = Math.max(
+                arrowLayout.verticalHeightEm || 2.7,
+                3.2
+            );
+
+            const totalHeightEm =
+                verticalSpan * ordinaryDiagonalHeightEm
+                + Math.max(verticalSpan - 1, 0) * 1.25;
+
             setGridCellIfInBounds(
                 grid,
-                gridRow + rowOffset,
-                gridCol + colOffset,
+                startRow,
+                arrowCol,
                 renderDiagonalArrow(
                     label,
                     direction,
@@ -3049,10 +4101,25 @@
                         isDashed,
                         showArrowHead: !isPlainLine,
                         horizontalSpan,
+                        rowSpan: reservedRowSpan,
+                        heightEm: totalHeightEm,
                         labelPosition: arrow.labelPosition
                     }
                 )
             );
+
+            /*
+            * The rowspan cell occupies these subsequent expanded rows.
+            * Prevent the table generator from emitting duplicate cells there.
+            */
+            for (let offset = 1; offset < reservedRowSpan; offset += 1) {
+                setGridCellIfInBounds(
+                    grid,
+                    startRow + offset,
+                    arrowCol,
+                    XY_VERTICAL_ROWSPAN_COVERED
+                );
+            }
 
             return;
         }
@@ -3905,52 +4972,55 @@
         const tablePattern =
             '<table\\b[^>]*class=["\'][^"\']*\\bpm-xymatrix-table\\b[^"\']*["\'][^>]*>[\\s\\S]*?<\\/table>';
 
+        const containsConvertedXyMatrixTable = inner =>
+            /\bpm-xymatrix-table\b/i.test(
+                String(inner || "")
+            );
+
         /*
-        * The backend may preserve a display environment around multiple
-        * converted xymatrix tables:
+        * Match each complete equation wrapper first.
         *
-        *   \begin{equation*}
-        *   table
-        *   \hspace{2cm}
-        *   table
-        *   \end{equation*}
-        *
-        * Process it as one mixed xymatrix sequence before the generic
-        * equation normalizer turns the wrapper into visible \[ ... \].
+        * Only unwrap it when that exact wrapper contains a converted
+        * xymatrix table. This prevents the regex from crossing an earlier
+        * closing delimiter while searching for a table farther down.
         */
         output = output.replace(
-            new RegExp(
-                `\\\\begin\\{equation\\*?\\}\\s*([\\s\\S]*?${tablePattern}[\\s\\S]*?)\\s*\\\\end\\{equation\\*?\\}`,
-                "gi"
-            ),
-            (_, inner) =>
-                renderMixedXyMatrixWrapperContent(inner)
+            /\\begin\{(equation\*?)\}([\s\S]*?)\\end\{\1\}/gi,
+            function(fullMatch, environmentName, inner) {
+                if (!containsConvertedXyMatrixTable(inner)) {
+                    return fullMatch;
+                }
+
+                return renderMixedXyMatrixWrapperContent(inner);
+            }
         );
 
         /*
-        * Display wrappers may legitimately contain:
-        *
-        *   table = table
-        *   table = 0
-        *
-        * Process those as mixed xymatrix sequences.
+        * Apply the same nearest-wrapper rule to $$ ... $$ displays.
         */
         output = output.replace(
-            new RegExp(
-                `\\$\\$\\s*([\\s\\S]*?${tablePattern}[\\s\\S]*?)\\s*\\$\\$`,
-                "gi"
-            ),
-            (_, inner) =>
-                renderMixedXyMatrixWrapperContent(inner)
+            /\$\$([\s\S]*?)\$\$/g,
+            function(fullMatch, inner) {
+                if (!containsConvertedXyMatrixTable(inner)) {
+                    return fullMatch;
+                }
+
+                return renderMixedXyMatrixWrapperContent(inner);
+            }
         );
 
+        /*
+        * Apply the same nearest-wrapper rule to \[ ... \] displays.
+        */
         output = output.replace(
-            new RegExp(
-                `\\\\\\[\\s*([\\s\\S]*?${tablePattern}[\\s\\S]*?)\\s*\\\\\\]`,
-                "gi"
-            ),
-            (_, inner) =>
-                renderMixedXyMatrixWrapperContent(inner)
+            /\\\[([\s\S]*?)\\\]/g,
+            function(fullMatch, inner) {
+                if (!containsConvertedXyMatrixTable(inner)) {
+                    return fullMatch;
+                }
+
+                return renderMixedXyMatrixWrapperContent(inner);
+            }
         );
 
         /*

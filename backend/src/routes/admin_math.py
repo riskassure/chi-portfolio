@@ -305,14 +305,20 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     master_regex = re.compile(master_pattern_str, re.IGNORECASE)
 
     # 4. Split TeX into safe text blocks vs sensitive math/command blocks.
+        # 4. Split the rendered content into protected math/HTML tokens
+    # versus ordinary prose where autolinking is allowed.
     token_pattern = re.compile(
         r"("
-        r'<span class="math-no-autolink">.*?</span>'
-        r"|<a\b.*?</a>"
+        r'<span\b[^>]*class=["\'][^"\']*\bmath-no-autolink\b[^"\']*["\'][^>]*>.*?</span>'
+        r"|<a\b[^>]*>.*?</a>"
         r"|\$\$.*?\$\$"
+        r"|\\\[.*?\\\]"
+        r"|\\\(.*?\\\)"
         r"|\$.*?\$"
-        r"|\\begin\{.*?\}.*?\\end\{.*?\}"
-        r"|\\\w+"
+        r"|\\begin\{[^{}]+\}.*?\\end\{[^{}]+\}"
+        r"|<!--.*?-->"
+        r"|<[^>]+>"
+        r"|\\[A-Za-z@]+\*?"
         r")",
         re.DOTALL | re.IGNORECASE
     )
