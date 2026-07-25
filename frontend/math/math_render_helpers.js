@@ -2498,48 +2498,6 @@
         defs.appendChild(marker);
     }
 
-    function getOverlayCellCenter(
-        cellRect,
-        tableRect,
-        sourceRow,
-        sourceCol,
-        maxSourceRow,
-        maxSourceCol,
-        diagonalEndpointKeys
-    ) {
-        let x =
-            cellRect.left
-            + cellRect.width / 2
-            - tableRect.left;
-
-        let y =
-            cellRect.top
-            + cellRect.height / 2
-            - tableRect.top;
-
-        const key = `${sourceRow}:${sourceCol}`;
-        const isDiagonalEndpoint =
-            diagonalEndpointKeys.has(key);
-
-        const atTop = sourceRow === 0;
-        const atBottom = sourceRow === maxSourceRow;
-        const atLeft = sourceCol === 0;
-        const atRight = sourceCol === maxSourceCol;
-
-        /*
-        * Only push truly outer diagonal endpoints such as
-        * the Z in pullback/pushout universal-property diagrams.
-        */
-        if (isDiagonalEndpoint) {
-            if (atLeft) x -= 22;
-            if (atRight) x += 22;
-            if (atTop) y -= 16;
-            if (atBottom) y += 16;
-        }
-
-        return { x, y };
-    }
-
     function getXyOverlayObjectAnchor(cell) {
         if (!cell) {
             return null;
@@ -3599,17 +3557,6 @@
         return Math.max(horizontalSteps, 1);
     }
 
-    function getXyArrowVerticalSpan(directionText) {
-        const clean = String(directionText || "")
-            .toLowerCase()
-            .replace(/[^rlud]/g, "");
-
-        const verticalSteps =
-            (clean.match(/[ud]/g) || []).length;
-
-        return Math.max(verticalSteps, 1);
-    }
-
     function isXyDiagonalDirection(direction) {
         return (
             direction === "dl"
@@ -3732,14 +3679,6 @@
         const horizontalSpan =
             Math.max(Number(options.horizontalSpan) || 1, 1);
 
-        const rowSpan =
-            Math.max(Number(options.rowSpan) || 1, 1);
-
-        const rowSpanAttribute =
-            rowSpan > 1
-                ? ` data-pm-rowspan="${rowSpan}"`
-                : "";
-
         /*
         * A wide diagonal such as [lld] or [rrd] crosses more than one
         * source-column gap. Keep the owning table cell at zero width so the
@@ -3755,12 +3694,10 @@
                 ? 0
                 : widthEm;
 
-        const heightEm =
-            Number(options.heightEm)
-            || Math.max(
-                arrowLayout.verticalHeightEm || 2.7,
-                3.2
-            );
+        const heightEm = Math.max(
+            arrowLayout.verticalHeightEm || 2.7,
+            3.2
+        );
 
         const isDashed = options.isDashed === true;
 
@@ -3850,7 +3787,7 @@
             : "";
 
         return `
-            <div class="pm-xymatrix-diagonal-arrow"${rowSpanAttribute} style="
+            <div class="pm-xymatrix-diagonal-arrow" style="
                 position:relative;
                 width:${layoutWidthEm}em;
                 height:${heightEm}em;
@@ -4043,56 +3980,25 @@
             || direction === "ul"
             || direction === "ur"
         ) {
-            const horizontalSpan =
-                getXyArrowHorizontalSpan(arrow.directionText);
-
-            const verticalSpan =
-                getXyArrowVerticalSpan(arrow.directionText);
-
-            /*
-            * Expanded-grid rows are:
-            *
-            *   object row, arrow row, object row, arrow row, object row
-            *
-            * Therefore a two-source-row diagonal occupies three expanded rows.
-            */
-            const visualRowSpan =
-                verticalSpan * 2 - 1;
-
-            /*
-            * Do not reserve the final diagonal row in the table structure.
-            * That last gap cell may need to host another short diagonal
-            * arrow ending at the same target (for example [dr] next to [ddr]).
-            */
-            const reservedRowSpan =
-                Math.max(visualRowSpan - 1, 1);
-
-            const startRow =
+            const rowOffset =
                 direction.includes("d")
-                    ? gridRow + 1
-                    : gridRow - reservedRowSpan;
+                    ? 1
+                    : -1;
+
+            const horizontalSpan =
+                getXyArrowHorizontalSpan(
+                    arrow.directionText
+                );
 
             const colOffset =
                 direction.includes("r")
                     ? horizontalSpan
                     : -horizontalSpan;
 
-            const arrowCol =
-                gridCol + colOffset;
-
-            const ordinaryDiagonalHeightEm = Math.max(
-                arrowLayout.verticalHeightEm || 2.7,
-                3.2
-            );
-
-            const totalHeightEm =
-                verticalSpan * ordinaryDiagonalHeightEm
-                + Math.max(verticalSpan - 1, 0) * 1.25;
-
             setGridCellIfInBounds(
                 grid,
-                startRow,
-                arrowCol,
+                gridRow + rowOffset,
+                gridCol + colOffset,
                 renderDiagonalArrow(
                     label,
                     direction,
@@ -4101,25 +4007,11 @@
                         isDashed,
                         showArrowHead: !isPlainLine,
                         horizontalSpan,
-                        rowSpan: reservedRowSpan,
-                        heightEm: totalHeightEm,
-                        labelPosition: arrow.labelPosition
+                        labelPosition:
+                            arrow.labelPosition
                     }
                 )
             );
-
-            /*
-            * The rowspan cell occupies these subsequent expanded rows.
-            * Prevent the table generator from emitting duplicate cells there.
-            */
-            for (let offset = 1; offset < reservedRowSpan; offset += 1) {
-                setGridCellIfInBounds(
-                    grid,
-                    startRow + offset,
-                    arrowCol,
-                    XY_VERTICAL_ROWSPAN_COVERED
-                );
-            }
 
             return;
         }
