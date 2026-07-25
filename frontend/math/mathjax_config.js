@@ -34,7 +34,9 @@
                 assign: ":=",
                 mathbbm: ["#1", 1],
                 Span: "\\operatorname{span}",
-                
+                up: "\\uparrow\\!\\!",
+                down: "\\downarrow\\!\\!",
+
                 setOf: [
                     "\\left\\{#1\\;\\middle|\\;#2\\right\\}",
                     2
