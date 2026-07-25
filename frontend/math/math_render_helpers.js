@@ -1986,6 +1986,31 @@
         const sourceColumnCount = Math.max(...sourceRows.map(row => row.length));
         const arrowLayout = calculateXyMatrixArrowLayout(sourceRows);
 
+        /*
+        * Long diagonals such as [lld] and [rrd] cross empty inter-object
+        * columns. Reserve those column gaps so the SVG overlays remain inside
+        * the measured xymatrix width and neighboring object labels do not
+        * collapse together.
+        */
+        const hasWideDiagonal = sourceRows
+            .flat()
+            .some(cell =>
+                (cell.arrows || []).some(arrow =>
+                    (
+                        arrow.direction === "dl"
+                        || arrow.direction === "dr"
+                        || arrow.direction === "ul"
+                        || arrow.direction === "ur"
+                    )
+                    && getXyArrowHorizontalSpan(arrow.directionText) > 1
+                )
+            );
+
+        const wideDiagonalGapWidthEm = Math.max(
+            arrowLayout.horizontalWidthEm || 3.6,
+            4.2
+        );
+
         const expandedRowCount = sourceRows.length * 2 - 1;
         const expandedColumnCount = sourceColumnCount * 2 - 1;
 
@@ -2153,6 +2178,33 @@
                     ? "line-height:0;"
                     : "";
 
+                const isArrowSpaceColumn =
+                    colIndex % 2 === 1;
+
+                const reservedGapStyle =
+                    hasWideDiagonal && isArrowSpaceColumn
+                        ? `
+                            width:${wideDiagonalGapWidthEm}em;
+                            min-width:${wideDiagonalGapWidthEm}em;
+                        `
+                        : "";
+
+                const reservedGapHtml =
+                    hasWideDiagonal
+                    && isArrowSpaceColumn
+                    && !cellHtml
+                        ? `
+                            <span
+                                aria-hidden="true"
+                                style="
+                                    display:block;
+                                    width:${wideDiagonalGapWidthEm}em;
+                                    height:1px;
+                                "
+                            ></span>
+                        `
+                        : cellHtml;
+
                 const verticalRowSpanMatch =
                     String(cellHtml || "").match(
                         /\bdata-pm-rowspan="(\d+)"/
@@ -2175,8 +2227,9 @@
                         vertical-align:middle;
                         white-space:nowrap;
                         ${cellLineHeight}
+                        ${reservedGapStyle}
                     ">
-                        ${cellHtml}
+                        ${reservedGapHtml}
                     </td>
                 `);
 
@@ -2564,6 +2617,17 @@
         return Math.max(clean.length, 1);
     }
 
+    function getXyArrowHorizontalSpan(directionText) {
+        const clean = String(directionText || "")
+            .toLowerCase()
+            .replace(/[^rlud]/g, "");
+
+        const horizontalSteps =
+            (clean.match(/[lr]/g) || []).length;
+
+        return Math.max(horizontalSteps, 1);
+    }
+
     function extractXyArrowLabel(modifierText) {
         const text = String(modifierText || "");
 
@@ -2653,10 +2717,28 @@
     ) {
         const safeLabel = escapeHtmlForMathCell(label || "");
 
-        const widthEm = Math.max(
+        const baseWidthEm = Math.max(
             arrowLayout.horizontalWidthEm || 3.6,
             4.2
         );
+
+        const horizontalSpan =
+            Math.max(Number(options.horizontalSpan) || 1, 1);
+
+        /*
+        * A wide diagonal such as [lld] or [rrd] crosses more than one
+        * source-column gap. Keep the owning table cell at zero width so the
+        * long SVG can overflow across neighboring cells without stretching
+        * the xymatrix column layout.
+        */
+        const widthEm =
+            baseWidthEm * horizontalSpan
+            + Math.max(horizontalSpan - 1, 0) * 0.9;
+
+        const layoutWidthEm =
+            horizontalSpan > 1
+                ? 0
+                : widthEm;
 
         const heightEm = Math.max(
             arrowLayout.verticalHeightEm || 2.7,
@@ -2664,7 +2746,12 @@
         );
 
         const isDashed = options.isDashed === true;
-        const labelPosition = options.labelPosition || "center";
+
+        const showArrowHead =
+            options.showArrowHead !== false;
+
+        const labelPosition =
+            options.labelPosition || "center";
 
         const goesRight =
             direction === "dr" || direction === "ur";
@@ -2678,13 +2765,6 @@
         const startY = goesDown ? 4 : 96;
         const endY = goesDown ? 96 : 4;
 
-        /*
-        * Offset labels slightly away from the diagonal.
-        *
-        * center: centered directly over the diagonal
-        * above:  shifted toward the upper side
-        * below:  shifted toward the lower side
-        */
         let labelTopPercent = 50;
         let labelLeftPercent = 50;
 
@@ -2694,10 +2774,6 @@
             labelTopPercent += 13;
         }
 
-        /*
-        * For left-sloping diagonals, move the label slightly in the opposite
-        * horizontal direction so it does not sit on the arrow shaft.
-        */
         if (direction === "dl" || direction === "ur") {
             labelLeftPercent +=
                 labelPosition === "above" ? 7
@@ -2728,62 +2804,86 @@
             `
             : "";
 
+        const markerId =
+            `pm-xymatrix-diagonal-head-${direction}-${horizontalSpan}-${isDashed ? "dashed" : "solid"}`;
+
+        const markerDefinition = showArrowHead
+            ? `
+                <defs>
+                    <marker
+                        id="${markerId}"
+                        markerWidth="8"
+                        markerHeight="8"
+                        refX="7"
+                        refY="4"
+                        orient="auto"
+                        markerUnits="strokeWidth"
+                    >
+                        <path
+                            d="M0,0 L8,4 L0,8 Z"
+                            fill="currentColor"
+                        ></path>
+                    </marker>
+                </defs>
+            `
+            : "";
+
+        const markerAttribute = showArrowHead
+            ? `marker-end="url(#${markerId})"`
+            : "";
+
         return `
             <div class="pm-xymatrix-diagonal-arrow" style="
                 position:relative;
-                width:${widthEm}em;
+                width:${layoutWidthEm}em;
                 height:${heightEm}em;
-                min-width:${widthEm}em;
+                min-width:${layoutWidthEm}em;
                 min-height:${heightEm}em;
                 display:inline-block;
                 vertical-align:middle;
+                overflow:visible;
             ">
-                <svg
-                    aria-hidden="true"
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                    style="
-                        position:absolute;
-                        inset:0;
-                        width:100%;
-                        height:100%;
-                        overflow:visible;
-                    "
-                >
-                    <defs>
-                        <marker
-                            id="pm-xymatrix-diagonal-head-${direction}-${isDashed ? "dashed" : "solid"}"
-                            markerWidth="8"
-                            markerHeight="8"
-                            refX="7"
-                            refY="4"
-                            orient="auto"
-                            markerUnits="strokeWidth"
-                        >
-                            <path
-                                d="M0,0 L8,4 L0,8 Z"
-                                fill="currentColor"
-                            ></path>
-                        </marker>
-                    </defs>
+                <div style="
+                    position:absolute;
+                    left:50%;
+                    top:0;
+                    width:${widthEm}em;
+                    height:100%;
+                    transform:translateX(-50%);
+                    overflow:visible;
+                ">
+                    <svg
+                        aria-hidden="true"
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="none"
+                        style="
+                            position:absolute;
+                            inset:0;
+                            width:100%;
+                            height:100%;
+                            overflow:visible;
+                        "
+                    >
+                        ${markerDefinition}
 
-                    <line
-                        x1="${startX}"
-                        y1="${startY}"
-                        x2="${endX}"
-                        y2="${endY}"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                        vector-effect="non-scaling-stroke"
-                        ${isDashed
-                            ? 'stroke-dasharray="6 5"'
-                            : ""
-                        }
-                        marker-end="url(#pm-xymatrix-diagonal-head-${direction}-${isDashed ? "dashed" : "solid"})"
-                    ></line>
-                </svg>
+                        <line
+                            x1="${startX}"
+                            y1="${startY}"
+                            x2="${endX}"
+                            y2="${endY}"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            vector-effect="non-scaling-stroke"
+                            ${isDashed
+                                ? 'stroke-dasharray="6 5"'
+                                : ""
+                            }
+                            ${markerAttribute}
+                        ></line>
+                    </svg>
 
-                ${labelHtml}
+                    ${labelHtml}
+                </div>
             </div>
         `;
     }
@@ -2795,7 +2895,8 @@
         label,
         direction,
         span,
-        arrowLayout
+        arrowLayout,
+        options = {}
     ) {
         const sourceSpan = Math.max(Number(span) || 1, 1);
 
@@ -2834,7 +2935,8 @@
                 {
                     rowSpan,
                     heightEm: totalHeightEm,
-                    showArrowHead: true,
+                    showArrowHead:
+                        options.showArrowHead !== false,
                     extendLine: false
                 }
             )
@@ -2927,8 +3029,13 @@
             const rowOffset =
                 direction.includes("d") ? 1 : -1;
 
+            const horizontalSpan =
+                getXyArrowHorizontalSpan(arrow.directionText);
+
             const colOffset =
-                direction.includes("r") ? 1 : -1;
+                direction.includes("r")
+                    ? horizontalSpan
+                    : -horizontalSpan;
 
             setGridCellIfInBounds(
                 grid,
@@ -2940,6 +3047,8 @@
                     arrowLayout,
                     {
                         isDashed,
+                        showArrowHead: !isPlainLine,
+                        horizontalSpan,
                         labelPosition: arrow.labelPosition
                     }
                 )
@@ -2956,7 +3065,10 @@
                 label,
                 "down",
                 span,
-                arrowLayout
+                arrowLayout,
+                {
+                    showArrowHead: !isPlainLine
+                }
             );
             return;
         }
@@ -2969,7 +3081,10 @@
                 label,
                 "up",
                 span,
-                arrowLayout
+                arrowLayout,
+                {
+                    showArrowHead: !isPlainLine
+                }
             );
         }
     }
@@ -3606,6 +3721,22 @@
             if (!normalized) {
                 return;
             }
+            
+            /*
+            * Preserve an explicit TeX gap between adjacent diagrams as a CSS
+            * spacer rather than sending \hspace to MathJax.
+            */
+            const hspaceMatch = normalized.match(
+                /^\\hspace\*?\s*\{\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:pt|pc|in|bp|cm|mm|dd|cc|sp|em|ex))\s*\}$/i
+            );
+
+            if (hspaceMatch) {
+                tokens.push({
+                    type: "spacer",
+                    width: hspaceMatch[1]
+                });
+                return;
+            }
 
             const punctuationMatch =
                 normalized.match(/^(.*?)([.,;:!?])$/);
@@ -3674,6 +3805,9 @@
         const hasConnector =
             tokens.some(token => token.type === "math");
 
+        const hasExplicitSpacer =
+            tokens.some(token => token.type === "spacer");
+
         const hasAttachedPunctuation =
             tokens.some(
                 token =>
@@ -3684,7 +3818,8 @@
         const needsSequenceLayout =
             tableCount > 1
             || hasConnector
-            || hasAttachedPunctuation;
+            || hasAttachedPunctuation
+            || hasExplicitSpacer;
 
         const renderToken = token => {
             if (token.type === "math") {
@@ -3697,6 +3832,20 @@
                             white-space:nowrap;
                         "
                     >\\({}${token.core}{}\\)${token.punctuation || ""}</span>
+                `;
+            }
+
+            if (token.type === "spacer") {
+                return `
+                    <span
+                        aria-hidden="true"
+                        style="
+                            display:block;
+                            flex:0 0 ${token.width};
+                            width:${token.width};
+                            height:1px;
+                        "
+                    ></span>
                 `;
             }
 
@@ -3741,7 +3890,7 @@
                     align-items:center;
                     justify-content:center;
                     flex-wrap:wrap;
-                    gap:0.55rem;
+                    gap:${hasExplicitSpacer ? "0" : "0.55rem"};
                     margin:1rem 0;
                 "
             >
@@ -3755,6 +3904,28 @@
 
         const tablePattern =
             '<table\\b[^>]*class=["\'][^"\']*\\bpm-xymatrix-table\\b[^"\']*["\'][^>]*>[\\s\\S]*?<\\/table>';
+
+        /*
+        * The backend may preserve a display environment around multiple
+        * converted xymatrix tables:
+        *
+        *   \begin{equation*}
+        *   table
+        *   \hspace{2cm}
+        *   table
+        *   \end{equation*}
+        *
+        * Process it as one mixed xymatrix sequence before the generic
+        * equation normalizer turns the wrapper into visible \[ ... \].
+        */
+        output = output.replace(
+            new RegExp(
+                `\\\\begin\\{equation\\*?\\}\\s*([\\s\\S]*?${tablePattern}[\\s\\S]*?)\\s*\\\\end\\{equation\\*?\\}`,
+                "gi"
+            ),
+            (_, inner) =>
+                renderMixedXyMatrixWrapperContent(inner)
+        );
 
         /*
         * Display wrappers may legitimately contain:
