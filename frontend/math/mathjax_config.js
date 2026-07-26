@@ -172,24 +172,152 @@
     }
 
     function reportVisibleLatexCommands(root, context = {}) {
-        const text = collectVisibleText(root);
-        const leftovers = findVisibleLatexCommands(text);
+        const visibleText = collectVisibleText(root);
+
+        const leftovers = mergeAuditFindings(
+            findVisibleLatexCommands(visibleText),
+            findUndefinedMathJaxCommands(root),
+            findLeakedMathPlaceholders(visibleText)
+        );
 
         if (leftovers.length > 0) {
-            console.warn("Visible unresolved LaTeX commands after MathJax typeset:", {
-                context,
-                leftovers
-            });
-
-            root.dispatchEvent(new CustomEvent("mathjax-leftover-commands", {
-                detail: {
+            console.warn(
+                "Math rendering audit findings after MathJax typeset:",
+                {
                     context,
                     leftovers
                 }
-            }));
+            );
+
+            root.dispatchEvent(
+                new CustomEvent("mathjax-leftover-commands", {
+                    detail: {
+                        context,
+                        leftovers
+                    }
+                })
+            );
         }
 
         return leftovers;
+    }
+
+    function findUndefinedMathJaxCommands(root) {
+        if (!root) {
+            return [];
+        }
+
+        const commandPattern = /^\\[A-Za-z@]+(?:\*)?$/;
+        const seen = new Map();
+
+        root
+            .querySelectorAll(
+                'mjx-assistive-mml mtext[mathcolor="red"]'
+            )
+            .forEach(node => {
+                const command =
+                    String(node.textContent || "").trim();
+
+                if (
+                    !commandPattern.test(command) ||
+                    shouldIgnoreCommand(command.replace(/^\\/, ""))
+                ) {
+                    return;
+                }
+
+                if (!seen.has(command)) {
+                    seen.set(command, {
+                        command,
+                        count: 0,
+                        examples: []
+                    });
+                }
+
+                const entry = seen.get(command);
+                entry.count += 1;
+
+                if (entry.examples.length < 3) {
+                    entry.examples.push(
+                        `MathJax undefined command: ${command}`
+                    );
+                }
+            });
+
+        return Array.from(seen.values());
+    }
+
+
+    function findLeakedMathPlaceholders(text) {
+        const normalized = String(text || "");
+        const placeholderPattern =
+            /PMMATHPROSEBLOCK\d+END/g;
+
+        const matches = [];
+        let match;
+
+        while (
+            (match = placeholderPattern.exec(normalized)) !== null
+        ) {
+            matches.push({
+                value: match[0],
+                index: match.index
+            });
+        }
+
+        if (matches.length === 0) {
+            return [];
+        }
+
+        return [{
+            command: "[PMMATHPROSEBLOCK_LEAK]",
+            count: matches.length,
+            examples: matches
+                .slice(0, 3)
+                .map(item =>
+                    makeTextSnippet(normalized, item.index)
+                )
+        }];
+    }
+
+
+    function mergeAuditFindings(...findingGroups) {
+        const merged = new Map();
+
+        findingGroups
+            .flat()
+            .filter(Boolean)
+            .forEach(item => {
+                const command =
+                    String(item.command || "").trim();
+
+                if (!command) {
+                    return;
+                }
+
+                if (!merged.has(command)) {
+                    merged.set(command, {
+                        command,
+                        count: 0,
+                        examples: []
+                    });
+                }
+
+                const target = merged.get(command);
+
+                target.count += Number(item.count || 0);
+
+                (item.examples || []).forEach(example => {
+                    if (
+                        example &&
+                        target.examples.length < 3 &&
+                        !target.examples.includes(example)
+                    ) {
+                        target.examples.push(example);
+                    }
+                });
+            });
+
+        return Array.from(merged.values());
     }
 
     function collectVisibleText(root) {

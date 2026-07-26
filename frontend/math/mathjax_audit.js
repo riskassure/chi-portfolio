@@ -1,7 +1,7 @@
 // frontend/math/mathjax_audit.js
 
 const API_ENDPOINT = "http://127.0.0.1:5000/api";
-const AUDIT_VERSION = "mathjax-audit-v1";
+const AUDIT_VERSION = "mathjax-audit-v2";
 
 let latestAuditRows = [];
 
@@ -227,7 +227,7 @@ async function runAudit(conceptRefs, options = {}) {
 
     const doneMessage = [
         `Done. Checked ${checked}`,
-        `concepts with visible macro issues: ${issueConceptCount}`,
+        `concepts with rendering findings: ${issueConceptCount}`,
         `fetch/render failures: ${failed}`
     ];
 
