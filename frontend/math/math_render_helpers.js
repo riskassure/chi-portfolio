@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-diagonal-overlay-v1",
+        debugVersion: "local-newcommand-v2",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -67,9 +67,27 @@
 
         let clean = tex || "";
 
+        /*
+        * Expand concept-local \newcommand definitions before the
+        * ordinary rendering cleanup pipeline.
+        */
+        if (
+            window.MathCmsLocalMacros &&
+            typeof window.MathCmsLocalMacros.apply === "function"
+        ) {
+            clean = window.MathCmsLocalMacros.apply(
+                clean,
+                options.localMacroSource || "",
+                options.context || {}
+            );
+        }
+
         clean = cleanLaTeXEnvironments(clean);
         clean = restoreUnderlineHtmlInsideMath(clean);
-        clean = normalizeDiagramImageUrls(clean, apiEndpoint);
+        clean = normalizeDiagramImageUrls(
+            clean,
+            apiEndpoint
+        );
 
         return clean;
     }

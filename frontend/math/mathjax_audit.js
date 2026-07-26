@@ -295,12 +295,41 @@ async function auditConcept(concept) {
 
     canvas.classList.add("tex2jax_process");
 
-    const rawTex = window.MathCmsRender.getDisplayTex(concept);
-    const renderedTexHash = await hashText(rawTex || "");
+    const rawTex =
+        window.MathCmsRender.getDisplayTex(concept);
 
-    const html = window.MathCmsRender.prepareConceptHtml(rawTex, {
-        apiEndpoint: API_ENDPOINT
-    });
+    const localMacroSource =
+        concept.cleaned_tex || "";
+
+    /*
+    * Local macro definitions affect the final rendering, so include
+    * cleaned_tex in the audit hash as well.
+    */
+    const renderedTexHash =
+        await hashText(
+            [
+                rawTex || "",
+                "PMLOCAL-SOURCE:",
+                localMacroSource
+            ].join("\n")
+        );
+
+    const html =
+        window.MathCmsRender.prepareConceptHtml(
+            rawTex,
+            {
+                apiEndpoint: API_ENDPOINT,
+
+                localMacroSource,
+
+                context: {
+                    page: "mathjax_audit",
+                    concept_id: concept.id || null,
+                    slug: concept.slug || null,
+                    title: concept.title || null
+                }
+            }
+        );
 
     // Important for full-audit mode:
     // MathJax keeps internal references to previously typeset nodes.

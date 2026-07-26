@@ -74,8 +74,25 @@ async function renderConceptPage(concept) {
             : concept.display_tex || concept.rendered_tex || concept.cleaned_tex || "No textual mathematical content saved.";
 
         const preProcessedTex = window.MathCmsRender
-            ? window.MathCmsRender.prepareConceptHtml(rawTexContent, { apiEndpoint: API_ENDPOINT })
-            : normalizeDiagramImageUrls(cleanLaTeXEnvironments(rawTexContent));
+            ? window.MathCmsRender.prepareConceptHtml(
+                rawTexContent,
+                {
+                    apiEndpoint: API_ENDPOINT,
+
+                    localMacroSource:
+                        concept.cleaned_tex || "",
+
+                    context: {
+                        page: "concept",
+                        concept_id: concept.id || null,
+                        slug: concept.slug || currentSlug || null,
+                        title: concept.title || null
+                    }
+                }
+            )
+            : normalizeDiagramImageUrls(
+                cleanLaTeXEnvironments(rawTexContent)
+            );
 
         const canvas = document.getElementById("mathContentCanvas");
         canvas.innerHTML = preProcessedTex;

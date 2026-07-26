@@ -1020,12 +1020,27 @@ def unwrap_latex_ensuremath(replacement: str) -> str:
 
 def render_latex_command_definitions_to_html(html: str) -> str:
     """
-    Remove legacy \\newcommand and \\providecommand definitions.
+    Remove legacy \\newcommand and \\providecommand definitions without
+    expanding their later uses.
 
-    Simple \\newcommand definitions continue to be expanded later in the
-    document. \\providecommand definitions are removed without expansion,
-    because imported bibliography preambles commonly contain implementation
-    details that should never become visible prose.
+    Concept-local macro expansion is handled by the frontend
+    math_local_macros.js module using definitions retained in cleaned_tex.
+
+    This division is intentional:
+
+        cleaned_tex:
+            retains the local macro definitions
+
+        rendered_tex:
+            omits the visible definitions but retains macro uses such as
+            \\Q and \\conj{x}
+
+        frontend:
+            expands those macro uses with concept-local scope
+
+    \\providecommand definitions continue to be removed because imported
+    bibliography preambles commonly contain implementation details that
+    should never become visible prose.
     """
     command_names = (
         r"\newcommand",
@@ -1034,7 +1049,6 @@ def render_latex_command_definitions_to_html(html: str) -> str:
 
     search_start = 0
     output_parts = []
-    macro_replacements = {}
 
     while True:
         candidates = [
@@ -1059,9 +1073,17 @@ def render_latex_command_definitions_to_html(html: str) -> str:
 
         cursor = start_index + len(command)
 
+        # Accept the starred form:
+        #
+        #   \newcommand*{\foo}{...}
+        #
+        if cursor < len(html) and html[cursor] == "*":
+            cursor += 1
+
         while cursor < len(html) and html[cursor].isspace():
             cursor += 1
 
+        # A malformed or unsupported occurrence should remain untouched.
         if cursor >= len(html) or html[cursor] != "{":
             output_parts.append(
                 html[search_start:start_index + len(command)]
@@ -1069,19 +1091,21 @@ def render_latex_command_definitions_to_html(html: str) -> str:
             search_start = start_index + len(command)
             continue
 
-        macro_name_close = find_matching_latex_brace(html, cursor)
+        macro_name_close = find_matching_latex_brace(
+            html,
+            cursor,
+        )
 
         if macro_name_close == -1:
             output_parts.append(html[search_start:])
             break
 
-        macro_name = html[cursor + 1:macro_name_close].strip()
         cursor = macro_name_close + 1
 
         while cursor < len(html) and html[cursor].isspace():
             cursor += 1
 
-        # Skip an optional argument-count declaration such as [2].
+        # Skip an argument-count declaration such as [1] or [2].
         if cursor < len(html) and html[cursor] == "[":
             optional_close = html.find("]", cursor + 1)
 
@@ -1094,42 +1118,44 @@ def render_latex_command_definitions_to_html(html: str) -> str:
             while cursor < len(html) and html[cursor].isspace():
                 cursor += 1
 
-        if cursor >= len(html) or html[cursor] != "{":
-            output_parts.append(html[search_start:])
-            break
+            # An additional optional group represents a default argument:
+            #
+            #   \newcommand{\foo}[2][default]{...}
+            #
+            # The frontend does not support that form yet. Preserve it intact
+            # rather than silently removing or misinterpreting it.
+            if cursor < len(html) and html[cursor] == "[":
+                output_parts.append(
+                    html[search_start:start_index + len(command)]
+                )
+                search_start = start_index + len(command)
+                continue
 
-        replacement_close = find_matching_latex_brace(html, cursor)
+        if cursor >= len(html) or html[cursor] != "{":
+            output_parts.append(
+                html[search_start:start_index + len(command)]
+            )
+            search_start = start_index + len(command)
+            continue
+
+        replacement_close = find_matching_latex_brace(
+            html,
+            cursor,
+        )
 
         if replacement_close == -1:
             output_parts.append(html[search_start:])
             break
 
-        replacement = html[cursor + 1:replacement_close].strip()
-
-        output_parts.append(html[search_start:start_index])
-
-        # Preserve the existing simple-newcommand expansion behavior.
-        # Bibliography-oriented providecommand definitions are only removed.
-        if (
-            command == r"\newcommand"
-            and macro_name.startswith("\\")
-        ):
-            macro_replacements[macro_name] = (
-                unwrap_latex_ensuremath(replacement)
-            )
+        # Preserve everything preceding the definition, but omit the
+        # definition itself from rendered_tex.
+        output_parts.append(
+            html[search_start:start_index]
+        )
 
         search_start = replacement_close + 1
 
-    rendered = "".join(output_parts)
-
-    for macro_name, replacement in macro_replacements.items():
-        rendered = re.sub(
-            re.escape(macro_name) + r"\b",
-            lambda _match, value=replacement: value,
-            rendered,
-        )
-
-    return rendered
+    return "".join(output_parts)
 
 
 def render_pmlinkexternal_to_html(html: str) -> str:
