@@ -1,4 +1,4 @@
-# backend/src/utils/math/step1_load_relational.py
+# backend/src/database/math/pipeline/step1_load_relational.py
 
 import sys
 import re
@@ -9,6 +9,10 @@ from datetime import datetime
 SRC_DIR = Path(__file__).resolve().parents[3]
 sys.path.append(str(SRC_DIR))
 from config import DB_PATH
+
+from services.math.local_macro_helper import (
+    extract_local_newcommands,
+)
 
 
 def generate_slug(canonical_name):
@@ -161,16 +165,12 @@ def transform_latex_content(raw_content):
         for esc in re.findall(r"\\pmnolink\{([^}]+)\}", header_block):
             metadata["escaped_words"].append(esc.strip())
 
-        content_match = re.search(
-            r"\\begin\{document\}(.*)\\end\{document\}",
-            raw_content,
-            re.DOTALL
+        local_macro_result = extract_local_newcommands(
+            raw_content
         )
 
         metadata["cleaned_tex"] = (
-            content_match.group(1).strip()
-            if content_match
-            else ""
+            local_macro_result.used_cleaned_tex_preview
         )
 
         return metadata
