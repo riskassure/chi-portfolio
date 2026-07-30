@@ -56,6 +56,7 @@
                 T: "\\mathbb{T}",
 
                 ob: "\\operatorname{Ob}",
+                op: "{\\mathrm{op}}",
                 eqv: "\\simeq",
                 Spec: "\\operatorname{Spec}",
                 lra: "\\longrightarrow",
