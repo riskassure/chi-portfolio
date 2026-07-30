@@ -29,6 +29,7 @@
                 bbZ: "\\mathbb{Z}",
                 closure: ["\\overline{#1}", 1],
                 hdots: "\\dots",
+                ldot: "\\ldots",
                 derive: "\\stackrel{*}{\\Rightarrow}",
                 tmop: ["\\operatorname{#1}", 1],
                 assign: ":=",
