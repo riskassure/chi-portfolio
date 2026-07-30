@@ -3466,6 +3466,20 @@
         let objectFrame = null;
 
         /*
+        * Legacy Xy-pic crossing-gap marker:
+        *
+        *   \ar@{-}[rd]|!{"2,1";"1,2"}\hole
+        *
+        * The HTML/SVG converter already renders the underlying arrow. Remove
+        * the placement suffix so it cannot leak into the visible object text
+        * or reach MathJax as an undefined command.
+        */
+        text = text.replace(
+            /\|\s*!\s*\{[^{}]*\}\s*\\hole\b/g,
+            ""
+        );
+
+        /*
         * Xy-pic framed automaton states:
         *
         *   *+[o][F-]{0}   single-circle state
