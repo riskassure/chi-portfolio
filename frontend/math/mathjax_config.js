@@ -105,6 +105,7 @@
                 kard: "\\operatorname{kard}",
                 LCM: "\\operatorname{LCM}",
                 diam: "\\operatorname{diam}",
+                rad: "\\operatorname{rad}",
                 theory: "\\operatorname{Th}",
                 Li: "\\operatorname{Li}",
 
