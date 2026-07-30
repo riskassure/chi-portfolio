@@ -8,7 +8,7 @@
     const MAX_TOTAL_EXPANSIONS = 10000;
 
     root.MathCmsLocalMacros = {
-        debugVersion: "local-newcommand-v2",
+        debugVersion: "local-newcommand-v3",
         apply,
         inspect: parseLocalMacroPrelude
     };
@@ -764,43 +764,36 @@
             pass < MAX_EXPANSION_PASSES;
             pass += 1
         ) {
-            let passCount = 0;
+            const result =
+                expandTextPass(
+                    output,
+                    macros,
+                    MAX_TOTAL_EXPANSIONS
+                        - totalExpansions
+                );
 
-            for (const macro of macros) {
-                const result =
-                    expandMacro(
-                        output,
-                        macro,
-                        MAX_TOTAL_EXPANSIONS
-                            - totalExpansions
-                    );
+            output =
+                result.text;
 
-                output =
-                    result.text;
+            totalExpansions +=
+                result.count;
 
-                passCount +=
-                    result.count;
+            if (
+                totalExpansions
+                >= MAX_TOTAL_EXPANSIONS
+            ) {
+                console.warn(
+                    "Concept-local macro expansion limit reached.",
+                    {
+                        context,
+                        totalExpansions
+                    }
+                );
 
-                totalExpansions +=
-                    result.count;
-
-                if (
-                    totalExpansions
-                    >= MAX_TOTAL_EXPANSIONS
-                ) {
-                    console.warn(
-                        "Concept-local macro expansion limit reached.",
-                        {
-                            context,
-                            totalExpansions
-                        }
-                    );
-
-                    return output;
-                }
+                return output;
             }
 
-            if (passCount === 0) {
+            if (result.count === 0) {
                 return output;
             }
         }
@@ -818,9 +811,18 @@
     }
 
 
-    function expandMacro(
+    /**
+     * Expand one left-to-right pass through the current text.
+     *
+     * Replacement text is revisited on the next pass. This preserves
+     * an unbraced control sequence as one argument before that control
+     * sequence itself is expanded:
+     *
+     *   \GL n\C
+     */
+    function expandTextPass(
         text,
-        macro,
+        macros,
         remainingLimit
     ) {
         let output = "";
@@ -832,13 +834,13 @@
             && count < remainingLimit
         ) {
             const found =
-                findMacroToken(
+                findNextExpandableMacro(
                     text,
-                    macro.token,
+                    macros,
                     cursor
                 );
 
-            if (found === -1) {
+            if (!found) {
                 output +=
                     text.slice(cursor);
 
@@ -851,69 +853,17 @@
             output +=
                 text.slice(
                     cursor,
-                    found
+                    found.start
                 );
 
-            /*
-             * Zero-argument macro.
-             */
-            if (
-                macro.argumentCount
-                === 0
-            ) {
-                output +=
-                    macro.replacement;
-
-                cursor =
-                    found
-                    + macro.token.length;
-
-                count += 1;
-                continue;
-            }
-
-            const parsedArguments =
-                readMacroArguments(
-                    text,
-                    found
-                        + macro.token.length,
-                    macro.argumentCount
+            output +=
+                buildMacroReplacement(
+                    found.macro,
+                    found.values
                 );
-
-            /*
-             * Version 1 requires braced arguments. Leave malformed
-             * or unsupported usage untouched so the audit can report it.
-             */
-            if (!parsedArguments) {
-                output +=
-                    macro.token;
-
-                cursor =
-                    found
-                    + macro.token.length;
-
-                continue;
-            }
-
-            let replacement =
-                macro.replacement;
-
-            parsedArguments.values
-                .forEach(
-                    (value, index) => {
-                        replacement =
-                            replacement
-                                .split(
-                                    `#${index + 1}`
-                                )
-                                .join(value);
-                    }
-                );
-
-            output += replacement;
 
             cursor =
-                parsedArguments.end;
+                found.end;
 
             count += 1;
         }
@@ -927,6 +877,104 @@
             text: output,
             count
         };
+    }
+
+
+    /**
+     * Find the earliest complete, expandable local macro call.
+     *
+     * Malformed parameterized calls remain untouched, while later valid
+     * calls can still be expanded.
+     */
+    function findNextExpandableMacro(
+        text,
+        macros,
+        start
+    ) {
+        let earliest = null;
+
+        for (const macro of macros) {
+            let found =
+                findMacroToken(
+                    text,
+                    macro.token,
+                    start
+                );
+
+            while (found !== -1) {
+                const argumentStart =
+                    found
+                    + macro.token.length;
+
+                let values = [];
+                let end =
+                    argumentStart;
+
+                if (macro.argumentCount > 0) {
+                    const parsedArguments =
+                        readMacroArguments(
+                            text,
+                            argumentStart,
+                            macro.argumentCount
+                        );
+
+                    if (!parsedArguments) {
+                        found =
+                            findMacroToken(
+                                text,
+                                macro.token,
+                                argumentStart
+                            );
+
+                        continue;
+                    }
+
+                    values =
+                        parsedArguments.values;
+
+                    end =
+                        parsedArguments.end;
+                }
+
+                if (
+                    earliest === null
+                    || found < earliest.start
+                ) {
+                    earliest = {
+                        macro,
+                        start: found,
+                        end,
+                        values
+                    };
+                }
+
+                break;
+            }
+        }
+
+        return earliest;
+    }
+
+
+    function buildMacroReplacement(
+        macro,
+        values
+    ) {
+        let replacement =
+            macro.replacement;
+
+        values.forEach(
+            (value, index) => {
+                replacement =
+                    replacement
+                        .split(
+                            `#${index + 1}`
+                        )
+                        .join(value);
+            }
+        );
+
+        return replacement;
     }
 
 
@@ -978,13 +1026,17 @@
 
 
     /**
-     * Version 1 supports braced arguments:
+     * Read ordinary TeX undelimited macro arguments.
      *
-     *   \conj{x}
-     *   \pair{x}{y}
+     * Each argument may be:
      *
-     * Unbraced TeX arguments can be added later when an actual
-     * source concept requires them.
+     *   {a grouped argument}
+     *   \ControlSequence
+     *   \%
+     *   x
+     *
+     * Braces group multiple tokens but are not included in the
+     * replacement value.
      */
     function readMacroArguments(
         text,
@@ -1000,31 +1052,106 @@
             index += 1
         ) {
             cursor =
-                skipWhitespace(
+                skipSpacesAndComments(
                     text,
                     cursor
                 );
 
-            if (text[cursor] !== "{") {
+            if (cursor >= text.length) {
                 return null;
             }
 
-            const group =
-                readBalancedGroup(
-                    text,
-                    cursor
+            /*
+            * Braced argument:
+            *
+            *   {x+y}
+            */
+            if (text[cursor] === "{") {
+                const group =
+                    readBalancedGroup(
+                        text,
+                        cursor
+                    );
+
+                if (!group) {
+                    return null;
+                }
+
+                values.push(
+                    group.content
                 );
 
-            if (!group) {
-                return null;
+                cursor =
+                    group.end;
+
+                continue;
             }
 
+            /*
+            * Control-word argument:
+            *
+            *   \C
+            *   \mathbb
+            */
+            if (text[cursor] === "\\") {
+                const command =
+                    readControlSequence(
+                        text,
+                        cursor
+                    );
+
+                if (command) {
+                    values.push(
+                        text.slice(
+                            cursor,
+                            command.end
+                        )
+                    );
+
+                    cursor =
+                        command.end;
+
+                    continue;
+                }
+
+                /*
+                * Control-symbol argument:
+                *
+                *   \%
+                *   \{
+                *   \,
+                */
+                if (
+                    cursor + 1
+                    >= text.length
+                ) {
+                    return null;
+                }
+
+                values.push(
+                    text.slice(
+                        cursor,
+                        cursor + 2
+                    )
+                );
+
+                cursor += 2;
+
+                continue;
+            }
+
+            /*
+            * Ordinary single-character argument:
+            *
+            *   x
+            *   n
+            *   2
+            */
             values.push(
-                group.content
+                text[cursor]
             );
 
-            cursor =
-                group.end;
+            cursor += 1;
         }
 
         return {
