@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "local-newcommand-v2",
+        debugVersion: "eqnarray-grouped-rows-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -1411,37 +1411,108 @@
     function splitEqnarrayRows(body) {
         const text = String(body || "");
         const rows = [];
+
         let start = 0;
         let nestedDepth = 0;
+        let braceDepth = 0;
 
-        for (let i = 0; i < text.length; i++) {
-            const env = readLatexEnvironmentAt(text, i);
+        for (
+            let i = 0;
+            i < text.length;
+            i += 1
+        ) {
+            const env =
+                readLatexEnvironmentAt(
+                    text,
+                    i
+                );
 
-            if (env && isNestedLatexEnvironment(env.name)) {
+            if (
+                env
+                && isNestedLatexEnvironment(
+                    env.name
+                )
+            ) {
                 if (env.type === "begin") {
                     nestedDepth += 1;
                 } else {
-                    nestedDepth = Math.max(0, nestedDepth - 1);
+                    nestedDepth =
+                        Math.max(
+                            0,
+                            nestedDepth - 1
+                        );
                 }
 
-                i = env.endIndex - 1;
+                i =
+                    env.endIndex - 1;
+
                 continue;
             }
 
+            /*
+            * Escaped braces such as \{ and \} are TeX symbols,
+            * not grouping braces.
+            */
+            if (text[i] === "\\") {
+                if (
+                    text[i + 1] === "{"
+                    || text[i + 1] === "}"
+                ) {
+                    i += 1;
+                    continue;
+                }
+
+            } else if (text[i] === "{") {
+                braceDepth += 1;
+                continue;
+
+            } else if (text[i] === "}") {
+                braceDepth =
+                    Math.max(
+                        0,
+                        braceDepth - 1
+                    );
+
+                continue;
+            }
+
+            /*
+            * Split only a genuine top-level eqnarray row.
+            *
+            * Do not split \\ inside grouped macro arguments such
+            * as:
+            *
+            *   \substack{top \\ middle \\ bottom}
+            */
             if (
-                nestedDepth === 0 &&
-                text[i] === "\\" &&
-                text[i + 1] === "\\"
+                nestedDepth === 0
+                && braceDepth === 0
+                && text[i] === "\\"
+                && text[i + 1] === "\\"
             ) {
-                rows.push(text.slice(start, i).trim());
+                rows.push(
+                    text
+                        .slice(
+                            start,
+                            i
+                        )
+                        .trim()
+                );
+
                 i += 1;
                 start = i + 1;
             }
         }
 
-        rows.push(text.slice(start).trim());
+        rows.push(
+            text
+                .slice(start)
+                .trim()
+        );
 
-        return rows.filter(row => row.length > 0);
+        return rows.filter(
+            row => row.length > 0
+        );
     }
 
     function readLatexEnvironmentAt(text, index) {
