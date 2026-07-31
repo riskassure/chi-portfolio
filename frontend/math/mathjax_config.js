@@ -25,6 +25,7 @@
                 down: "{\\mathord{\\downarrow}}",
                 dom: "\\operatorname{dom}",
                 sgn: "\\operatorname{sgn}",
+                N: "\\mathbb{N}",
                 NN: "\\mathbb{N}",
                 bbZ: "\\mathbb{Z}",
                 closure: ["\\overline{#1}", 1],
