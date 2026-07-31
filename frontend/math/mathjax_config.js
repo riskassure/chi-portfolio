@@ -38,6 +38,7 @@
                 mathbbmss: ["\\mathbb{#1}", 1],
                 mathdd: ["\\mathbb{#1}", 1],
                 Span: "\\operatorname{span}",
+                Sp: "\\operatorname{span}",
                 up: "\\uparrow\\!\\!",
                 down: "\\downarrow\\!\\!",
 
