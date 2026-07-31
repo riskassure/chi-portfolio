@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "eqnarray-grouped-rows-v1",
+        debugVersion: "pstree-derivation-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -6961,21 +6961,6 @@
             return "";
         }
 
-        /*
-        * Narrow PSTree v1:
-        *
-        *   \pstree[...]
-        *   {\Tr{Z}}{
-        *       \pstree{\Tr{Y}}
-        *       {\Tr{X_1}\Tr{X_2}}
-        *   }
-        *
-        * This intentionally handles only the simple two-level rectangular
-        * deduction tree used by the "deduction" concept.
-        */
-        const pattern =
-            /\\\[\s*\\pstree(?:\s*\[[^\]]*\])?\s*\{\s*\\Tr\s*\{([^{}]+)\}\s*\}\s*\{\s*\\pstree(?:\s*\[[^\]]*\])?\s*\{\s*\\Tr\s*\{([^{}]+)\}\s*\}\s*\{\s*\\Tr\s*\{([^{}]+)\}\s*\\Tr\s*\{([^{}]+)\}\s*\}\s*\}\s*\\\]/gi;
-
         const renderNode = value => {
             const cleanValue =
                 String(value || "").trim();
@@ -7000,8 +6985,185 @@
             `;
         };
 
-        return String(tex).replace(
-            pattern,
+        const renderTwoLeafTree = (
+            rootLabel,
+            middleLabel,
+            leftLabel,
+            rightLabel
+        ) => {
+            return `
+                <div
+                    class="pm-pstree-display tex2jax_process"
+                    style="
+                        display:flex;
+                        justify-content:center;
+                        margin:1rem 0;
+                    "
+                >
+                    <div style="
+                        display:flex;
+                        flex-direction:column;
+                        align-items:center;
+                    ">
+                        <div style="
+                            display:flex;
+                            justify-content:center;
+                            align-items:center;
+                            gap:2rem;
+                        ">
+                            ${renderNode(leftLabel)}
+                            ${renderNode(rightLabel)}
+                        </div>
+
+                        <svg
+                            aria-hidden="true"
+                            width="150"
+                            height="30"
+                            viewBox="0 0 150 30"
+                            style="
+                                display:block;
+                                overflow:visible;
+                            "
+                        >
+                            <line
+                                x1="36"
+                                y1="0"
+                                x2="75"
+                                y2="30"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            ></line>
+
+                            <line
+                                x1="114"
+                                y1="0"
+                                x2="75"
+                                y2="30"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            ></line>
+                        </svg>
+
+                        ${renderNode(middleLabel)}
+
+                        <div
+                            aria-hidden="true"
+                            style="
+                                height:1rem;
+                                border-left:1.5px solid currentColor;
+                            "
+                        ></div>
+
+                        ${renderNode(rootLabel)}
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderThreeLevelTree = (
+            rootLabel,
+            upperMiddleLabel,
+            lowerMiddleLabel,
+            leftLabel,
+            rightLabel
+        ) => {
+            return `
+                <div
+                    class="pm-pstree-display tex2jax_process"
+                    style="
+                        display:flex;
+                        justify-content:center;
+                        margin:1rem 0;
+                    "
+                >
+                    <div style="
+                        display:flex;
+                        flex-direction:column;
+                        align-items:center;
+                    ">
+                        <div style="
+                            display:flex;
+                            justify-content:center;
+                            align-items:center;
+                            gap:2rem;
+                        ">
+                            ${renderNode(leftLabel)}
+                            ${renderNode(rightLabel)}
+                        </div>
+
+                        <svg
+                            aria-hidden="true"
+                            width="150"
+                            height="30"
+                            viewBox="0 0 150 30"
+                            style="
+                                display:block;
+                                overflow:visible;
+                            "
+                        >
+                            <line
+                                x1="36"
+                                y1="0"
+                                x2="75"
+                                y2="30"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            ></line>
+
+                            <line
+                                x1="114"
+                                y1="0"
+                                x2="75"
+                                y2="30"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            ></line>
+                        </svg>
+
+                        ${renderNode(lowerMiddleLabel)}
+
+                        <div
+                            aria-hidden="true"
+                            style="
+                                height:1rem;
+                                border-left:1.5px solid currentColor;
+                            "
+                        ></div>
+
+                        ${renderNode(upperMiddleLabel)}
+
+                        <div
+                            aria-hidden="true"
+                            style="
+                                height:1rem;
+                                border-left:1.5px solid currentColor;
+                            "
+                        ></div>
+
+                        ${renderNode(rootLabel)}
+                    </div>
+                </div>
+            `;
+        };
+
+        let output = String(tex);
+
+        /*
+        * Narrow PSTree v1:
+        *
+        *   \pstree[...]
+        *   {\Tr{Z}}{
+        *       \pstree{\Tr{Y}}
+        *       {\Tr{X_1}\Tr{X_2}}
+        *   }
+        *
+        * Used by the "deduction" concept.
+        */
+        const simplePattern =
+            /\\\[\s*\\pstree(?:\s*\[[^\]]*\])?\s*\{\s*\\Tr\s*\{([^{}]+)\}\s*\}\s*\{\s*\\pstree(?:\s*\[[^\]]*\])?\s*\{\s*\\Tr\s*\{([^{}]+)\}\s*\}\s*\{\s*\\Tr\s*\{([^{}]+)\}\s*\\Tr\s*\{([^{}]+)\}\s*\}\s*\}\s*\\\]/gi;
+
+        output = output.replace(
+            simplePattern,
             function (
                 _match,
                 rootLabel,
@@ -7009,75 +7171,53 @@
                 leftLabel,
                 rightLabel
             ) {
-                return `
-                    <div
-                        class="pm-pstree-display tex2jax_process"
-                        style="
-                            display:flex;
-                            justify-content:center;
-                            margin:1rem 0;
-                        "
-                    >
-                        <div style="
-                            display:flex;
-                            flex-direction:column;
-                            align-items:center;
-                        ">
-                            <div style="
-                                display:flex;
-                                justify-content:center;
-                                align-items:center;
-                                gap:2rem;
-                            ">
-                                ${renderNode(leftLabel)}
-                                ${renderNode(rightLabel)}
-                            </div>
-
-                            <svg
-                                aria-hidden="true"
-                                width="150"
-                                height="30"
-                                viewBox="0 0 150 30"
-                                style="
-                                    display:block;
-                                    overflow:visible;
-                                "
-                            >
-                                <line
-                                    x1="36"
-                                    y1="0"
-                                    x2="75"
-                                    y2="30"
-                                    stroke="currentColor"
-                                    stroke-width="1.5"
-                                ></line>
-
-                                <line
-                                    x1="114"
-                                    y1="0"
-                                    x2="75"
-                                    y2="30"
-                                    stroke="currentColor"
-                                    stroke-width="1.5"
-                                ></line>
-                            </svg>
-
-                            ${renderNode(middleLabel)}
-
-                            <div
-                                aria-hidden="true"
-                                style="
-                                    height:1rem;
-                                    border-left:1.5px solid currentColor;
-                                "
-                            ></div>
-
-                            ${renderNode(rootLabel)}
-                        </div>
-                    </div>
-                `;
+                return renderTwoLeafTree(
+                    rootLabel,
+                    middleLabel,
+                    leftLabel,
+                    rightLabel
+                );
             }
         );
+
+        /*
+        * Narrow PSTree v2:
+        *
+        *   \pstree[...]{\Tc{...}~[...]{A\to A}}{
+        *       \pstree{\TC~[...]{A}}{
+        *           \pstree{\TC~[...]{A\land A}}{
+        *               \TC~[...]{A}
+        *               \TC~[...]{A}
+        *           }
+        *       }
+        *   }
+        *
+        * Used by "derivations-in-natural-deduction".
+        */
+        const derivationPattern =
+            /\\\[\s*\\pstree(?:\s*\[[^\]]*\])?\s*\{\s*\\Tc\s*\{[^{}]*\}\s*~\s*\[[^\]]*\]\s*\{([^{}]+)\}\s*\}\s*\{\s*\\pstree(?:\s*\[[^\]]*\])?\s*\{\s*\\TC\s*~\s*\[[^\]]*\]\s*\{([^{}]+)\}\s*\}\s*\{\s*\\pstree(?:\s*\[[^\]]*\])?\s*\{\s*\\TC\s*~\s*\[[^\]]*\]\s*\{([^{}]+)\}\s*\}\s*\{\s*\\TC\s*~\s*\[[^\]]*\]\s*\{([^{}]+)\}\s*\\TC\s*~\s*\[[^\]]*\]\s*\{([^{}]+)\}\s*\}\s*\}\s*\}\s*\\\]/gi;
+
+        output = output.replace(
+            derivationPattern,
+            function (
+                _match,
+                rootLabel,
+                upperMiddleLabel,
+                lowerMiddleLabel,
+                leftLabel,
+                rightLabel
+            ) {
+                return renderThreeLevelTree(
+                    rootLabel,
+                    upperMiddleLabel,
+                    lowerMiddleLabel,
+                    leftLabel,
+                    rightLabel
+                );
+            }
+        );
+
+        return output;
     }
 
     function cleanLaTeXEnvironments(tex) {
