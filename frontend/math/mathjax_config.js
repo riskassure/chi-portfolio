@@ -36,6 +36,7 @@
                 assign: ":=",
                 mathbbm: ["#1", 1],
                 mathbbmss: ["\\mathbb{#1}", 1],
+                mathdd: ["\\mathbb{#1}", 1],
                 Span: "\\operatorname{span}",
                 up: "\\uparrow\\!\\!",
                 down: "\\downarrow\\!\\!",
