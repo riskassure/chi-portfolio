@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-triple-lines-v8",
+        debugVersion: "xymatrix-inline-sequence-v2",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -1823,10 +1823,18 @@
             const displayStartMatch =
                 before.match(/\\\[\s*$/);
 
-            const inlineStartMatch =
+            const inlineStartCandidate =
                 displayStartMatch
                     ? null
                     : before.match(/\$([^$\r\n]*)$/);
+
+            const inlineStartMatch =
+                inlineStartCandidate
+                && !String(
+                    inlineStartCandidate[1] || ""
+                ).includes("\\xymatrix")
+                    ? inlineStartCandidate
+                    : null;
 
             const inlineEndMatch =
                 inlineStartMatch
@@ -5455,17 +5463,37 @@
         );
 
         /*
-        * Inline dollar wrappers must contain only one converted table,
-        * plus optional punctuation. Do not search broadly through prose
-        * for a later xymatrix table.
+        * Process each complete single-dollar wrapper independently.
+        *
+        * This supports both:
+        *
+        *   $table$
+        *   $table = table$
+        *
+        * without searching beyond that wrapper into surrounding prose.
         */
         output = output.replace(
-            new RegExp(
-                `(^|[^\\\\$])\\$(?!\\$)\\s*(${tablePattern})\\s*([,.;:!?]?)\\s*\\$(?!\\$)`,
-                "gi"
-            ),
-            (_, prefix, tableHtml, punctuation) =>
-                `${prefix}${tableHtml}${punctuation || ""}`
+            /(^|[^\\$])\$(?!\$)((?:\\.|[^\\$])*)\$(?!\$)/g,
+            function (
+                fullMatch,
+                prefix,
+                inner
+            ) {
+                if (
+                    !containsConvertedXyMatrixTable(
+                        inner
+                    )
+                ) {
+                    return fullMatch;
+                }
+
+                return (
+                    prefix
+                    + renderMixedXyMatrixWrapperContent(
+                        inner
+                    )
+                );
+            }
         );
 
         /*
