@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-leading-label-v1",
+        debugVersion: "rooted-tree-pstree-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -7310,6 +7310,161 @@
         return output;
     }
 
+    function convertRootedTreePstreeToHtml(tex) {
+        if (!tex) {
+            return "";
+        }
+
+        /*
+        * Narrow converter for the PSTricks diagram used by "rooted-tree".
+        *
+        * Tree structure:
+        *
+        *                 a       b   c   d
+        *                 |        \ | /
+        *                 e   f   g   h
+        *                  \ /     \ /
+        *                   i       j
+        *                    \     /
+        *                       k
+        */
+        const rootedTreePattern =
+            /\\\[\s*\\pstree[\s\S]*?\\Tc\s*\{3pt\}[\s\S]*?\{\s*\$k\$\s*\}[\s\S]*?\\TC[\s\S]*?\{\s*\$d\$\s*\}[\s\S]*?\\\]/gi;
+
+        return String(tex).replace(
+            rootedTreePattern,
+            `
+                <div
+                    class="pm-rooted-tree-display mathjax-diagnostic-ignore"
+                    style="
+                        display:flex;
+                        justify-content:center;
+                        max-width:100%;
+                        overflow-x:auto;
+                        margin:1rem 0;
+                    "
+                >
+                    <svg
+                        role="img"
+                        aria-label="Rooted tree with root k"
+                        width="640"
+                        height="335"
+                        viewBox="0 0 640 335"
+                        preserveAspectRatio="xMidYMid meet"
+                        style="
+                            display:block;
+                            width:min(100%, 640px);
+                            height:auto;
+                            overflow:visible;
+                        "
+                    >
+                        <g
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            vector-effect="non-scaling-stroke"
+                        >
+                            <!-- root to first level -->
+                            <line x1="320" y1="295" x2="220" y2="220"></line>
+                            <line x1="320" y1="295" x2="420" y2="220"></line>
+
+                            <!-- i branch -->
+                            <line x1="220" y1="220" x2="150" y2="140"></line>
+                            <line x1="220" y1="220" x2="270" y2="140"></line>
+                            <line x1="150" y1="140" x2="100" y2="60"></line>
+
+                            <!-- j branch -->
+                            <line x1="420" y1="220" x2="370" y2="140"></line>
+                            <line x1="420" y1="220" x2="500" y2="140"></line>
+
+                            <!-- h children -->
+                            <line x1="500" y1="140" x2="430" y2="60"></line>
+                            <line x1="500" y1="140" x2="500" y2="60"></line>
+                            <line x1="500" y1="140" x2="570" y2="60"></line>
+                        </g>
+
+                        <!-- filled ordinary vertices -->
+                        <g fill="currentColor">
+                            <circle cx="100" cy="60" r="4"></circle>
+                            <circle cx="430" cy="60" r="4"></circle>
+                            <circle cx="500" cy="60" r="4"></circle>
+                            <circle cx="570" cy="60" r="4"></circle>
+
+                            <circle cx="150" cy="140" r="4"></circle>
+                            <circle cx="270" cy="140" r="4"></circle>
+                            <circle cx="370" cy="140" r="4"></circle>
+                            <circle cx="500" cy="140" r="4"></circle>
+
+                            <circle cx="220" cy="220" r="4"></circle>
+                            <circle cx="420" cy="220" r="4"></circle>
+                        </g>
+
+                        <!-- open root vertex -->
+                        <circle
+                            cx="320"
+                            cy="295"
+                            r="5"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            vector-effect="non-scaling-stroke"
+                        ></circle>
+
+                        <!-- vertex labels -->
+                        <g
+                            fill="currentColor"
+                            font-family="serif"
+                            font-size="21"
+                            font-style="italic"
+                            dominant-baseline="middle"
+                        >
+                            <text x="112" y="60">a</text>
+
+                            <text
+                                x="418"
+                                y="60"
+                                text-anchor="end"
+                            >b</text>
+
+                            <text x="512" y="60">c</text>
+                            <text x="582" y="60">d</text>
+
+                            <text
+                                x="138"
+                                y="140"
+                                text-anchor="end"
+                            >e</text>
+
+                            <text x="282" y="140">f</text>
+
+                            <text
+                                x="358"
+                                y="140"
+                                text-anchor="end"
+                            >g</text>
+
+                            <text x="512" y="140">h</text>
+
+                            <text
+                                x="208"
+                                y="220"
+                                text-anchor="end"
+                            >i</text>
+
+                            <text x="432" y="220">j</text>
+
+                            <text
+                                x="320"
+                                y="318"
+                                text-anchor="middle"
+                            >k</text>
+                        </g>
+                    </svg>
+                </div>
+            `
+        );
+    }
+
     function cleanLaTeXEnvironments(tex) {
         if (!tex) return "";
 
@@ -7561,8 +7716,11 @@
         // Normalize legacy eqnarray blocks before MathJax sees them.
         clean = convertEqnarrayToAligned(clean);
 
-        // Convert the simple two-level PSTricks tree used by "deduction".
+        // Convert the simple PSTricks deduction trees.
         clean = convertSimpleDeductionPstreeToHtml(clean);
+
+        // Convert the larger fixed diagram used by "rooted-tree".
+        clean = convertRootedTreePstreeToHtml(clean);
 
         // existing pspicture/list/etc cleanup continues below...
         clean = clean.replace(
