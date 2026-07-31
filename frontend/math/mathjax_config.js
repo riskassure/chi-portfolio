@@ -44,6 +44,11 @@
                     2
                 ],
 
+                gen: [
+                    "\\left\\langle #1 \\right\\rangle",
+                    1
+                ],
+
                 hom: "\\operatorname{Hom}",
                 Hom: "\\operatorname{Hom}",
                 Ker: "\\operatorname{Ker}",
