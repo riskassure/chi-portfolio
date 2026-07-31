@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "pstree-derivation-v1",
+        debugVersion: "xymatrix-leading-label-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -132,26 +132,45 @@
         };
     }
 
-
     function restoreMathAfterProseCleanup(value, blocks) {
         const items = Array.isArray(blocks) ? blocks : [];
+        let output = String(value || "");
 
-        return String(value || "").replace(
-            /PMMATHPROSEBLOCK(\d+)END/g,
-            (match, indexText) => {
-                const index = Number(indexText);
+        /*
+        * A protected outer math block can contain placeholders created earlier
+        * for inner MathJax expressions, particularly in generated xymatrix HTML.
+        * Restore repeatedly until no additional placeholders are exposed.
+        */
+        for (
+            let pass = 0;
+            pass <= items.length;
+            pass += 1
+        ) {
+            const nextOutput = output.replace(
+                /PMMATHPROSEBLOCK(\d+)END/g,
+                (match, indexText) => {
+                    const index = Number(indexText);
 
-                if (
-                    !Number.isInteger(index)
-                    || index < 0
-                    || index >= items.length
-                ) {
-                    return match;
+                    if (
+                        !Number.isInteger(index)
+                        || index < 0
+                        || index >= items.length
+                    ) {
+                        return match;
+                    }
+
+                    return items[index];
                 }
+            );
 
-                return items[index];
+            if (nextOutput === output) {
+                break;
             }
-        );
+
+            output = nextOutput;
+        }
+
+        return output;
     }
 
     function formatLegacyFontGroup(command, content) {
@@ -1799,13 +1818,39 @@
             let replaceEnd = braceEnd + 1;
 
             const before = tex.slice(0, matrixIndex);
-            const displayStartMatch = before.match(/\\\[\s*$/);
+            const after = tex.slice(replaceEnd);
+
+            const displayStartMatch =
+                before.match(/\\\[\s*$/);
+
+            const inlineStartMatch =
+                displayStartMatch
+                    ? null
+                    : before.match(/\$([^$\r\n]*)$/);
+
+            const inlineEndMatch =
+                inlineStartMatch
+                    ? after.match(/^\s*\$/)
+                    : null;
+
+            let leadingInlineMath = "";
 
             if (displayStartMatch) {
-                replaceStart = matrixIndex - displayStartMatch[0].length;
-            }
+                replaceStart =
+                    matrixIndex - displayStartMatch[0].length;
 
-            const after = tex.slice(replaceEnd);
+            } else if (
+                inlineStartMatch
+                && inlineEndMatch
+            ) {
+                replaceStart =
+                    matrixIndex - inlineStartMatch[0].length;
+
+                replaceEnd += inlineEndMatch[0].length;
+
+                leadingInlineMath =
+                    String(inlineStartMatch[1] || "").trim();
+            }
 
             // A display xymatrix commonly ends with punctuation:
             //
@@ -1825,10 +1870,55 @@
                 replaceEnd += displayEndMatch[0].length;
             }
 
-            const body = tex.slice(braceStart + 1, braceEnd);
-            const html =
-                buildHtmlTableFromXyMatrixBody(body) +
-                trailingDisplayPunctuation;
+            const body =
+                tex.slice(braceStart + 1, braceEnd);
+
+            const matrixHtml =
+                buildHtmlTableFromXyMatrixBody(body);
+
+            let html;
+
+            if (leadingInlineMath) {
+                /*
+                * Source forms such as:
+                *
+                *   $P:\xymatrix{...}$
+                *
+                * place the label directly beside the diagram. Remove the matrix's
+                * ordinary standalone margin and center the combined unit.
+                */
+                const compactMatrixHtml =
+                    matrixHtml.replace(
+                        "margin:1rem auto;",
+                        "margin:0;"
+                    );
+
+                html = `
+                    <div
+                        class="pm-xymatrix-labeled-display tex2jax_process"
+                        style="
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            gap:1.00rem;
+                            margin:1rem 0;
+                        "
+                    >
+                        <span style="white-space:nowrap;">
+                            \\(${escapeHtmlForMathCell(leadingInlineMath)}\\)
+                        </span>
+
+                        ${compactMatrixHtml}
+                    </div>
+
+                    ${trailingDisplayPunctuation}
+                `;
+
+            } else {
+                html =
+                    matrixHtml +
+                    trailingDisplayPunctuation;
+            }
 
             result += tex.slice(cursor, replaceStart);
             result += html;
