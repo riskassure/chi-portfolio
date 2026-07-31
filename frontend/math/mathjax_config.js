@@ -182,6 +182,7 @@
 
                 norm: ["\\left\\lVert #1 \\right\\rVert", 1],
                 abs: ["\\left\\lvert #1 \\right\\rvert", 1],
+                ip: ["\\left\\langle #1 \\right\\rangle", 1],
                 line: ["\\overleftrightarrow{#1}", 1],
 
                 lp: "(",
