@@ -2204,11 +2204,13 @@
                 const objectHtml = renderXyObjectCell(
                     cell.objectTex,
                     cell.objectFrame,
-                    selfLoops
+                    selfLoops,
+                    cell.overlayLabel
                 );
 
                 const hasVisibleObject =
                     String(cell.objectTex || "").trim() !== ""
+                    || String(cell.overlayLabel || "").trim() !== ""
                     || Boolean(cell.objectFrame)
                     || selfLoops.length > 0;
 
@@ -3464,6 +3466,7 @@
         const arrows = [];
         let twoCellLabel = "";
         let objectFrame = null;
+        let overlayLabel = "";
 
         /*
         * Legacy Xy-pic crossing-gap marker:
@@ -3477,6 +3480,22 @@
         text = text.replace(
             /\|\s*!\s*\{[^{}]*\}\s*\\hole\b/g,
             ""
+        );
+
+        /*
+        * Legacy Xy-pic saved text object:
+        *
+        *   \save *\txt{the decimal point} \restore \ar[u]
+        *
+        * Preserve the visible text and following arrow, but discard the
+        * Xy-pic save/restore positioning wrappers.
+        */
+        text = text.replace(
+            /\\save\s*\*\s*\\txt\s*\{([^{}]*)\}\s*\\restore\b/g,
+            (_, label) => {
+                overlayLabel = String(label || "").trim();
+                return "";
+            }
         );
 
         /*
@@ -3617,6 +3636,7 @@
         return {
             objectTex,
             objectFrame,
+            overlayLabel,
             arrows,
             twoCellLabel,
             legacyTwoCell
@@ -4453,10 +4473,47 @@
     function renderXyObjectCell(
         tex,
         frame = null,
-        selfLoops = []
+        selfLoops = [],
+        overlayLabel = ""
     ) {
-        if (!tex) {
+        const cleanOverlayLabel =
+            String(overlayLabel || "").trim();
+
+        if (!tex && !cleanOverlayLabel) {
             return "";
+        }
+
+        /*
+        * Xy-pic \save ... \restore text is positioned without contributing
+        * to the width of its matrix column.
+        */
+        if (cleanOverlayLabel) {
+            const labelMathHtml =
+                `\\(\\text{${escapeHtmlForMathCell(cleanOverlayLabel)}}\\)`;
+
+            return `
+                <span
+                    class="pm-xymatrix-overlay-label"
+                    style="
+                        position:relative;
+                        display:inline-block;
+                        width:0;
+                        height:1.35em;
+                        overflow:visible;
+                        vertical-align:middle;
+                    "
+                >
+                    <span style="
+                        position:absolute;
+                        top:0;
+                        left:50%;
+                        transform:translateX(-50%);
+                        white-space:nowrap;
+                    ">
+                        ${labelMathHtml}
+                    </span>
+                </span>
+            `;
         }
 
         const mathHtml =
