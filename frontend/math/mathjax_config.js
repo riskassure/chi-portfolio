@@ -65,6 +65,9 @@
                 F: "\\mathcal{F}",
                 T: "\\mathbb{T}",
 
+                Yleft: "\\mathbin{-\\mkern-5mu\\mathord{<}}",
+                Yright: "\\mathbin{\\mathord{>}\\mkern-5mu-}",
+
                 ob: "\\operatorname{Ob}",
                 op: "{\\mathrm{op}}",
                 eqv: "\\simeq",
