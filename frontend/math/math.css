@@ -237,6 +237,28 @@
     overflow-x: auto; /* Protects layout if equations are exceptionally wide */
 }
 
+/*
+ * Keep exceptionally wide display equations inside the concept column.
+ * Each equation receives its own horizontal scrollbar when needed.
+ */
+.math-canvas-frame mjx-container[display="true"] {
+    display: block !important;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-sizing: border-box;
+    padding: 0.15rem 0 0.35rem;
+}
+
+/*
+ * Preserve the equation's natural width inside the scrollable container
+ * rather than shrinking or wrapping the mathematical expression.
+ */
+.math-canvas-frame mjx-container[display="true"] > mjx-math {
+    min-width: max-content;
+}
+
 /* 🔗 THE AUTOLINKER COSMETICS */
 .math-autolink {
     color: #2563eb;

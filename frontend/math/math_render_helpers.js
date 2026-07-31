@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "rooted-tree-pstree-v1",
+        debugVersion: "xymatrix-triple-lines-v8",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -2113,6 +2113,17 @@
 
     const XY_PLAIN_HORIZONTAL_LINE = "__PM_XY_PLAIN_HORIZONTAL_LINE__";
 
+    function isXyPlainHorizontalLineCell(value) {
+        return (
+            value === XY_PLAIN_HORIZONTAL_LINE
+            || (
+                value
+                && typeof value === "object"
+                && value.type === "plain-horizontal-line"
+            )
+        );
+    }
+
     const XY_VERTICAL_ROWSPAN_COVERED = "__PM_XY_VERTICAL_ROWSPAN_COVERED__";
 
     function recoverLostXyMatrixRowSeparators(value) {
@@ -2408,32 +2419,90 @@
                     continue;
                 }
 
-                if (cellHtml === XY_PLAIN_HORIZONTAL_LINE) {
+                if (isXyPlainHorizontalLineCell(cellHtml)) {
                     let runEnd = colIndex + 1;
 
                     while (
-                        runEnd < row.length &&
-                        row[runEnd] === XY_PLAIN_HORIZONTAL_LINE
+                        runEnd < row.length
+                        && isXyPlainHorizontalLineCell(
+                            row[runEnd]
+                        )
                     ) {
                         runEnd += 1;
                     }
 
-                    const colspan = runEnd - colIndex;
+                    const runCells =
+                        row.slice(colIndex, runEnd);
+
+                    const labeledLineCell =
+                        runCells.find(value => (
+                            value
+                            && typeof value === "object"
+                            && value.type === "plain-horizontal-line"
+                        )) || null;
+
+                    const label =
+                        String(
+                            labeledLineCell?.label || ""
+                        ).trim();
+
+                    const labelPosition =
+                        labeledLineCell?.labelPosition
+                        || "above";
+
+                    const lineCount =
+                        labeledLineCell?.lineCount === 3
+                            ? 3
+                            : labeledLineCell?.lineCount === 2
+                                ? 2
+                                : 1;
+
+                    const colspan =
+                        runEnd - colIndex;
+
+                    /*
+                    * Match the relation width closely to its visible label.
+                    *
+                    * The [r] or [rr] direction determines the destination cell, but
+                    * should not artificially stretch this congruence symbol.
+                    */
+                    const labelLength =
+                        estimateTexLabelLength(label);
+
+                    const lineWidthEm =
+                        label
+                            ? Math.max(
+                                2.4,
+                                1.0 + labelLength * 0.38
+                            )
+                            : 2.4;
+
+                    const lineHtml =
+                        renderHorizontalArrow(
+                            label,
+                            "right",
+                            {
+                                horizontalWidthEm: lineWidthEm
+                            },
+                            {
+                                showArrowHead: false,
+                                labelPosition,
+                                lineCount
+                            }
+                        );
 
                     htmlCells.push(`
                         <td
                             colspan="${colspan}"
-                            aria-hidden="true"
                             style="
-                                padding:0;
-                                height:1.2em;
+                                padding:0 0.18em;
+                                height:1.8em;
+                                text-align:center;
                                 vertical-align:middle;
+                                white-space:nowrap;
                             "
                         >
-                            <div style="
-                                width:100%;
-                                border-top:1.5px solid currentColor;
-                            "></div>
+                            ${lineHtml}
                         </td>
                     `);
 
@@ -2702,6 +2771,110 @@
 
     function getXyOverlayCoordinateKey(row, col) {
         return `${Number(row)}:${Number(col)}`;
+    }
+
+    function wrapScrollableXyMatrixTables(
+        root = document
+    ) {
+        const scope =
+            root
+            && typeof root.querySelectorAll === "function"
+                ? root
+                : document;
+
+        const tables = Array.from(
+            scope.querySelectorAll(
+                "table.pm-xymatrix-table"
+                + ":not([data-pm-diagonal-arrows])"
+            )
+        );
+
+        tables.forEach(table => {
+            /*
+            * Preserve specialized layouts that already manage their own
+            * positioning or participate in a larger inline construction.
+            */
+            if (
+                table.classList.contains(
+                    "pm-xymatrix-two-cell-table"
+                )
+                || table.closest(
+                    ".pm-xymatrix-labeled-display,"
+                    + ".pm-xymatrix-sequence,"
+                    + ".pm-underbraced-xymatrix,"
+                    + ".pm-xymatrix-scroll"
+                )
+            ) {
+                return;
+            }
+
+            if (!table.parentNode) {
+                return;
+            }
+
+            const wrapper =
+                document.createElement("div");
+
+            wrapper.className =
+                "pm-xymatrix-scroll";
+
+            wrapper.style.display = "block";
+            wrapper.style.width = "100%";
+            wrapper.style.maxWidth = "100%";
+            wrapper.style.overflowX = "auto";
+            wrapper.style.boxSizing = "border-box";
+            wrapper.style.margin = "1rem 0";
+            wrapper.style.paddingBottom = "0.35rem";
+
+            table.parentNode.insertBefore(
+                wrapper,
+                table
+            );
+
+            wrapper.appendChild(table);
+
+            /*
+            * The wrapper now owns the vertical margin. Keep the mathematical
+            * chain at its natural one-line width inside the scroll area.
+            */
+            table.style.margin = "0 auto";
+            table.style.width = "max-content";
+            table.style.maxWidth = "none";
+        });
+
+        const sequences = Array.from(
+            scope.querySelectorAll(
+                ".pm-xymatrix-sequence"
+            )
+        );
+
+        sequences.forEach(sequence => {
+            /*
+            * A mixed Xy-matrix sequence is already one semantic mathematical
+            * chain. Keep its pieces on one line and scroll the whole sequence
+            * when it is wider than the concept column.
+            */
+            sequence.style.width = "100%";
+            sequence.style.maxWidth = "100%";
+            sequence.style.flexWrap = "nowrap";
+            sequence.style.overflowX = "auto";
+            sequence.style.overflowY = "hidden";
+            sequence.style.boxSizing = "border-box";
+            sequence.style.paddingBottom = "0.35rem";
+
+            /*
+            * Start overflowing chains at the left edge so their beginning
+            * remains visible. Continue centering chains that already fit.
+            */
+            sequence.style.justifyContent = "flex-start";
+
+            if (
+                sequence.scrollWidth
+                <= sequence.clientWidth + 1
+            ) {
+                sequence.style.justifyContent = "center";
+            }
+        });
     }
 
     async function renderXyMatrixDiagonalOverlays(
@@ -3346,6 +3519,8 @@
                 labelsToTypeset
             );
         }
+
+        wrapScrollableXyMatrixTables(scope);
     }
 
     function normalizeLegacyTwoCellArrowLabel(value) {
@@ -3652,7 +3827,7 @@
         //   ="1"
         //   ="2"
         const arrowPattern =
-            /\\ar(?:@\{[^{}]*\}|@<[^>]*>|@[^\s\[\]&{}]+)*(?:\s*\[([^\]]*)\])?((?:\s*(?:[_^](?:[-+])?\s*[<>]*\s*(?:\{(?:[^{}]|\{[^{}]*\})*\}|\\?[A-Za-z0-9]+)|\|(?:\{(?:[^{}]|\{[^{}]*\})*\}|\\?[A-Za-z0-9=+\-]+)))*)\s*(?:=\s*"[^"]+")?/g;
+            /\\ar(?:@(?:[+-]?(?:\d+(?:\.\d+)?|\.\d+))?\{[^{}]*\}|@<[^>]*>|@[^\s\[\]&{}]+)*(?:\s*\[([^\]]*)\])?((?:\s*(?:[_^](?:[-+])?\s*[<>]*\s*(?:\{(?:[^{}]|\{[^{}]*\})*\}|\\?[A-Za-z0-9]+)|\|(?:\{(?:[^{}]|\{[^{}]*\})*\}|\\?[A-Za-z0-9=+\-]+)))*)\s*(?:=\s*"[^"]+")?/g;
 
         let match;
 
@@ -3660,7 +3835,21 @@
             const directionText = match[1] || "r";
 
             const styleMatch =
-                match[0].match(/@\{([^{}]*)\}/);
+                match[0].match(
+                    /@([+-]?(?:\d+(?:\.\d+)?|\.\d+))?\{([^{}]*)\}/
+                );
+
+            const styleVariant =
+                styleMatch
+                    ? String(styleMatch[1] || "").trim()
+                    : "";
+
+            const styleLineCount =
+                styleVariant === "3"
+                    ? 3
+                    : styleVariant === "2"
+                        ? 2
+                        : 1;
 
             const curveMatch =
                 match[0].match(
@@ -3678,7 +3867,8 @@
                 direction: normalizeXyArrowDirection(directionText),
                 directionText,
                 span: getXyArrowSpan(directionText),
-                style: styleMatch ? styleMatch[1] : "->",
+                style: styleMatch ? styleMatch[2] : "->",
+                lineCount: styleLineCount,
                 label: labelInfo.text,
                 labelPosition: labelInfo.position,
 
@@ -3854,24 +4044,64 @@
         gridRow,
         gridCol,
         direction,
-        span
+        span,
+        label = "",
+        labelPosition = "above",
+        lineCount = 1
     ) {
-        const sourceSpan = Math.max(Number(span) || 1, 1);
-        const step = direction === "left" ? -1 : 1;
+        const sourceSpan =
+            Math.max(Number(span) || 1, 1);
 
-        // Expanded Xy grid:
-        // object, arrow-space, object, arrow-space, object...
-        //
-        // A source span of 1 occupies 1 expanded cell.
-        // A source span of 8 occupies 15 expanded cells.
-        const expandedCellCount = sourceSpan * 2 - 1;
+        const step =
+            direction === "left"
+                ? -1
+                : 1;
 
-        for (let offset = 1; offset <= expandedCellCount; offset += 1) {
+        /*
+        * Expanded Xy grid:
+        *
+        * object, arrow-space, object, arrow-space, object...
+        *
+        * A source span of 1 occupies 1 expanded cell.
+        * A source span of 2 occupies 3 expanded cells.
+        */
+        const expandedCellCount =
+            sourceSpan * 2 - 1;
+
+        const cleanLabel =
+            String(label || "").trim();
+
+        const cleanLineCount =
+            lineCount === 3
+                ? 3
+                : lineCount === 2
+                    ? 2
+                    : 1;
+
+        const labelOffset =
+            Math.ceil(expandedCellCount / 2);
+
+        for (
+            let offset = 1;
+            offset <= expandedCellCount;
+            offset += 1
+        ) {
+            const cellValue =
+                cleanLabel && offset === labelOffset
+                    ? {
+                        type: "plain-horizontal-line",
+                        label: cleanLabel,
+                        labelPosition:
+                            labelPosition || "above",
+                        lineCount: cleanLineCount
+                    }
+                    : XY_PLAIN_HORIZONTAL_LINE;
+
             setGridCellIfInBounds(
                 grid,
                 gridRow,
                 gridCol + step * offset,
-                XY_PLAIN_HORIZONTAL_LINE
+                cellValue
             );
         }
     }
@@ -4138,7 +4368,10 @@
                     gridRow,
                     gridCol,
                     "right",
-                    span
+                    span,
+                    label,
+                    arrow.labelPosition,
+                    arrow.lineCount
                 );
                 return;
             }
@@ -4166,7 +4399,10 @@
                     gridRow,
                     gridCol,
                     "left",
-                    span
+                    span,
+                    label,
+                    arrow.labelPosition,
+                    arrow.lineCount
                 );
                 return;
             }
@@ -4714,6 +4950,13 @@
         const safeLabel = escapeHtmlForMathCell(label || "");
         const showArrowHead = options.showArrowHead !== false;
 
+        const lineCount =
+            options.lineCount === 3
+                ? 3
+                : options.lineCount === 2
+                    ? 2
+                    : 1;
+
         const labelPosition =
             options.labelPosition || "above";
 
@@ -4725,7 +4968,9 @@
                 ? "top:0.72em;"
                 : labelPosition === "center"
                     ? "top:50%; transform:translate(-50%, -50%);"
-                    : "top:-0.65em;";
+                    : showArrowHead
+                        ? "top:-0.65em;"
+                        : "top:0.02em;";
 
         const labelTransform =
             labelPosition === "center"
@@ -4742,6 +4987,37 @@
                     line-height:1;
                 ">\\({\\scriptstyle ${safeLabel}}\\)</div>`
             : "";
+
+        const lineOffsets =
+            lineCount === 3
+                ? [-0.16, 0, 0.16]
+                : lineCount === 2
+                    ? [-0.09, 0.09]
+                    : [0];
+
+        /*
+        * Ordinary arrows remain vertically centered. Arrowhead-free labeled
+        * relations reserve the upper part of the box for the label and place
+        * their parallel lines lower.
+        */
+        const lineCenterPercent =
+            showArrowHead
+                ? 50
+                : 82;
+
+        const lineHtml =
+            lineOffsets
+                .map(offset => `
+                    <span style="
+                        position:absolute;
+                        left:0;
+                        right:0;
+                        top:calc(${lineCenterPercent}% + ${offset}em);
+                        transform:translateY(-50%);
+                        border-top:1.35px solid currentColor;
+                    "></span>
+                `)
+                .join("");
 
         let arrowHead = "";
 
@@ -4781,14 +5057,7 @@
                 vertical-align:middle;
                 z-index:1;
             ">
-                <span style="
-                    position:absolute;
-                    left:0;
-                    right:0;
-                    top:50%;
-                    transform:translateY(-50%);
-                    border-top:1.5px solid currentColor;
-                "></span>
+                ${lineHtml}
 
                 ${arrowHead}
                 ${labelHtml}
