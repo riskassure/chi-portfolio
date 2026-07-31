@@ -6956,6 +6956,130 @@
         return output;
     }
 
+    function convertSimpleDeductionPstreeToHtml(tex) {
+        if (!tex) {
+            return "";
+        }
+
+        /*
+        * Narrow PSTree v1:
+        *
+        *   \pstree[...]
+        *   {\Tr{Z}}{
+        *       \pstree{\Tr{Y}}
+        *       {\Tr{X_1}\Tr{X_2}}
+        *   }
+        *
+        * This intentionally handles only the simple two-level rectangular
+        * deduction tree used by the "deduction" concept.
+        */
+        const pattern =
+            /\\\[\s*\\pstree(?:\s*\[[^\]]*\])?\s*\{\s*\\Tr\s*\{([^{}]+)\}\s*\}\s*\{\s*\\pstree(?:\s*\[[^\]]*\])?\s*\{\s*\\Tr\s*\{([^{}]+)\}\s*\}\s*\{\s*\\Tr\s*\{([^{}]+)\}\s*\\Tr\s*\{([^{}]+)\}\s*\}\s*\}\s*\\\]/gi;
+
+        const renderNode = value => {
+            const cleanValue =
+                String(value || "").trim();
+
+            return `
+                <span
+                    class="pm-pstree-node"
+                    style="
+                        display:inline-flex;
+                        align-items:center;
+                        justify-content:center;
+                        min-width:2.2rem;
+                        min-height:1.75rem;
+                        padding:0.08rem 0.42rem;
+                        border:1px solid #666;
+                        border-radius:0.2rem;
+                        background:#fff;
+                    "
+                >
+                    \\(${escapeHtmlForMathCell(cleanValue)}\\)
+                </span>
+            `;
+        };
+
+        return String(tex).replace(
+            pattern,
+            function (
+                _match,
+                rootLabel,
+                middleLabel,
+                leftLabel,
+                rightLabel
+            ) {
+                return `
+                    <div
+                        class="pm-pstree-display tex2jax_process"
+                        style="
+                            display:flex;
+                            justify-content:center;
+                            margin:1rem 0;
+                        "
+                    >
+                        <div style="
+                            display:flex;
+                            flex-direction:column;
+                            align-items:center;
+                        ">
+                            <div style="
+                                display:flex;
+                                justify-content:center;
+                                align-items:center;
+                                gap:2rem;
+                            ">
+                                ${renderNode(leftLabel)}
+                                ${renderNode(rightLabel)}
+                            </div>
+
+                            <svg
+                                aria-hidden="true"
+                                width="150"
+                                height="30"
+                                viewBox="0 0 150 30"
+                                style="
+                                    display:block;
+                                    overflow:visible;
+                                "
+                            >
+                                <line
+                                    x1="36"
+                                    y1="0"
+                                    x2="75"
+                                    y2="30"
+                                    stroke="currentColor"
+                                    stroke-width="1.5"
+                                ></line>
+
+                                <line
+                                    x1="114"
+                                    y1="0"
+                                    x2="75"
+                                    y2="30"
+                                    stroke="currentColor"
+                                    stroke-width="1.5"
+                                ></line>
+                            </svg>
+
+                            ${renderNode(middleLabel)}
+
+                            <div
+                                aria-hidden="true"
+                                style="
+                                    height:1rem;
+                                    border-left:1.5px solid currentColor;
+                                "
+                            ></div>
+
+                            ${renderNode(rootLabel)}
+                        </div>
+                    </div>
+                `;
+            }
+        );
+    }
+
     function cleanLaTeXEnvironments(tex) {
         if (!tex) return "";
 
@@ -7206,6 +7330,9 @@
 
         // Normalize legacy eqnarray blocks before MathJax sees them.
         clean = convertEqnarrayToAligned(clean);
+
+        // Convert the simple two-level PSTricks tree used by "deduction".
+        clean = convertSimpleDeductionPstreeToHtml(clean);
 
         // existing pspicture/list/etc cleanup continues below...
         clean = clean.replace(
