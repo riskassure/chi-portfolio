@@ -4,7 +4,7 @@
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
 
     window.MathCmsRender = {
-        debugVersion: "xymatrix-inline-sequence-v2",
+        debugVersion: "multline-protection-v1",
         getDisplayTex,
         prepareConceptHtml,
         cleanLaTeXEnvironments,
@@ -101,6 +101,16 @@
             blocks.push(block);
             return `PMMATHPROSEBLOCK${index}END`;
         };
+
+        /*
+         * Raw multline environments are already display math.
+         * Protect their \\ row separators from prose cleanup,
+         * including the TeX control-space rule.
+         */
+        output = output.replace(
+            /\\begin\s*\{(multline\*?)\}[\s\S]*?\\end\s*\{\1\}/gi,
+            protectBlock
+        );
 
         // Protect display forms before inline forms.
         output = output.replace(

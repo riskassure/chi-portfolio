@@ -1718,10 +1718,30 @@ def render_prose_latex_to_html(tex: str) -> str:
 
     html = render_cyrillic_latex_macros(html)
 
+    # Protect display-math environments during prose spacing cleanup.
+    #
+    # Without this protection, a row separator followed by a space:
+    #
+    #     \\ =
+    #
+    # is mistaken for a trailing TeX control-space command:
+    #
+    #     backslash followed by a space
+    #
+    # and loses its second backslash.
+    html, spacing_protected_mathjax_blocks = (
+        protect_mathjax_environments(html)
+    )
+
     for command, replacement in PROSE_SPACING_COMMANDS.items():
         html = html.replace(command, replacement)
 
     html = html.replace(r"\&", "&")
+
+    html = restore_mathjax_environments(
+        html,
+        spacing_protected_mathjax_blocks,
+    )
 
     # Convert verbatim before any other environment rendering so literal LaTeX
     # examples inside verbatim are preserved instead of being interpreted.
