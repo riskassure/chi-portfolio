@@ -14,6 +14,7 @@ if str(SRC_DIR) not in sys.path:
 from config import DB_PATH, MATH_DIAGRAM_DIR
 
 from services.math.concept_render_service import (
+    render_math_preview,
     render_tex_reusing_existing_diagrams,
 )
 
@@ -45,7 +46,6 @@ from services.math.admin_concept_detail_service import (
 
 from database.math.pipeline.step2_build_diagrams import (
     process_pstricks_diagrams_in_transaction,
-    render_pstricks_preview,
 )
 
 math_bp = Blueprint("math_bp", __name__)
@@ -787,7 +787,7 @@ def render_admin_math_preview():
             }), 400
 
         try:
-            preview_result = render_pstricks_preview(cleaned_tex)
+            preview_result = render_math_preview(cleaned_tex)
 
             return jsonify({
                 "success": True,

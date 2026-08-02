@@ -2,6 +2,10 @@
 
 import sqlite3
 
+from database.math.pipeline.step2_build_diagrams import (
+    render_pstricks_preview,
+)
+
 from services.math.render_helper import (
     extract_all_pstricks_diagram_blocks,
     get_svg_filename,
@@ -75,3 +79,15 @@ def render_tex_reusing_existing_diagrams(
         )
 
     return render_prose_latex_to_html(rendered_source)
+
+
+def render_math_preview(
+    cleaned_tex: str,
+) -> dict:
+    """
+    Render unsaved cleaned TeX for the admin editor preview.
+
+    Successful PSTricks blocks may create or reuse hash-named SVG files,
+    but this operation does not update concept or diagram database rows.
+    """
+    return render_pstricks_preview(cleaned_tex)
