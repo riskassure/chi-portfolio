@@ -8,8 +8,11 @@ if str(SRC_DIR) not in sys.path:
 
 from config import DB_PATH
 
-from routes.admin_math import (
+from services.math.smart_save_service import (
     compare_pstricks_hashes,
+)
+
+from services.math.concept_render_service import (
     render_tex_reusing_existing_diagrams,
 )
 
