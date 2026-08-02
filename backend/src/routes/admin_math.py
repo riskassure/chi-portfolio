@@ -39,6 +39,10 @@ from services.math.public_concept_detail_service import (
     fetch_public_math_concept_detail,
 )
 
+from services.math.admin_concept_detail_service import (
+    fetch_admin_math_concept_detail,
+)
+
 from database.math.pipeline.step2_build_diagrams import (
     process_pstricks_diagrams_in_transaction,
     render_pstricks_preview,
@@ -702,7 +706,10 @@ def get_math_concept_detail(slug):
             conn.close()
 
 
-@math_bp.route("/api/admin/math/concepts/<int:concept_id>", methods=["GET", "OPTIONS"])
+@math_bp.route(
+    "/api/admin/math/concepts/<int:concept_id>",
+    methods=["GET", "OPTIONS"],
+)
 def get_admin_math_concept_detail(concept_id):
     """
     Protected admin read route for hydrating edit.html?id=123.
@@ -726,150 +733,26 @@ def get_admin_math_concept_detail(concept_id):
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            cursor.execute("""
-                SELECT
-                    mc.id,
-                    mc.canonical_name,
-                    mc.slug,
-                    mc.title,
-                    mc.owner,
-                    mc.created_at,
-                    mc.updated_at,
-                    mc.source_staging_id,
-                    mc.source_file_name,
-                    stg.raw_content AS raw_tex,
-                    mc.cleaned_tex,
-                    mc.rendered_tex,
-                    mc.is_cleaned
-                FROM math_concepts mc
-                LEFT JOIN stg_math_import stg
-                    ON stg.id = mc.source_staging_id
-                WHERE mc.id = ?;
-            """, (concept_id,))
+            concept_data = fetch_admin_math_concept_detail(
+                cursor=cursor,
+                concept_id=concept_id,
+            )
 
-            concept_row = cursor.fetchone()
-
-            if not concept_row:
+            if concept_data is None:
                 return jsonify({
                     "status": "error",
-                    "message": "Concept not found."
+                    "message": "Concept not found.",
                 }), 404
-
-            concept_data = dict(concept_row)
-
-            cursor.execute("""
-                SELECT mcl.code, mcl.text
-                FROM math_classifications mcl
-                JOIN math_concept_classifications mcc
-                    ON mcl.id = mcc.classification_id
-                WHERE mcc.concept_id = ?
-                ORDER BY mcl.code ASC;
-            """, (concept_id,))
-
-            concept_data["classifications"] = [
-                {"code": r["code"], "text": r["text"]}
-                for r in cursor.fetchall()
-            ]
-
-            cursor.execute("""
-                SELECT mt.type_name
-                FROM math_types mt
-                JOIN math_concept_types mct
-                    ON mt.id = mct.type_id
-                WHERE mct.concept_id = ?
-                ORDER BY mt.type_name ASC;
-            """, (concept_id,))
-
-            concept_data["types"] = [
-                r["type_name"]
-                for r in cursor.fetchall()
-            ]
-
-            cursor.execute("""
-                SELECT synonym_text
-                FROM math_synonyms
-                WHERE concept_id = ?
-                ORDER BY synonym_text ASC;
-            """, (concept_id,))
-
-            concept_data["synonyms"] = [
-                r["synonym_text"]
-                for r in cursor.fetchall()
-            ]
-
-            cursor.execute("""
-                SELECT defined_term
-                FROM math_definitions
-                WHERE concept_id = ?
-                ORDER BY defined_term ASC;
-            """, (concept_id,))
-
-            concept_data["definitions"] = [
-                r["defined_term"]
-                for r in cursor.fetchall()
-            ]
-
-            cursor.execute("""
-                SELECT word
-                FROM math_link_exclusions
-                WHERE concept_id = ?
-                ORDER BY word ASC;
-            """, (concept_id,))
-
-            concept_data["link_exclusions"] = [
-                r["word"]
-                for r in cursor.fetchall()
-            ]
-
-            cursor.execute("""
-                SELECT
-                    rc.id,
-                    rc.related_canonical_name,
-                    rc.related_concept_id,
-                    mc.title,
-                    mc.canonical_name,
-                    mc.slug
-                FROM math_related_concepts rc
-                LEFT JOIN math_concepts mc
-                    ON mc.id = rc.related_concept_id
-                WHERE rc.concept_id = ?
-                ORDER BY COALESCE(mc.title, rc.related_canonical_name) ASC;
-            """, (concept_id,))
-
-            concept_data["related_concepts"] = [
-                dict(r)
-                for r in cursor.fetchall()
-            ]
-
-            cursor.execute("""
-                SELECT
-                    id,
-                    block_index,
-                    source_hash,
-                    source_tex,
-                    failure_stage,
-                    error_output,
-                    tex_temp_path,
-                    created_at
-                FROM math_concept_diagram_failures
-                WHERE concept_id = ?
-                ORDER BY block_index ASC;
-            """, (concept_id,))
-
-            concept_data["diagram_failures"] = [
-                dict(r)
-                for r in cursor.fetchall()
-            ]
 
             return jsonify({
                 "status": "success",
-                "data": concept_data
+                "data": concept_data,
             }), 200
 
         except sqlite3.Error as e:
             return jsonify({
                 "status": "error",
-                "message": str(e)
+                "message": str(e),
             }), 500
 
         finally:
