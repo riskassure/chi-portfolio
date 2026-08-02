@@ -21,10 +21,6 @@ from services.math.smart_save_service import (
     determine_smart_save_mode,
 )
 
-from services.math.autolink_service import (
-    apply_math_autolinker,
-)
-
 from services.math.audit_service import (
     get_latest_completed_audit_run_id,
     get_now_timestamp,
@@ -37,6 +33,10 @@ from services.math.public_search_service import (
 
 from services.math.public_catalog_service import (
     fetch_public_math_catalog,
+)
+
+from services.math.public_concept_detail_service import (
+    fetch_public_math_concept_detail,
 )
 
 from database.math.pipeline.step2_build_diagrams import (
@@ -675,139 +675,26 @@ def get_math_concept_detail(slug):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        # Supports concept.html?slug=... and also the older JS fallback where an id
-        # may be passed into the same route.
-        if str(slug).isdigit():
-            cursor.execute("""
-                SELECT
-                    mc.id,
-                    mc.title,
-                    mc.slug,
-                    mc.owner,
-                    mc.created_at,
-                    mc.updated_at,
-                    mc.cleaned_tex,
-                    mc.rendered_tex
-                FROM math_concepts mc
-                WHERE mc.slug = ?
-                   OR mc.id = ?;
-            """, (slug, int(slug)))
-        else:
-            cursor.execute("""
-                SELECT
-                    mc.id,
-                    mc.title,
-                    mc.slug,
-                    mc.owner,
-                    mc.created_at,
-                    mc.updated_at,
-                    mc.cleaned_tex,
-                    mc.rendered_tex
-                FROM math_concepts mc
-                WHERE mc.slug = ?;
-            """, (slug,))
+        concept_data = fetch_public_math_concept_detail(
+            cursor=cursor,
+            identifier=slug,
+        )
 
-        concept_row = cursor.fetchone()
-
-        if not concept_row:
+        if concept_data is None:
             return jsonify({
                 "status": "error",
-                "message": "Concept not found."
+                "message": "Concept not found.",
             }), 404
-
-        concept_data = dict(concept_row)
-        concept_id = concept_data["id"]
-
-        display_tex = (
-            concept_data["rendered_tex"]
-            or concept_data["cleaned_tex"]
-        )
-
-        concept_data["display_tex"] = apply_math_autolinker(
-            concept_id,
-            display_tex,
-            cursor
-        )
-
-        cursor.execute("""
-            SELECT mt.type_name
-            FROM math_types mt
-            JOIN math_concept_types mct
-                ON mt.id = mct.type_id
-            WHERE mct.concept_id = ?
-            ORDER BY mt.type_name ASC;
-        """, (concept_id,))
-
-        concept_data["types"] = [
-            r["type_name"]
-            for r in cursor.fetchall()
-        ]
-
-        cursor.execute("""
-            SELECT mcl.code, mcl.text
-            FROM math_classifications mcl
-            JOIN math_concept_classifications mcc
-                ON mcl.id = mcc.classification_id
-            WHERE mcc.concept_id = ?
-            ORDER BY mcl.code ASC;
-        """, (concept_id,))
-
-        concept_data["classifications"] = [
-            {"code": r["code"], "text": r["text"]}
-            for r in cursor.fetchall()
-        ]
-
-        cursor.execute("""
-            SELECT synonym_text
-            FROM math_synonyms
-            WHERE concept_id = ?
-            ORDER BY synonym_text ASC;
-        """, (concept_id,))
-
-        concept_data["synonyms"] = [
-            r["synonym_text"]
-            for r in cursor.fetchall()
-        ]
-
-        cursor.execute("""
-            SELECT defined_term
-            FROM math_definitions
-            WHERE concept_id = ?
-            ORDER BY defined_term ASC;
-        """, (concept_id,))
-
-        concept_data["definitions"] = [
-            r["defined_term"]
-            for r in cursor.fetchall()
-        ]
-
-        cursor.execute("""
-            SELECT
-                rc.related_concept_id AS id,
-                mc.title,
-                mc.canonical_name,
-                mc.slug
-            FROM math_related_concepts rc
-            JOIN math_concepts mc
-                ON mc.id = rc.related_concept_id
-            WHERE rc.concept_id = ?
-            ORDER BY mc.title ASC;
-        """, (concept_id,))
-
-        concept_data["related_concepts"] = [
-            dict(r)
-            for r in cursor.fetchall()
-        ]
 
         return jsonify({
             "status": "success",
-            "data": concept_data
+            "data": concept_data,
         }), 200
 
     except sqlite3.Error as e:
         return jsonify({
             "status": "error",
-            "message": str(e)
+            "message": str(e),
         }), 500
 
     finally:
