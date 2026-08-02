@@ -35,6 +35,10 @@ from services.math.public_search_service import (
     search_public_math_library,
 )
 
+from services.math.public_catalog_service import (
+    fetch_public_math_catalog,
+)
+
 from database.math.pipeline.step2_build_diagrams import (
     process_pstricks_diagrams_in_transaction,
     render_pstricks_preview,
@@ -616,104 +620,41 @@ def get_math_concepts():
     if request.method == "OPTIONS":
         return jsonify({"status": "CORS preflight ok"}), 200
 
+    classification_filter = request.args.get(
+        "classification",
+        default=None,
+        type=str,
+    )
+
+    search_query = request.args.get(
+        "q",
+        default=None,
+        type=str,
+    )
+
     conn = None
 
     try:
-        class_filter = request.args.get("classification", default=None, type=str)
-        search_query = request.args.get("q", default=None, type=str)
-
         conn = sqlite3.connect(str(DB_PATH))
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        query_base = """
-            SELECT
-                mc.id,
-                mc.title,
-                mc.slug,
-                mc.owner,
-                mc.created_at,
-                mc.updated_at,
-                mc.is_cleaned,
-                GROUP_CONCAT(DISTINCT mt.type_name) AS type_names,
-                GROUP_CONCAT(DISTINCT mcl.code) AS classification_codes
-            FROM math_concepts mc
-            LEFT JOIN math_concept_types mct
-                ON mc.id = mct.concept_id
-            LEFT JOIN math_types mt
-                ON mct.type_id = mt.id
-            LEFT JOIN math_concept_classifications mcc
-                ON mc.id = mcc.concept_id
-            LEFT JOIN math_classifications mcl
-                ON mcc.classification_id = mcl.id
-        """
-
-        conditions = []
-        params = []
-
-        if class_filter:
-            conditions.append("""
-                mc.id IN (
-                    SELECT concept_id
-                    FROM math_concept_classifications
-                    WHERE classification_id = (
-                        SELECT id
-                        FROM math_classifications
-                        WHERE code = ?
-                    )
-                )
-            """)
-            params.append(class_filter.upper().strip())
-
-        if search_query:
-            search_query = search_query.strip()
-            conditions.append("""
-                (
-                    mc.title LIKE ?
-                    OR mc.slug LIKE ?
-                    OR mcl.code LIKE ?
-                )
-            """)
-            like_param = f"%{search_query}%"
-            params.extend([like_param, like_param, like_param])
-
-        if conditions:
-            query_base += " WHERE " + " AND ".join(conditions)
-
-        query_base += """
-            GROUP BY mc.id
-            ORDER BY mc.title ASC;
-        """
-
-        cursor.execute(query_base, params)
-
-        concepts = []
-
-        for row in cursor.fetchall():
-            d = dict(row)
-            d["types"] = (
-                d["type_names"].split(",")
-                if d["type_names"]
-                else []
-            )
-            d["classification_codes"] = (
-                d["classification_codes"].split(",")
-                if d["classification_codes"]
-                else []
-            )
-            d.pop("type_names", None)
-            concepts.append(d)
+        concepts = fetch_public_math_catalog(
+            cursor=cursor,
+            classification_filter=classification_filter,
+            search_query=search_query,
+        )
 
         return jsonify({
             "status": "success",
             "count": len(concepts),
-            "data": concepts
+            "data": concepts,
         }), 200
 
     except sqlite3.Error as e:
         return jsonify({
             "status": "error",
-            "message": str(e)
+            "message": str(e),
         }), 500
 
     finally:
