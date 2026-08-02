@@ -25,6 +25,12 @@ from services.math.autolink_service import (
     apply_math_autolinker,
 )
 
+from services.math.audit_service import (
+    get_latest_completed_audit_run_id,
+    get_now_timestamp,
+    normalize_audit_mode,
+)
+
 from database.math.pipeline.step2_build_diagrams import (
     process_pstricks_diagrams_in_transaction,
     render_pstricks_preview,
@@ -245,36 +251,6 @@ def search_admin_math_concepts():
                 conn.close()
 
     return process_search()
-
-
-def get_now_timestamp():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-def normalize_audit_mode(value):
-    mode = (value or "all").strip().lower()
-
-    if mode not in {"all", "problematic"}:
-        return "all"
-
-    return mode
-
-
-def get_latest_completed_audit_run_id(cursor):
-    cursor.execute("""
-        SELECT id
-        FROM math_audit_runs
-        WHERE completed_at IS NOT NULL
-        ORDER BY completed_at DESC, id DESC
-        LIMIT 1;
-    """)
-
-    row = cursor.fetchone()
-
-    if not row:
-        return None
-
-    return row["id"] if isinstance(row, sqlite3.Row) else row[0]
 
 
 @math_bp.route("/api/admin/math/audit-runs/batch-save", methods=["POST", "OPTIONS"])
