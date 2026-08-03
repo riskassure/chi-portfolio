@@ -1,14 +1,8 @@
 # backend/src/routes/admin_math.py
 
 import sqlite3
-import sys
-from pathlib import Path
 from datetime import datetime
 from flask import Blueprint, jsonify, request, send_from_directory
-
-SRC_DIR = Path(__file__).resolve().parents[1]  # backend/src
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
 
 from config import DB_PATH, MATH_DIAGRAM_DIR
 
