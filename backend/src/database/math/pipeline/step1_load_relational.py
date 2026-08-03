@@ -14,19 +14,9 @@ from services.math.local_macro_helper import (
     extract_local_newcommands,
 )
 
-
-def generate_slug(canonical_name):
-    if not canonical_name:
-        return None
-
-    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1-\2", canonical_name)
-    s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", s1)
-
-    return (
-        s2.lower()
-        .replace("_", "-")
-        .replace("--", "-")
-    )
+from services.math.slug_helper import (
+    generate_slug,
+)
 
 
 def normalize_to_iso_datetime(date_string):

@@ -2,7 +2,6 @@
 
 import sqlite3
 import sys
-import re
 from pathlib import Path
 from datetime import datetime
 from flask import Blueprint, jsonify, request, send_from_directory
@@ -15,6 +14,10 @@ from config import DB_PATH, MATH_DIAGRAM_DIR
 
 from services.math.concept_render_service import (
     render_math_preview,
+)
+
+from services.math.slug_helper import (
+    generate_slug,
 )
 
 from services.math.audit_service import (
@@ -53,20 +56,6 @@ math_bp = Blueprint("math_bp", __name__)
 @math_bp.route("/api/math/diagrams/<path:filename>", methods=["GET"])
 def serve_math_diagram(filename):
     return send_from_directory(MATH_DIAGRAM_DIR, filename)
-
-
-def generate_slug(canonical_name):
-    if not canonical_name:
-        return None
-
-    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1-\2", canonical_name)
-    s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", s1)
-
-    return (
-        s2.lower()
-        .replace("_", "-")
-        .replace("--", "-")
-    )
 
 
 @math_bp.route("/api/math/classifications", methods=["GET", "OPTIONS"])
