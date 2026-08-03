@@ -15,11 +15,6 @@ from config import DB_PATH, MATH_DIAGRAM_DIR
 
 from services.math.concept_render_service import (
     render_math_preview,
-    render_tex_reusing_existing_diagrams,
-)
-
-from services.math.smart_save_service import (
-    determine_smart_save_mode,
 )
 
 from services.math.audit_service import (
@@ -46,7 +41,10 @@ from services.math.admin_concept_detail_service import (
 
 from services.math.concept_metadata_service import (
     attach_concept_metadata,
-    replace_concept_metadata,
+)
+
+from services.math.concept_update_service import (
+    update_math_concept,
 )
 
 from database.math.pipeline.step2_build_diagrams import (
@@ -860,141 +858,14 @@ def update_math_metadata():
             cursor = conn.cursor()
             cursor.execute("PRAGMA foreign_keys = ON;")
 
-            # Fetch existing TeX before updating so smart-save can compare old vs new.
-            cursor.execute("""
-                SELECT
-                    cleaned_tex,
-                    slug
-                FROM math_concepts
-                WHERE id = ?;
-            """, (concept_id,))
-
-            existing_row = cursor.fetchone()
-
-            if not existing_row:
-                return jsonify({
-                    "success": False,
-                    "message": f"Concept id {concept_id} was not found."
-                }), 404
-
-            old_cleaned_tex = existing_row[0] or ""
-            current_slug = existing_row[1] or None
-
-            smart_save = determine_smart_save_mode(
-                old_cleaned_tex,
-                updated_tex
-            )
-
-            # Update core record.
-            # Smart-save Phase C2:
-            # If TeX did not change, preserve rendered_tex exactly as-is.
-            # If TeX changed, rendered_tex is still cleared for now.
-            # The next slice will refresh rendered_tex for text-only changes.
-            if smart_save["save_mode"] == "metadata_only":
-                # TeX did not change, but refresh rendered_tex using the current renderer.
-                # This is useful when render_helper.py has improved since rendered_tex
-                # was last generated.
-                refreshed_rendered_tex = render_tex_reusing_existing_diagrams(
-                    concept_id=concept_id,
-                    cleaned_tex=updated_tex,
-                    cursor=cursor
-                )
-
-                cursor.execute("""
-                    UPDATE math_concepts
-                    SET
-                        title = ?,
-                        owner = ?,
-                        cleaned_tex = ?,
-                        rendered_tex = ?,
-                        updated_at = ?,
-                        is_cleaned = ?
-                    WHERE id = ?;
-                """, (
-                    updated_title,
-                    updated_owner,
-                    updated_tex,
-                    refreshed_rendered_tex,
-                    uniform_timestamp,
-                    is_cleaned_flag,
-                    concept_id
-                ))
-
-            elif smart_save["save_mode"] == "text_render_only":
-                # TeX changed, but PSTricks blocks did not.
-                # Refresh rendered_tex safely without regenerating diagrams.
-                refreshed_rendered_tex = render_tex_reusing_existing_diagrams(
-                    concept_id=concept_id,
-                    cleaned_tex=updated_tex,
-                    cursor=cursor
-                )
-
-                cursor.execute("""
-                    UPDATE math_concepts
-                    SET
-                        title = ?,
-                        owner = ?,
-                        cleaned_tex = ?,
-                        rendered_tex = ?,
-                        updated_at = ?,
-                        is_cleaned = ?
-                    WHERE id = ?;
-                """, (
-                    updated_title,
-                    updated_owner,
-                    updated_tex,
-                    refreshed_rendered_tex,
-                    uniform_timestamp,
-                    is_cleaned_flag,
-                    concept_id
-                ))
-
-            else:
-                # PSTricks blocks changed, were added, or were removed.
-                # Rebuild supported diagrams inside this save transaction.
-                pstricks_result = (
-                    process_pstricks_diagrams_in_transaction(
-                        cursor=cursor,
-                        concept_id=concept_id,
-                        cleaned_tex=updated_tex,
-                    )
-                )
-
-                refreshed_rendered_tex = (
-                    pstricks_result["rendered_tex"]
-                )
-
-                cursor.execute("""
-                    UPDATE math_concepts
-                    SET
-                        title = ?,
-                        owner = ?,
-                        cleaned_tex = ?,
-                        rendered_tex = ?,
-                        updated_at = ?,
-                        is_cleaned = ?
-                    WHERE id = ?;
-                """, (
-                    updated_title,
-                    updated_owner,
-                    updated_tex,
-                    refreshed_rendered_tex,
-                    uniform_timestamp,
-                    is_cleaned_flag,
-                    concept_id,
-                ))
-
-                print(
-                    "[ADMIN SAVE PSTRICKS]",
-                    f"concept_id={concept_id}",
-                    f"blocks={pstricks_result['block_count']}",
-                    f"successes={pstricks_result['success_count']}",
-                    f"failures={pstricks_result['failure_count']}",
-                )
-
-            replace_concept_metadata(
+            update_result = update_math_concept(
                 cursor=cursor,
                 concept_id=concept_id,
+                updated_title=updated_title,
+                updated_owner=updated_owner,
+                updated_tex=updated_tex,
+                updated_at=uniform_timestamp,
+                is_cleaned_flag=is_cleaned_flag,
                 classifications=classifications,
                 types=types,
                 synonyms=synonyms,
@@ -1002,17 +873,19 @@ def update_math_metadata():
                 related_concepts=related_concepts,
             )
 
+            if update_result is None:
+                return jsonify({
+                    "success": False,
+                    "message": (
+                        f"Concept id {concept_id} was not found."
+                    ),
+                }), 404
+
             conn.commit()
 
             return jsonify({
                 "success": True,
-                "message": smart_save["message"],
-                "concept_id": concept_id,
-                "slug": current_slug,
-                "save_mode": smart_save["save_mode"],
-                "tex_changed": smart_save["tex_changed"],
-                "pstricks_changed": smart_save["pstricks_changed"],
-                "diagram_compare": smart_save["diagram_compare"]
+                **update_result,
             }), 200
 
         except sqlite3.Error as e:
