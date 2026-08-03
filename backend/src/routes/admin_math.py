@@ -39,16 +39,12 @@ from services.math.admin_concept_detail_service import (
     fetch_admin_math_concept_detail,
 )
 
-from services.math.concept_metadata_service import (
-    attach_concept_metadata,
+from services.math.concept_create_service import (
+    create_math_concept,
 )
 
 from services.math.concept_update_service import (
     update_math_concept,
-)
-
-from database.math.pipeline.step2_build_diagrams import (
-    process_pstricks_diagrams_in_transaction,
 )
 
 math_bp = Blueprint("math_bp", __name__)
@@ -944,62 +940,15 @@ def create_new_math_concept():
             cursor = conn.cursor()
             cursor.execute("PRAGMA foreign_keys = ON;")
 
-            cursor.execute("""
-                INSERT INTO math_concepts (
-                    canonical_name,
-                    slug,
-                    title,
-                    created_at,
-                    updated_at,
-                    owner,
-                    source_staging_id,
-                    source_file_name,
-                    cleaned_tex,
-                    rendered_tex,
-                    is_cleaned
-                )
-                VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, ?);
-            """, (
-                canonical_name,
-                slug,
-                title,
-                uniform_timestamp,
-                uniform_timestamp,
-                owner,
-                cleaned_tex,
-                is_cleaned_flag
-            ))
-
-            concept_id = cursor.lastrowid
-
-            pstricks_result = (
-                process_pstricks_diagrams_in_transaction(
-                    cursor=cursor,
-                    concept_id=concept_id,
-                    cleaned_tex=cleaned_tex,
-                )
-            )
-
-            cursor.execute("""
-                UPDATE math_concepts
-                SET rendered_tex = ?
-                WHERE id = ?;
-            """, (
-                pstricks_result["rendered_tex"],
-                concept_id,
-            ))
-
-            print(
-                "[ADMIN CREATE PSTRICKS]",
-                f"concept_id={concept_id}",
-                f"blocks={pstricks_result['block_count']}",
-                f"successes={pstricks_result['success_count']}",
-                f"failures={pstricks_result['failure_count']}",
-            )            
-
-            attach_concept_metadata(
+            create_result = create_math_concept(
                 cursor=cursor,
-                concept_id=concept_id,
+                canonical_name=canonical_name,
+                slug=slug,
+                title=title,
+                timestamp=uniform_timestamp,
+                owner=owner,
+                cleaned_tex=cleaned_tex,
+                is_cleaned_flag=is_cleaned_flag,
                 classifications=classifications,
                 types=types,
                 synonyms=synonyms,
@@ -1011,10 +960,7 @@ def create_new_math_concept():
 
             return jsonify({
                 "success": True,
-                "message": "New concept created and rendered successfully!",
-                "concept_id": concept_id,
-                "id": concept_id,
-                "slug": slug
+                **create_result,
             }), 201
 
         except sqlite3.IntegrityError as e:
