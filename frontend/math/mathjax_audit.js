@@ -585,7 +585,10 @@ async function copyLatestCsv() {
         return;
     }
 
-    const csv = rowsToCsv(latestAuditRows);
+    const csv =
+        window.MathCmsAuditCsv.rowsToCsv(
+            latestAuditRows
+        );
 
     try {
         await navigator.clipboard.writeText(csv);
@@ -595,36 +598,6 @@ async function copyLatestCsv() {
         setAuditStatus("Unable to copy CSV automatically. Check console for CSV output.", "error");
         console.log(csv);
     }
-}
-
-function rowsToCsv(rows) {
-    const headers = [
-        "command",
-        "count",
-        "concept_id",
-        "slug",
-        "title",
-        "example",
-        "concept_url"
-    ];
-
-    const lines = [headers.join(",")];
-
-    rows.forEach(row => {
-        lines.push(headers.map(header => csvCell(row[header])).join(","));
-    });
-
-    return lines.join("\n");
-}
-
-function csvCell(value) {
-    const text = String(value ?? "");
-
-    if (/[",\n\r]/.test(text)) {
-        return `"${text.replace(/"/g, '""')}"`;
-    }
-
-    return text;
 }
 
 function setAuditStatus(message, type = "info") {
