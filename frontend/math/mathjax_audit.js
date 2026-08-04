@@ -5,10 +5,6 @@ const AUDIT_VERSION = "mathjax-audit-overflow-v1";
 
 let latestAuditRows = [];
 
-const AUDIT_ROWS_STORAGE_KEY = "mathCmsLatestAuditRows";
-const AUDIT_STATUS_STORAGE_KEY = "mathCmsLatestAuditStatus";
-const AUDIT_SAVED_AT_STORAGE_KEY = "mathCmsLatestAuditSavedAt";
-
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("auditManualBtn")?.addEventListener("click", auditManualList);
     document.getElementById("auditAllBtn")?.addEventListener("click", auditAllConcepts);
@@ -401,68 +397,41 @@ async function auditConcept(concept) {
 
 
 function saveLatestAuditSnapshot(statusMessage = "") {
-    try {
-        sessionStorage.setItem(
-            AUDIT_ROWS_STORAGE_KEY,
-            JSON.stringify(latestAuditRows || [])
+    window.MathCmsAuditSnapshot
+        .saveAuditSnapshot(
+            latestAuditRows,
+            statusMessage
         );
-
-        sessionStorage.setItem(
-            AUDIT_STATUS_STORAGE_KEY,
-            statusMessage || ""
-        );
-
-        sessionStorage.setItem(
-            AUDIT_SAVED_AT_STORAGE_KEY,
-            new Date().toLocaleString()
-        );
-
-    } catch (err) {
-        console.warn("Unable to save audit snapshot to sessionStorage.", err);
-    }
 }
 
 
 function restoreLatestAuditSnapshot() {
-    try {
-        const rawRows = sessionStorage.getItem(AUDIT_ROWS_STORAGE_KEY);
+    const snapshot =
+        window.MathCmsAuditSnapshot
+            .readAuditSnapshot();
 
-        if (!rawRows) {
-            return;
-        }
-
-        const rows = JSON.parse(rawRows);
-
-        if (!Array.isArray(rows) || rows.length === 0) {
-            return;
-        }
-
-        latestAuditRows = rows;
-        renderAuditRows();
-
-        const savedAt = sessionStorage.getItem(AUDIT_SAVED_AT_STORAGE_KEY);
-        const priorStatus = sessionStorage.getItem(AUDIT_STATUS_STORAGE_KEY);
-
-        setAuditStatus(
-            priorStatus ||
-                `Restored ${rows.length} audit result row(s) from the previous audit${savedAt ? ` saved at ${savedAt}` : ""}. You can copy CSV now.`,
-            "warn"
-        );
-
-    } catch (err) {
-        console.warn("Unable to restore audit snapshot from sessionStorage.", err);
+    if (!snapshot) {
+        return;
     }
+
+    latestAuditRows = snapshot.rows;
+    renderAuditRows();
+
+    setAuditStatus(
+        snapshot.statusMessage ||
+            `Restored ${snapshot.rows.length} audit result row(s) from the previous audit${
+                snapshot.savedAt
+                    ? ` saved at ${snapshot.savedAt}`
+                    : ""
+            }. You can copy CSV now.`,
+        "warn"
+    );
 }
 
 
 function clearLatestAuditSnapshot() {
-    try {
-        sessionStorage.removeItem(AUDIT_ROWS_STORAGE_KEY);
-        sessionStorage.removeItem(AUDIT_STATUS_STORAGE_KEY);
-        sessionStorage.removeItem(AUDIT_SAVED_AT_STORAGE_KEY);
-    } catch (err) {
-        console.warn("Unable to clear audit snapshot from sessionStorage.", err);
-    }
+    window.MathCmsAuditSnapshot
+        .clearAuditSnapshot();
 }
 
 function getIssueCount(rows) {
