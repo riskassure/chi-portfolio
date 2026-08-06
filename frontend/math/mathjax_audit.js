@@ -126,7 +126,12 @@ async function runAudit(conceptRefs, options = {}) {
         );
 
         try {
-            const concept = await fetchConcept(ref.identifier);
+            const concept =
+                await window.MathCmsAuditApi
+                    .fetchConcept(
+                        API_ENDPOINT,
+                        ref.identifier
+                    );
             const auditResult = await auditConcept(concept);
             const rows = auditResult.rows || [];
 
@@ -198,7 +203,14 @@ async function runAudit(conceptRefs, options = {}) {
             // Save visible audit rows first so Copy CSV still works after reload.
             saveLatestAuditSnapshot(preSaveMessage);
 
-            batchSaveInfo = await batchSaveAuditRun(mode, auditResultPayload);
+            batchSaveInfo =
+                await window.MathCmsAuditApi
+                    .batchSaveAuditRun(
+                        API_ENDPOINT,
+                        AUDIT_VERSION,
+                        mode,
+                        auditResultPayload
+                    );
 
         } catch (err) {
             console.warn("Unable to batch-save audit run.", err);
@@ -244,47 +256,6 @@ async function runAudit(conceptRefs, options = {}) {
     );
 
     saveLatestAuditSnapshot(finalMessage);
-}
-
-async function batchSaveAuditRun(mode, results) {
-    const response = await fetch(`${API_ENDPOINT}/admin/math/audit-runs/batch-save`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            mode,
-            audit_version: AUDIT_VERSION,
-            results
-        })
-    });
-
-    const json = await response.json();
-
-    if (!response.ok || json.status !== "success") {
-        throw new Error(
-            json.message ||
-            json.error ||
-            `Unable to batch-save audit run. HTTP ${response.status}`
-        );
-    }
-
-    return json;
-}
-
-async function fetchConcept(identifier) {
-    const response = await fetch(
-        `${API_ENDPOINT}/math/concepts/${encodeURIComponent(identifier)}`
-    );
-
-    const json = await response.json();
-
-    if (!response.ok || json.status !== "success") {
-        throw new Error(json.message || `Failed to fetch concept ${identifier}.`);
-    }
-
-    return json.data;
 }
 
 async function auditConcept(concept) {
@@ -550,4 +521,4 @@ function escapeHtml(value) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
-}   
+}
