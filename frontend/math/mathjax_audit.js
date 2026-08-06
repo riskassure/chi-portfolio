@@ -312,11 +312,7 @@ async function auditConcept(concept) {
                 [
                     rawTex || "",
                     "PMLOCAL-SOURCE:",
-                    localMacroSource || "",
-                    "CLEANED-TEX:",
-                    cleanedTex || "",
-                    "RENDERED-TEX:",
-                    renderedTex || ""
+                    localMacroSource
                 ].join("\n")
             );
 
