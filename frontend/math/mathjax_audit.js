@@ -77,7 +77,7 @@ async function auditConceptListMode(mode) {
             .filter(row => row.identifier);
 
         latestAuditRows = [];
-        renderAuditRows();
+        renderAuditRows(latestAuditRows);
 
         if (conceptRefs.length === 0) {
             setAuditStatus(
@@ -103,7 +103,7 @@ async function auditConceptListMode(mode) {
 
 async function runAudit(conceptRefs, options = {}) {
     latestAuditRows = [];
-    renderAuditRows();
+    renderAuditRows(latestAuditRows);
     clearLatestAuditSnapshot();
 
     const mode = options.mode || "manual";
@@ -136,7 +136,7 @@ async function runAudit(conceptRefs, options = {}) {
             const rows = auditResult.rows || [];
 
             latestAuditRows.push(...rows);
-            renderAuditRows();
+            renderAuditRows(latestAuditRows);
 
             if (persistRun && concept.id) {
                 auditResultPayload.push({
@@ -173,7 +173,7 @@ async function runAudit(conceptRefs, options = {}) {
                 concept_url: ""
             });
 
-            renderAuditRows();
+            renderAuditRows(latestAuditRows);
 
             if (persistRun && ref.id) {
                 auditResultPayload.push({
@@ -225,7 +225,7 @@ async function runAudit(conceptRefs, options = {}) {
                 concept_url: ""
             });
 
-            renderAuditRows();
+            renderAuditRows(latestAuditRows);
         }
     }
 
@@ -392,7 +392,7 @@ function restoreLatestAuditSnapshot() {
     }
 
     latestAuditRows = snapshot.rows;
-    renderAuditRows();
+    renderAuditRows(latestAuditRows);
 
     setAuditStatus(
         snapshot.statusMessage ||
@@ -411,7 +411,7 @@ function clearLatestAuditSnapshot() {
         .clearAuditSnapshot();
 }
 
-function renderAuditRows() {
+function renderAuditRows(rows) {
     const body = document.getElementById("auditResultsBody");
     const summary = document.getElementById("auditSummary");
 
@@ -419,14 +419,14 @@ function renderAuditRows() {
 
     body.innerHTML = "";
 
-    if (latestAuditRows.length === 0) {
+    if (rows.length === 0) {
         summary.innerText = "No unresolved visible macros found so far.";
         return;
     }
 
     const commandCounts = new Map();
 
-    latestAuditRows.forEach(row => {
+    rows.forEach(row => {
         commandCounts.set(
             row.command,
             (commandCounts.get(row.command) || 0) + Number(row.count || 0)
@@ -438,9 +438,9 @@ function renderAuditRows() {
         .map(([command, count]) => `${command}: ${count}`)
         .join(" | ");
 
-    summary.innerText = `${latestAuditRows.length} result row(s). ${commandSummary}`;
+    summary.innerText = `${rows.length} result row(s). ${commandSummary}`;
 
-    latestAuditRows
+    rows
         .slice()
         .sort((a, b) => {
             const byCommand = String(a.command).localeCompare(String(b.command));
