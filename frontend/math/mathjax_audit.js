@@ -452,25 +452,15 @@ function renderAuditRows() {
             const tr = document.createElement("tr");
 
             tr.innerHTML = `
-                <td style="border-bottom: 1px solid #e2e8f0; padding: 0.5rem;"><code>${escapeHtml(row.command)}</code></td>
-                <td style="border-bottom: 1px solid #e2e8f0; padding: 0.5rem;">${escapeHtml(row.count)}</td>
-                <td style="border-bottom: 1px solid #e2e8f0; padding: 0.5rem;">${renderConceptLink(row)}</td>
-                <td style="border-bottom: 1px solid #e2e8f0; padding: 0.5rem;"><code>${escapeHtml(row.slug)}</code></td>
-                <td style="border-bottom: 1px solid #e2e8f0; padding: 0.5rem;">${escapeHtml(row.example)}</td>
+                <td style="border-bottom: 1px solid #e2e8f0; padding: 0.5rem;"><code>${window.MathCmsAuditView.escapeHtml(row.command)}</code></td>
+                <td style="border-bottom: 1px solid #e2e8f0; padding: 0.5rem;">${window.MathCmsAuditView.escapeHtml(row.count)}</td>
+                <td style="border-bottom: 1px solid #e2e8f0; padding: 0.5rem;">${window.MathCmsAuditView.renderConceptLink(row)}</td>
+                <td style="border-bottom: 1px solid #e2e8f0; padding: 0.5rem;"><code>${window.MathCmsAuditView.escapeHtml(row.slug)}</code></td>
+                <td style="border-bottom: 1px solid #e2e8f0; padding: 0.5rem;">${window.MathCmsAuditView.escapeHtml(row.example)}</td>
             `;
 
             body.appendChild(tr);
         });
-}
-
-function renderConceptLink(row) {
-    const title = escapeHtml(row.title || row.slug || row.concept_id || "Open concept");
-
-    if (!row.concept_url) {
-        return title;
-    }
-
-    return `<a href="${escapeHtml(row.concept_url)}" target="_blank" rel="noopener noreferrer">${title}</a>`;
 }
 
 async function copyLatestCsv() {
@@ -514,11 +504,3 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function escapeHtml(value) {
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
