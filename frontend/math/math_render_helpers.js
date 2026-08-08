@@ -778,23 +778,6 @@
         return result;
     }
 
-    function normalizeLegacyOverFractions(value) {
-        let output = String(value || "");
-
-        // Common PlanetMath form:
-        //   {n \over 2^k}
-        //   {a+b \over c}
-        //
-        // Intentionally limited to simple, non-nested brace groups.
-        output = output.replace(
-            /\{\s*([^{}]+?)\s+\\over\s+([^{}]+?)\s*\}/g,
-            (_, numerator, denominator) =>
-                `\\frac{${numerator.trim()}}{${denominator.trim()}}`
-        );
-
-        return output;
-    }
-
     function normalizeFootnoteMacros(value) {
         const source = String(value || "");
 
@@ -7617,7 +7600,7 @@
         // literal angle brackets inside math are protected as \lt and \gt.
         clean = normalizeXyMatrixHtmlArtifacts(clean);
 
-        clean = normalizeLegacyOverFractions(clean);
+        clean = window.MathCmsRenderLegacyTex.normalizeLegacyOverFractions(clean);
 
         // TeX line-break control has no visible HTML or MathJax meaning.
         clean = clean.replace(/\\nobreak\b/g, "");
