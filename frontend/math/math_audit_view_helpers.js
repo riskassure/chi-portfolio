@@ -29,9 +29,32 @@ function renderConceptLink(row) {
 }
 
 
+function setAuditStatus(message, type = "info") {
+    const status =
+        document.getElementById(
+            "auditStatus"
+        );
+
+    if (!status) return;
+
+    const colors = {
+        info: "#334155",
+        success: "#047857",
+        warn: "#92400e",
+        error: "#b91c1c"
+    };
+
+    status.style.color =
+        colors[type] || colors.info;
+
+    status.innerText = message;
+}
+
+
 window.MathCmsAuditView = {
     renderConceptLink,
-    escapeHtml
+    escapeHtml,
+    setAuditStatus
 };
 
 })();

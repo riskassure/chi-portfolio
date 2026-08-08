@@ -23,7 +23,7 @@ async function auditManualList() {
         .filter(Boolean);
 
     if (identifiers.length === 0) {
-        setAuditStatus("Paste at least one slug or ID first.", "error");
+        window.MathCmsAuditView.setAuditStatus("Paste at least one slug or ID first.", "error");
         return;
     }
 
@@ -50,7 +50,7 @@ async function auditProblematicConcepts() {
 
 async function auditConceptListMode(mode) {
     try {
-        setAuditStatus(`Loading ${mode} audit concept list...`, "info");
+        window.MathCmsAuditView.setAuditStatus(`Loading ${mode} audit concept list...`, "info");
 
         const response = await fetch(
             `${API_ENDPOINT}/admin/math/concepts/audit-list?mode=${encodeURIComponent(mode)}`,
@@ -83,7 +83,7 @@ async function auditConceptListMode(mode) {
             );
 
         if (conceptRefs.length === 0) {
-            setAuditStatus(
+            window.MathCmsAuditView.setAuditStatus(
                 json.message || `No concepts returned for ${mode} audit mode.`,
                 "success"
             );
@@ -97,7 +97,7 @@ async function auditConceptListMode(mode) {
 
     } catch (err) {
         console.warn(err);
-        setAuditStatus(
+        window.MathCmsAuditView.setAuditStatus(
             `Audit ${mode} failed: ${err.message}`,
             "error"
         );
@@ -121,12 +121,12 @@ async function runAudit(conceptRefs, options = {}) {
 
     const auditResultPayload = [];
 
-    setAuditStatus(`Starting ${mode} audit for ${total} concept(s)...`, "info");
+    window.MathCmsAuditView.setAuditStatus(`Starting ${mode} audit for ${total} concept(s)...`, "info");
 
     for (const ref of conceptRefs) {
         checked += 1;
 
-        setAuditStatus(
+        window.MathCmsAuditView.setAuditStatus(
             `Auditing ${checked} of ${total}: ${ref.title || ref.slug || ref.id}`,
             "info"
         );
@@ -208,7 +208,7 @@ async function runAudit(conceptRefs, options = {}) {
             const preSaveMessage =
                 `Scan complete. Saving audit run with ${auditResultPayload.length} result record(s)...`;
 
-            setAuditStatus(preSaveMessage, "info");
+            window.MathCmsAuditView.setAuditStatus(preSaveMessage, "info");
 
             // Important:
             // Live Server may reload the page when SQLite changes during batch-save.
@@ -265,7 +265,7 @@ async function runAudit(conceptRefs, options = {}) {
 
     const finalMessage = `${doneMessage.join("; ")}.`;
 
-    setAuditStatus(
+    window.MathCmsAuditView.setAuditStatus(
         finalMessage,
         latestAuditRows.length > 0 ? "warn" : "success"
     );
@@ -412,7 +412,7 @@ function restoreLatestAuditSnapshot() {
             latestAuditRows
         );
 
-    setAuditStatus(
+    window.MathCmsAuditView.setAuditStatus(
         snapshot.statusMessage ||
             `Restored ${snapshot.rows.length} audit result row(s) from the previous audit${
                 snapshot.savedAt
@@ -431,7 +431,7 @@ function clearLatestAuditSnapshot() {
 
 async function copyLatestCsv() {
     if (latestAuditRows.length === 0) {
-        setAuditStatus("No audit rows to copy.", "error");
+        window.MathCmsAuditView.setAuditStatus("No audit rows to copy.", "error");
         return;
     }
 
@@ -442,31 +442,14 @@ async function copyLatestCsv() {
 
     try {
         await navigator.clipboard.writeText(csv);
-        setAuditStatus("Copied audit CSV to clipboard.", "success");
+        window.MathCmsAuditView.setAuditStatus("Copied audit CSV to clipboard.", "success");
     } catch (err) {
         console.warn(err);
-        setAuditStatus("Unable to copy CSV automatically. Check console for CSV output.", "error");
+        window.MathCmsAuditView.setAuditStatus("Unable to copy CSV automatically. Check console for CSV output.", "error");
         console.log(csv);
     }
-}
-
-function setAuditStatus(message, type = "info") {
-    const status = document.getElementById("auditStatus");
-
-    if (!status) return;
-
-    const colors = {
-        info: "#334155",
-        success: "#047857",
-        warn: "#92400e",
-        error: "#b91c1c"
-    };
-
-    status.style.color = colors[type] || colors.info;
-    status.innerText = message;
 }
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
-
