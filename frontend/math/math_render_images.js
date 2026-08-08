@@ -120,8 +120,22 @@ function cleanLatexImageLabelText(value) {
 }
 
 
+function normalizeDiagramImageUrls(
+    html,
+    apiEndpoint
+) {
+    if (!html) return "";
+
+    return html.replace(
+        /src=(["'])\/api\/math\/diagrams\//gi,
+        `src=$1${apiEndpoint}/math/diagrams/`
+    );
+}
+
+
 window.MathCmsRenderImages = {
-    normalizeLatexImageArtifacts
+    normalizeLatexImageArtifacts,
+    normalizeDiagramImageUrls
 };
 
 })();

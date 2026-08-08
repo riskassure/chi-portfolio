@@ -8764,12 +8764,13 @@
         return output;
     }
 
-    function normalizeDiagramImageUrls(html, apiEndpoint = DEFAULT_API_ENDPOINT) {
-        if (!html) return "";
-
-        return html.replace(
-            /src=(["'])\/api\/math\/diagrams\//gi,
-            `src=$1${apiEndpoint}/math/diagrams/`
+    function normalizeDiagramImageUrls(
+        html,
+        apiEndpoint = DEFAULT_API_ENDPOINT
+    ) {
+        return window.MathCmsRenderImages.normalizeDiagramImageUrls(
+            html,
+            apiEndpoint
         );
     }
 })();
