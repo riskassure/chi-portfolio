@@ -146,7 +146,11 @@ async function runAudit(conceptRefs, options = {}) {
                         API_ENDPOINT,
                         ref.identifier
                     );
-            const auditResult = await auditConcept(concept);
+            const auditResult =
+                await auditConcept(
+                    concept,
+                    API_ENDPOINT
+                );
             const rows = auditResult.rows || [];
 
             latestAuditRows.push(...rows);
@@ -281,7 +285,10 @@ async function runAudit(conceptRefs, options = {}) {
     saveLatestAuditSnapshot(finalMessage);
 }
 
-async function auditConcept(concept) {
+async function auditConcept(
+    concept,
+    apiEndpoint
+) {
     const canvas = document.getElementById("auditCanvas");
 
     if (!canvas) {
@@ -314,7 +321,7 @@ async function auditConcept(concept) {
         window.MathCmsRender.prepareConceptHtml(
             rawTex,
             {
-                apiEndpoint: API_ENDPOINT,
+                apiEndpoint,
 
                 localMacroSource,
 
