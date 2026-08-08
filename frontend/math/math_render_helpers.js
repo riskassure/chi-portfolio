@@ -5530,7 +5530,10 @@
         `;
     }
 
-    function normalizeLatexImageArtifacts(tex) {
+    function normalizeLatexImageArtifacts(
+        tex,
+        escapeHtml
+    ) {
         if (!tex) return "";
 
         let output = String(tex || "");
@@ -5546,7 +5549,10 @@
         output = output.replace(
             /\\scalebox\{[^{}]*\}\s*\{\s*\\includegraphics(?:\[[^\]]*\])?\s*\{([^{}]*)\}\s*\}/gi,
             function(_, filename) {
-                return makeLatexImagePlaceholder(filename);
+                return makeLatexImagePlaceholder(
+                    filename,
+                    escapeHtml
+                );
             }
         );
 
@@ -5554,7 +5560,10 @@
         output = output.replace(
             /\\includegraphics(?:\[[^\]]*\])?\s*\{([^{}]*)\}/gi,
             function(_, filename) {
-                return makeLatexImagePlaceholder(filename);
+                return makeLatexImagePlaceholder(
+                    filename,
+                    escapeHtml
+                );
             }
         );
 
@@ -5570,7 +5579,7 @@
 
                 return `
                     <div class="pm-latex-image-caption mathjax-diagnostic-ignore" style="text-align:center; color:#64748b; font-size:0.92rem; margin:0.25rem 0 1rem;">
-                        <em>${escapeHtmlForMathCell(cleanCaption)}</em>
+                        <em>${escapeHtml(cleanCaption)}</em>
                     </div>
                 `;
             }
@@ -5580,11 +5589,14 @@
     }
 
 
-    function makeLatexImagePlaceholder(filename) {
+    function makeLatexImagePlaceholder(
+        filename,
+        escapeHtml
+    ) {
         const cleanFilename = cleanLatexImageLabelText(filename);
 
         const label = cleanFilename
-            ? `Image placeholder: ${escapeHtmlForMathCell(cleanFilename)}`
+            ? `Image placeholder: ${escapeHtml(cleanFilename)}`
             : "Image placeholder";
 
         return `
@@ -7975,7 +7987,10 @@
         );
 
         // Replace old LaTeX/EPS image commands with readable placeholders.
-        clean = normalizeLatexImageArtifacts(clean);
+        clean = normalizeLatexImageArtifacts(
+            clean,
+            escapeHtmlForMathCell
+        );
         
         // Arrange related placeholders while legacy layout markers
         // such as \raisebox and \hskip are still present.
