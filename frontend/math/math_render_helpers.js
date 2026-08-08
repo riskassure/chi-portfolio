@@ -216,7 +216,7 @@
         output = window.MathCmsRenderTextColor.normalizeTextColorMacros(output);
 
         // Convert LaTeX \url{...} commands into safe external links.
-        output = normalizeUrlMacros(output);
+        output = window.MathCmsRenderUrl.normalizeUrlMacros(output);
 
         /*
          * Legacy font commands may already be wrapped by the backend
@@ -6970,40 +6970,6 @@
             .replace(/\\mbox\{([^{}]*)\}/gi, "\\text{$1}")
             .replace(/\s+/g, " ")
             .trim();
-    }
-
-    function normalizeUrlMacros(value) {
-        const source = String(value || "");
-
-        if (!/\\url\s*\{/i.test(source)) {
-            return source;
-        }
-
-        return source.replace(
-            /\\url\s*\{([^{}]+)\}/gi,
-            function (_, rawUrl) {
-                const url = String(rawUrl || "").trim();
-
-                if (!url) {
-                    return "";
-                }
-
-                // Only create links for ordinary web URLs.
-                if (!/^https?:\/\//i.test(url)) {
-                    return url;
-                }
-
-                const anchor = document.createElement("a");
-
-                anchor.href = url;
-                anchor.textContent = url;
-                anchor.className = "pm-external-url";
-                anchor.target = "_blank";
-                anchor.rel = "noopener noreferrer";
-
-                return anchor.outerHTML;
-            }
-        );
     }
 
     function protectEqnarrayEnvironments(value) {
