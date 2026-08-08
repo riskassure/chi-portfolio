@@ -9,7 +9,11 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("auditManualBtn")?.addEventListener("click", auditManualList);
     document.getElementById("auditAllBtn")?.addEventListener("click", auditAllConcepts);
     document.getElementById("auditProblematicBtn")?.addEventListener("click", auditProblematicConcepts);
-    document.getElementById("copyCsvBtn")?.addEventListener("click", copyLatestCsv);
+    document.getElementById("copyCsvBtn")
+        ?.addEventListener(
+            "click",
+            () => copyLatestCsv(latestAuditRows)
+        );
 
     restoreLatestAuditSnapshot();
 });
@@ -429,15 +433,15 @@ function clearLatestAuditSnapshot() {
         .clearAuditSnapshot();
 }
 
-async function copyLatestCsv() {
-    if (latestAuditRows.length === 0) {
+async function copyLatestCsv(rows) {
+    if (rows.length === 0) {
         window.MathCmsAuditView.setAuditStatus("No audit rows to copy.", "error");
         return;
     }
 
     const csv =
         window.MathCmsAuditCsv.rowsToCsv(
-            latestAuditRows
+            rows
         );
 
     try {
