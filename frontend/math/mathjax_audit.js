@@ -60,18 +60,12 @@ async function auditConceptListMode(mode) {
     try {
         window.MathCmsAuditView.setAuditStatus(`Loading ${mode} audit concept list...`, "info");
 
-        const response = await fetch(
-            `${API_ENDPOINT}/admin/math/concepts/audit-list?mode=${encodeURIComponent(mode)}`,
-            {
-                credentials: "include"
-            }
-        );
-
-        const json = await response.json();
-
-        if (!response.ok || json.status !== "success") {
-            throw new Error(json.message || "Unable to load audit-list endpoint.");
-        }
+        const json =
+            await window.MathCmsAuditApi
+                .fetchAuditConceptList(
+                    API_ENDPOINT,
+                    mode
+                );
 
         const rows = Array.isArray(json.data) ? json.data : [];
 

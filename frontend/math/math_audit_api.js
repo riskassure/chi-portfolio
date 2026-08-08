@@ -70,10 +70,40 @@ async function fetchConcept(
     return json.data;
 }
 
+async function fetchAuditConceptList(
+    apiEndpoint,
+    mode
+) {
+    const response =
+        await fetch(
+            `${apiEndpoint}/admin/math/concepts/audit-list?mode=${
+                encodeURIComponent(mode)
+            }`,
+            {
+                credentials: "include"
+            }
+        );
+
+    const json =
+        await response.json();
+
+    if (
+        !response.ok
+        || json.status !== "success"
+    ) {
+        throw new Error(
+            json.message
+            || "Unable to load audit-list endpoint."
+        );
+    }
+
+    return json;
+}
 
 window.MathCmsAuditApi = {
     batchSaveAuditRun,
-    fetchConcept
+    fetchConcept,
+    fetchAuditConceptList
 };
 
 })();
