@@ -5998,17 +5998,6 @@
             );
     }
 
-    function normalizeDollarDisplayMath(tex) {
-        if (!tex) return "";
-
-        return String(tex || "").replace(
-            /\$\$([\s\S]*?)\$\$/g,
-            function(_, body) {
-                return `\\[${body}\\]`;
-            }
-        );
-    }
-
     function normalizePlaceholderImageLayouts(value) {
         const source = String(value || "");
 
@@ -7311,7 +7300,7 @@
 
         // Normalize legacy display wrappers so MathJax can process their contents.
         clean = normalizeDisplayMathEnvironments(clean);
-        clean = normalizeDollarDisplayMath(clean);
+        clean = window.MathCmsRenderDollarDisplay.normalizeDollarDisplayMath(clean);
 
         // Convert common PlanetMath piecewise array blocks before MathJax typesetting.
         clean = convertPiecewiseArraysToHtml(clean);
