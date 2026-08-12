@@ -7083,7 +7083,9 @@
 
         clean = normalizeAlgorithmCodeBlocks(clean);
 
-        const mboxProtection = protectMboxInsideMath(clean);
+        const mboxProtection =
+            window.MathCmsRenderMathText
+                .protectMboxInsideMath(clean);
         clean = mboxProtection.text;
 
         // Remove TeX comment/separator paragraphs and standalone lines that
@@ -7412,10 +7414,12 @@
                     verbProtection.verbValues
                 );
 
-        clean = restoreMboxInsideMath(
-            clean,
-            mboxProtection.values
-        );
+        clean =
+            window.MathCmsRenderMathText
+                .restoreMboxInsideMath(
+                    clean,
+                    mboxProtection.values
+                );
 
         /*
         * A TeX \par before "Sketch of proof." can be flattened inside the
@@ -7946,71 +7950,6 @@
         );
 
         return output;
-    }
-
-    function protectMboxInsideMath(value) {
-        let output = String(value || "");
-        const values = [];
-
-        const protectBody = body => String(body || "").replace(
-            /\\(?:mbox|text)\s*\{([^{}]*)\}/gi,
-            (match, content) => {
-                const value = String(content || "");
-
-                // Structured environments inside \mbox need their own conversion.
-                // Do not treat them as ordinary prose placeholders.
-                if (/\\begin\s*\{(?:tabular|array|cases|matrix|pmatrix|bmatrix)\}/i.test(value)) {
-                    return match;
-                }
-
-                const index = values.length;
-                values.push(value);
-
-                return `PMMATHTEXTTOKEN${index}END`;
-            }
-        );
-
-        output = output.replace(
-            /\\\[([\s\S]*?)\\\]/g,
-            (_, body) => `\\[${protectBody(body)}\\]`
-        );
-
-        output = output.replace(
-            /\\\(([\s\S]*?)\\\)/g,
-            (_, body) => `\\(${protectBody(body)}\\)`
-        );
-
-        output = output.replace(
-            /\$\$([\s\S]*?)\$\$/g,
-            (_, body) => `$$${protectBody(body)}$$`
-        );
-
-        output = output.replace(
-            /(?<!\\)(?<!\$)\$(?!\$)([\s\S]*?)(?<!\\)\$(?!\$)/g,
-            (_, body) => `$${protectBody(body)}$`
-        );
-
-        return {
-            text: output,
-            values
-        };
-    }
-
-    function restoreMboxInsideMath(value, values) {
-        const items = Array.isArray(values) ? values : [];
-
-        return String(value || "").replace(
-            /PMMATHTEXTTOKEN(\d+)END/g,
-            (match, indexText) => {
-                const index = Number(indexText);
-
-                if (!Number.isInteger(index) || index < 0 || index >= items.length) {
-                    return match;
-                }
-
-                return `\\text{${items[index]}}`;
-            }
-        );
     }
 
     function normalizeDiagramImageUrls(
