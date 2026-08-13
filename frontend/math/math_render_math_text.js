@@ -172,11 +172,50 @@ function restoreMboxInsideMath(value, values) {
     );
 }
 
+function restoreUnderlineHtmlInsideMath(value) {
+    let output = String(value || "");
+
+    const restoreUnderline = body =>
+        String(body || "").replace(
+            /<u>\s*([\s\S]*?)\s*<\/u>/gi,
+            function (_, inner) {
+                return `\\underline{${String(inner || "").trim()}}`;
+            }
+        );
+
+    // \[ ... \]
+    output = output.replace(
+        /\\\[([\s\S]*?)\\\]/g,
+        (_, body) => `\\[${restoreUnderline(body)}\\]`
+    );
+
+    // \( ... \)
+    output = output.replace(
+        /\\\(([\s\S]*?)\\\)/g,
+        (_, body) => `\\(${restoreUnderline(body)}\\)`
+    );
+
+    // $$ ... $$
+    output = output.replace(
+        /\$\$([\s\S]*?)\$\$/g,
+        (_, body) => `$$${restoreUnderline(body)}$$`
+    );
+
+    // single-dollar inline math
+    output = output.replace(
+        /(^|[^\\$])\$((?:\\.|[^$])*?)\$/g,
+        (_, prefix, body) => `${prefix}$${restoreUnderline(body)}$`
+    );
+
+    return output;
+}
+
 window.MathCmsRenderMathText = {
     normalizeTextBoldInsideMath,
     normalizeTextItalicInsideMath,
     protectMboxInsideMath,
-    restoreMboxInsideMath
+    restoreMboxInsideMath,
+    restoreUnderlineHtmlInsideMath
 };
 
 })();

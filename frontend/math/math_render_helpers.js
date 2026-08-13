@@ -21,44 +21,6 @@
         );
     }
 
-    function restoreUnderlineHtmlInsideMath(value) {
-        let output = String(value || "");
-
-        const restoreUnderline = body =>
-            String(body || "").replace(
-                /<u>\s*([\s\S]*?)\s*<\/u>/gi,
-                function (_, inner) {
-                    return `\\underline{${String(inner || "").trim()}}`;
-                }
-            );
-
-        // \[ ... \]
-        output = output.replace(
-            /\\\[([\s\S]*?)\\\]/g,
-            (_, body) => `\\[${restoreUnderline(body)}\\]`
-        );
-
-        // \( ... \)
-        output = output.replace(
-            /\\\(([\s\S]*?)\\\)/g,
-            (_, body) => `\\(${restoreUnderline(body)}\\)`
-        );
-
-        // $$ ... $$
-        output = output.replace(
-            /\$\$([\s\S]*?)\$\$/g,
-            (_, body) => `$$${restoreUnderline(body)}$$`
-        );
-
-        // single-dollar inline math
-        output = output.replace(
-            /(^|[^\\$])\$((?:\\.|[^$])*?)\$/g,
-            (_, prefix, body) => `${prefix}$${restoreUnderline(body)}$`
-        );
-
-        return output;
-    }
-
     function prepareConceptHtml(tex, options = {}) {
         const apiEndpoint =
             options.apiEndpoint ||
@@ -83,7 +45,9 @@
         }
 
         clean = cleanLaTeXEnvironments(clean);
-        clean = restoreUnderlineHtmlInsideMath(clean);
+        clean =
+            window.MathCmsRenderMathText
+                .restoreUnderlineHtmlInsideMath(clean);
         clean = normalizeDiagramImageUrls(
             clean,
             apiEndpoint
