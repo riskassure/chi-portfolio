@@ -158,7 +158,7 @@
 
                 const renderedCell = containsSimpleMatrixEnvironment(cleanCell)
                     ? buildMatrixMathSequenceHtml(cleanCell, false)
-                    : `\\(${escapeHtmlForMathCell(cleanCell)}\\)`;
+                    : `\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanCell)}\\)`;
 
                 return `
                     <td style="
@@ -378,7 +378,7 @@
                     padding:0.15rem 0.35rem;
                     text-align:${align};
                     white-space:nowrap;
-                ">\\(${escapeHtmlForMathCell(cleanCell)}\\)</td>`;
+                ">\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanCell)}\\)</td>`;
             }).join("");
 
             return `<tr>${htmlCells}</tr>`;
@@ -418,13 +418,6 @@
             .replace(/\\+\s*$/, "")
 
             .trim();
-    }
-
-    function escapeHtmlForMathCell(value) {
-        return String(value || "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
     }
 
     function stripXyMatrixSetupMacros(tex) {
@@ -561,7 +554,7 @@
                     "></div>
 
                     <figcaption style="margin-top:0.2rem;">
-                        \\(${escapeHtmlForMathCell(cleanLabel)}\\)
+                        \\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanLabel)}\\)
                     </figcaption>
                 </figure>
             `;
@@ -746,7 +739,7 @@
                         "
                     >
                         <span style="white-space:nowrap;">
-                            \\(${escapeHtmlForMathCell(leadingInlineMath)}\\)
+                            \\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(leadingInlineMath)}\\)
                         </span>
 
                         ${compactMatrixHtml}
@@ -2956,7 +2949,7 @@
         arrowLayout = {},
         options = {}
     ) {
-        const safeLabel = escapeHtmlForMathCell(label || "");
+        const safeLabel = window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(label || "");
 
         const baseWidthEm = Math.max(
             arrowLayout.horizontalWidthEm || 3.6,
@@ -3370,7 +3363,7 @@
             verticalOffsetEm,
             labelPosition = "above"
         ) => {
-            const safeLabel = escapeHtmlForMathCell(label);
+            const safeLabel = window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(label);
 
             const labelPositionStyle =
                 labelPosition === "below"
@@ -3440,7 +3433,7 @@
                 ">
                     ${transformationLabels.map(label => `
                         <span>
-                            \\({\\scriptstyle ${escapeHtmlForMathCell(label)}}\\)
+                            \\({\\scriptstyle ${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(label)}}\\)
                         </span>
                     `).join("")}
                 </div>
@@ -3477,7 +3470,7 @@
                         white-space:nowrap;
                         line-height:1;
                     ">
-                        \\({\\scriptstyle ${escapeHtmlForMathCell(
+                        \\({\\scriptstyle ${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(
                             middleArrowLabel
                         )}}\\)
                     </span>
@@ -3501,7 +3494,7 @@
     }
 
     function renderNamedReferenceTwoCell(label) {
-        const safeLabel = escapeHtmlForMathCell(label || "");
+        const safeLabel = window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(label || "");
 
         if (!safeLabel) {
             return "";
@@ -3533,7 +3526,7 @@
                 : "right";
 
         const safeLabel =
-            escapeHtmlForMathCell(arrow?.label || "");
+            window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(arrow?.label || "");
 
         const isAbove = placement === "above";
         const isLeft = side === "left";
@@ -3659,7 +3652,7 @@
         */
         if (cleanOverlayLabel) {
             const labelMathHtml =
-                `\\(\\text{${escapeHtmlForMathCell(cleanOverlayLabel)}}\\)`;
+                `\\(\\text{${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanOverlayLabel)}}\\)`;
 
             return `
                 <span
@@ -3687,7 +3680,7 @@
         }
 
         const mathHtml =
-            `\\(${escapeHtmlForMathCell(tex)}\\)`;
+            `\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(tex)}\\)`;
 
         let objectHtml;
 
@@ -3791,7 +3784,7 @@
         arrowLayout = {},
         options = {}
     ) {
-        const safeLabel = escapeHtmlForMathCell(label || "");
+        const safeLabel = window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(label || "");
         const showArrowHead = options.showArrowHead !== false;
 
         const lineCount =
@@ -3915,7 +3908,7 @@
         arrowLayout = {},
         options = {}
     ) {
-        const safeLabel = escapeHtmlForMathCell(label || "");
+        const safeLabel = window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(label || "");
 
         const heightEm =
             Number(options.heightEm)
@@ -4351,7 +4344,7 @@
         return `
             <div class="mathjax-diagnostic-ignore" style="margin:1rem 0; padding:0.75rem; border:1px dashed #cbd5e1; border-radius:6px; background:#f8fafc; color:#64748b;">
                 Unsupported xymatrix diagram:
-                <code>${escapeHtmlForMathCell(body)}</code>
+                <code>${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(body)}</code>
             </div>
         `;
     }
@@ -4535,7 +4528,7 @@
                             font-size:0.78em;
                             line-height:1;
                         ">
-                            \\(${escapeHtmlForMathCell(exponent)}\\)
+                            \\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(exponent)}\\)
                         </span>
                     </span>
                 `);
@@ -4617,13 +4610,13 @@
 
         if (/^[.,;:]+$/.test(cleanValue)) {
             pieces.push(
-                `<span style="display:inline-block;">${escapeHtmlForMathCell(cleanValue)}</span>`
+                `<span style="display:inline-block;">${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanValue)}</span>`
             );
             return;
         }
 
         pieces.push(
-            `<span style="display:inline-block; vertical-align:middle;">\\(${escapeHtmlForMathCell(cleanValue)}\\)</span>`
+            `<span style="display:inline-block; vertical-align:middle;">\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanValue)}\\)</span>`
         );
     }
 
@@ -4648,7 +4641,7 @@
     function buildDisplayMatrixHtml(envName, body, trailingPunctuation = "") {
         const matrixHtml = buildMatrixEnvironmentHtml(envName, body);
         const punctuationHtml = trailingPunctuation
-            ? `<span style="display:inline-block; vertical-align:middle; margin-left:0.08rem;">${escapeHtmlForMathCell(trailingPunctuation)}</span>`
+            ? `<span style="display:inline-block; vertical-align:middle; margin-left:0.08rem;">${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(trailingPunctuation)}</span>`
             : "";
 
         return `
@@ -4670,16 +4663,16 @@
         );
 
         const prefixHtml = cleanPrefix
-            ? `<span style="display:inline-block; vertical-align:middle; margin-right:0.25rem;">\\(${escapeHtmlForMathCell(cleanPrefix)}\\)</span>`
+            ? `<span style="display:inline-block; vertical-align:middle; margin-right:0.25rem;">\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanPrefix)}\\)</span>`
             : "";
 
         let suffixHtml = "";
 
         if (cleanSuffix) {
             if (/^[.,;:]$/.test(cleanSuffix)) {
-                suffixHtml = `<span style="display:inline-block; vertical-align:middle; margin-left:0.08rem;">${escapeHtmlForMathCell(cleanSuffix)}</span>`;
+                suffixHtml = `<span style="display:inline-block; vertical-align:middle; margin-left:0.08rem;">${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanSuffix)}</span>`;
             } else {
-                suffixHtml = `<span style="display:inline-block; vertical-align:middle; margin-left:0.25rem;">\\(${escapeHtmlForMathCell(cleanSuffix)}\\)</span>`;
+                suffixHtml = `<span style="display:inline-block; vertical-align:middle; margin-left:0.25rem;">\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanSuffix)}\\)</span>`;
             }
         }
 
@@ -4889,7 +4882,7 @@
             `;
         }
 
-        return `<span style="${wrapperStyle}; align-items:center;">${escapeHtmlForMathCell(cleanDelimiter)}</span>`;
+        return `<span style="${wrapperStyle}; align-items:center;">${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanDelimiter)}</span>`;
     }
 
     function buildMatrixEnvironmentHtml(envName, body, delimiterOverride = null, arraySpec = "") {
@@ -4934,7 +4927,7 @@
                         padding:0.10rem 0.35rem;
                         text-align:center;
                         white-space:nowrap;
-                    ">\\(${escapeHtmlForMathCell(cleanCell)}\\)</span>
+                    ">\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanCell)}\\)</span>
                 `;
             }).join("");
         }).join("");
@@ -5518,7 +5511,7 @@
 
         if (trailingMath) {
             pieces.push(
-                `<span style="display:inline-block; vertical-align:middle;">\\(${escapeHtmlForMathCell(trailingMath)}\\)</span>`
+                `<span style="display:inline-block; vertical-align:middle;">\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(trailingMath)}\\)</span>`
             );
         }
 
@@ -5571,7 +5564,7 @@
                         text-align:left;
                         white-space:nowrap;
                         vertical-align:middle;
-                    ">\\(${escapeHtmlForMathCell(leftCell)}\\)</td>
+                    ">\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(leftCell)}\\)</td>
 
                     <td style="
                         padding:0.12rem 0.35rem;
@@ -5591,7 +5584,7 @@
                     align-items:center;
                     align-self:center;
                     margin-right:0.18rem;
-                ">\\(${escapeHtmlForMathCell(cleanPrefix)}\\)</span>`
+                ">\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanPrefix)}\\)</span>`
             : "";
 
         if (isInline) {
@@ -5618,7 +5611,7 @@
                                 margin-right:0.16rem;
                                 white-space:nowrap;
                             ">
-                                \\(${escapeHtmlForMathCell(cleanPrefix)}\\)
+                                \\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanPrefix)}\\)
                             </span>
                         `
                         : ""
@@ -5719,13 +5712,13 @@
         );
 
         if (!proseMatch) {
-            return `\\(${escapeHtmlForMathCell(condition)}\\)`;
+            return `\\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(condition)}\\)`;
         }
 
         const prose = proseMatch[1];
         const remainingMath = proseMatch[2].trim();
 
-        const proseHtml = `<span style="font-style:normal;">${escapeHtmlForMathCell(prose)}</span>`;
+        const proseHtml = `<span style="font-style:normal;">${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(prose)}</span>`;
 
         if (!remainingMath) {
             return proseHtml;
@@ -5741,7 +5734,7 @@
                 ${proseHtml}
 
                 <span style="display:inline-block;">
-                    \\(${escapeHtmlForMathCell(remainingMath)}\\)
+                    \\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(remainingMath)}\\)
                 </span>
             </span>
         `;
@@ -5780,7 +5773,7 @@
                         background:#fff;
                     "
                 >
-                    \\(${escapeHtmlForMathCell(cleanValue)}\\)
+                    \\(${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(cleanValue)}\\)
                 </span>
             `;
         };
@@ -6396,7 +6389,7 @@
         // Replace old LaTeX/EPS image commands with readable placeholders.
         clean = window.MathCmsRenderImages.normalizeLatexImageArtifacts(
             clean,
-            escapeHtmlForMathCell
+            window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell
         );
         
         // Arrange related placeholders while legacy layout markers
@@ -6845,7 +6838,7 @@
                         align-items:start;
                         margin-top:0.55rem;
                     ">
-                        <strong>${escapeHtmlForMathCell(item.label)}</strong>
+                        <strong>${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(item.label)}</strong>
                         <div>${item.content}</div>
                     </div>
                 `).join("");
