@@ -56,71 +56,6 @@
         return clean;
     }
 
-    function normalizeEqnarrayHtmlArtifacts(value) {
-        return String(value || "")
-            // These artifacts can appear inside old rendered_tex equation arrays.
-            // Treat paragraph breaks inside eqnarray as equation row breaks.
-            .replace(/<br\s*\/?>\s*<\/p>\s*<p[^>]*>/gi, "\\\\")
-            .replace(/<\/p>\s*<p[^>]*>/gi, "\\\\")
-            .replace(/<br\s*\/?>/gi, "\\\\")
-
-            // Remove any leftover paragraph wrappers.
-            .replace(/<\/?p[^>]*>/gi, "")
-
-            // Decode matrix/alignment separators that were HTML-escaped by the
-            // backend renderer before reaching the frontend parser.
-            .replace(/&amp;/gi, "&")
-
-            // Common HTML whitespace artifact.
-            .replace(/&nbsp;/gi, " ");
-    }
-
-    function normalizeStructuredMathHtmlArtifacts(value) {
-        let output = String(value || "");
-
-        const normalizeBody = body => String(body || "")
-            // Paragraph breaks inside cases/arrays represent TeX rows.
-            .replace(
-                /<br\s*\/?>\s*<\/p>\s*<p[^>]*>/gi,
-                "\\\\"
-            )
-            .replace(
-                /<\/p>\s*<p[^>]*>/gi,
-                "\\\\"
-            )
-            .replace(
-                /<br\s*\/?>/gi,
-                "\\\\"
-            )
-
-            // Remove any remaining paragraph wrappers.
-            .replace(/<\/?p[^>]*>/gi, "")
-
-            // A cases/array environment is already math. Nested dollar pairs,
-            // often inherited from \mbox{if $x>0$}, must not remain inside it.
-            .replace(/\$([^$]+)\$/g, "$1");
-
-        output = output.replace(
-            /\\begin\s*\{cases\}([\s\S]*?)\\end\s*\{cases\}/gi,
-            (_, body) =>
-                `\\begin{cases}${normalizeBody(body)}\\end{cases}`
-        );
-
-        output = output.replace(
-            /\\begin\s*\{array\}\s*\{([^{}]*)\}([\s\S]*?)\\end\s*\{array\}/gi,
-            (_, columnSpec, body) =>
-                `\\begin{array}{${columnSpec}}${normalizeBody(body)}\\end{array}`
-        );
-
-        output = output.replace(
-            /\\begin\s*\{(matrix|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|smallmatrix)\}([\s\S]*?)\\end\s*\{\1\}/gi,
-            (_, envName, body) =>
-                `\\begin{${envName}}${normalizeBody(body)}\\end{${envName}}`
-        );
-
-        return output;
-    }
-
     function normalizeXyMatrixHtmlArtifacts(value) {
         const source = String(value || "");
 
@@ -155,7 +90,9 @@
 
             const body = source.slice(braceStart + 1, braceEnd);
 
-            const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
+            const normalizedBody =
+                window.MathCmsRenderStructuredMath
+                    .normalizeEqnarrayHtmlArtifacts(body);
 
             result += source.slice(cursor, braceStart + 1);
             result += normalizedBody;
@@ -194,10 +131,11 @@
     }
 
     function buildHtmlTableFromAlignBody(body) {
-        const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
+        const normalizedBody = window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(body);
 
         const rows = splitAlignRows(normalizedBody)
-            .map(splitEqnarrayCells)
+            .map(window.MathCmsRenderStructuredMath.splitEqnarrayCells)
             .filter(cells => cells.some(cell => cell.trim().length > 0));
 
         if (rows.length === 0) {
@@ -207,7 +145,8 @@
         const maxColumns = Math.max(...rows.map(cells => cells.length));
 
         const htmlRows = rows.map(cells => {
-            const paddedCells = padEqnarrayCells(cells, maxColumns);
+            const paddedCells = window.MathCmsRenderStructuredMath
+                .padEqnarrayCells(cells, maxColumns);
 
             const htmlCells = paddedCells.map((cell, index) => {
                 const align = getAlignColumnAlign(index);
@@ -250,7 +189,8 @@
             return [];
         }
 
-        const slashRows = splitEqnarrayRows(normalized);
+        const slashRows = window.MathCmsRenderStructuredMath
+            .splitEqnarrayRows(normalized);
 
         if (slashRows.length > 1) {
             return slashRows;
@@ -281,9 +221,11 @@
         let count = 0;
 
         for (let i = 0; i < text.length; i += 1) {
-            const env = readLatexEnvironmentAt(text, i);
+            const env = window.MathCmsRenderStructuredMath
+                .readLatexEnvironmentAt(text, i);
 
-            if (env && isNestedLatexEnvironment(env.name)) {
+            if (env && window.MathCmsRenderStructuredMath
+                .isNestedLatexEnvironment(env.name)) {
                 if (env.type === "begin") {
                     nestedDepth += 1;
                 } else {
@@ -314,9 +256,11 @@
         let nestedDepth = 0;
 
         for (let i = 0; i < text.length; i += 1) {
-            const env = readLatexEnvironmentAt(text, i);
+            const env = window.MathCmsRenderStructuredMath
+                .readLatexEnvironmentAt(text, i);
 
-            if (env && isNestedLatexEnvironment(env.name)) {
+            if (env && window.MathCmsRenderStructuredMath
+                .isNestedLatexEnvironment(env.name)) {
                 if (env.type === "begin") {
                     nestedDepth += 1;
                 } else {
@@ -372,7 +316,8 @@
     }
 
     function normalizeAlignCell(cell) {
-        return normalizeEqnarrayHtmlArtifacts(cell)
+        return window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(cell)
             .replace(/\s+/g, " ")
             .trim();
     }
@@ -402,11 +347,13 @@
     }
 
     function buildHtmlTableFromEqnarrayBody(body) {
-        const normalizedBody = normalizeEqnarrayHtmlArtifacts(body)
+        const normalizedBody = window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(body)
             .replace(/\\cr\b/gi, "\\\\");
 
-        const rows = splitEqnarrayRows(normalizedBody)
-            .map(splitEqnarrayCells)
+        const rows = window.MathCmsRenderStructuredMath
+            .splitEqnarrayRows(normalizedBody)
+            .map(window.MathCmsRenderStructuredMath.splitEqnarrayCells)
             .filter(cells => cells.some(cell => cell.trim().length > 0));
 
         if (rows.length === 0) {
@@ -416,7 +363,8 @@
         const maxColumns = Math.max(...rows.map(cells => cells.length));
 
         const htmlRows = rows.map(cells => {
-            const paddedCells = padEqnarrayCells(cells, maxColumns);
+            const paddedCells = window.MathCmsRenderStructuredMath
+                .padEqnarrayCells(cells, maxColumns);
 
             const htmlCells = paddedCells.map((cell, index) => {
                 const align = getEqnarrayColumnAlign(index);
@@ -446,51 +394,6 @@
         `;
     }
 
-    function splitEqnarrayCells(row) {
-        const text = String(row || "");
-        const cells = [];
-        let start = 0;
-        let nestedDepth = 0;
-
-        for (let i = 0; i < text.length; i++) {
-            const env = readLatexEnvironmentAt(text, i);
-
-            if (env && isNestedLatexEnvironment(env.name)) {
-                if (env.type === "begin") {
-                    nestedDepth += 1;
-                } else {
-                    nestedDepth = Math.max(0, nestedDepth - 1);
-                }
-
-                i = env.endIndex - 1;
-                continue;
-            }
-
-            if (
-                nestedDepth === 0 &&
-                text[i] === "&" &&
-                text[i - 1] !== "\\"
-            ) {
-                cells.push(text.slice(start, i).trim());
-                start = i + 1;
-            }
-        }
-
-        cells.push(text.slice(start).trim());
-
-        return cells;
-    }
-
-    function padEqnarrayCells(cells, maxColumns) {
-        const padded = [...cells];
-
-        while (padded.length < maxColumns) {
-            padded.push("");
-        }
-
-        return padded;
-    }
-
     function getEqnarrayColumnAlign(index) {
         if (index === 0) {
             return "right";
@@ -503,155 +406,9 @@
         return "left";
     }
 
-    function splitEqnarrayRows(body) {
-        const text = String(body || "");
-        const rows = [];
-
-        let start = 0;
-        let nestedDepth = 0;
-        let braceDepth = 0;
-
-        for (
-            let i = 0;
-            i < text.length;
-            i += 1
-        ) {
-            const env =
-                readLatexEnvironmentAt(
-                    text,
-                    i
-                );
-
-            if (
-                env
-                && isNestedLatexEnvironment(
-                    env.name
-                )
-            ) {
-                if (env.type === "begin") {
-                    nestedDepth += 1;
-                } else {
-                    nestedDepth =
-                        Math.max(
-                            0,
-                            nestedDepth - 1
-                        );
-                }
-
-                i =
-                    env.endIndex - 1;
-
-                continue;
-            }
-
-            /*
-            * Escaped braces such as \{ and \} are TeX symbols,
-            * not grouping braces.
-            */
-            if (text[i] === "\\") {
-                if (
-                    text[i + 1] === "{"
-                    || text[i + 1] === "}"
-                ) {
-                    i += 1;
-                    continue;
-                }
-
-            } else if (text[i] === "{") {
-                braceDepth += 1;
-                continue;
-
-            } else if (text[i] === "}") {
-                braceDepth =
-                    Math.max(
-                        0,
-                        braceDepth - 1
-                    );
-
-                continue;
-            }
-
-            /*
-            * Split only a genuine top-level eqnarray row.
-            *
-            * Do not split \\ inside grouped macro arguments such
-            * as:
-            *
-            *   \substack{top \\ middle \\ bottom}
-            */
-            if (
-                nestedDepth === 0
-                && braceDepth === 0
-                && text[i] === "\\"
-                && text[i + 1] === "\\"
-            ) {
-                rows.push(
-                    text
-                        .slice(
-                            start,
-                            i
-                        )
-                        .trim()
-                );
-
-                i += 1;
-                start = i + 1;
-            }
-        }
-
-        rows.push(
-            text
-                .slice(start)
-                .trim()
-        );
-
-        return rows.filter(
-            row => row.length > 0
-        );
-    }
-
-    function readLatexEnvironmentAt(text, index) {
-        const source = String(text || "");
-        const remainder = source.slice(index);
-
-        const markerMatch = remainder.match(
-            /^\\(begin|end)\s*\{\s*([^{}]+?)\s*\}/
-        );
-
-        if (!markerMatch) {
-            return null;
-        }
-
-        return {
-            type: markerMatch[1],
-            name: markerMatch[2],
-            endIndex: index + markerMatch[0].length
-        };
-    }
-
-    function isNestedLatexEnvironment(name) {
-        const normalized = String(name || "").replace(/\*$/, "");
-
-        return [
-            "array",
-            "cases",
-            "matrix",
-            "pmatrix",
-            "bmatrix",
-            "Bmatrix",
-            "vmatrix",
-            "Vmatrix",
-            "smallmatrix",
-            "aligned",
-            "alignedat",
-            "split",
-            "gathered",
-            "subarray"
-        ].includes(normalized);
-    }
-
     function normalizeEqnarrayCell(cell) {
-        return normalizeEqnarrayHtmlArtifacts(cell)
+        return window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(cell)
             .replace(/\s+/g, " ")
 
             // A malformed or partially normalized eqnarray row separator can
@@ -1243,11 +1000,14 @@
 
     function buildHtmlTableFromXyMatrixBody(body) {
         const normalizedBody = recoverLostXyMatrixRowSeparators(
-            normalizeEqnarrayHtmlArtifacts(body)
+            window.MathCmsRenderStructuredMath
+                .normalizeEqnarrayHtmlArtifacts(body)
         );
 
-        const sourceRows = splitEqnarrayRows(normalizedBody)
-            .map(row => splitEqnarrayCells(row).map(parseXyMatrixCell))
+        const sourceRows = window.MathCmsRenderStructuredMath
+            .splitEqnarrayRows(normalizedBody)
+            .map(row => window.MathCmsRenderStructuredMath
+                .splitEqnarrayCells(row).map(parseXyMatrixCell))
             .filter(row => row.length > 0);
 
         const hasLegacyTwoCell = sourceRows
@@ -4869,7 +4629,8 @@
 
 
     function normalizeMatrixSequenceMath(value) {
-        return normalizeEqnarrayHtmlArtifacts(value)
+        return window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(value)
             .replace(/\s+/g, " ")
 
             // Plain prose words inside math mode lose ordinary whitespace.
@@ -5042,7 +4803,8 @@
     }
 
     function normalizeMatrixAffix(value) {
-        return normalizeEqnarrayHtmlArtifacts(value)
+        return window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(value)
             .replace(/\s+/g, " ")
             .trim();
     }
@@ -5131,10 +4893,14 @@
     }
 
     function buildMatrixEnvironmentHtml(envName, body, delimiterOverride = null, arraySpec = "") {
-        const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
+        const normalizedBody = window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(body);
 
         const rows = splitMatrixBodyRows(normalizedBody)
-            .map(splitEqnarrayCells)
+            .map(
+                window.MathCmsRenderStructuredMath
+                    .splitEqnarrayCells
+            )
             .filter(cells => cells.some(cell => cell.trim().length > 0));
 
         if (rows.length === 0) {
@@ -5145,7 +4911,8 @@
         const delimiters = delimiterOverride || getMatrixDelimiters(envName);
 
         const htmlCells = rows.map(cells => {
-            const paddedCells = padEqnarrayCells(cells, maxColumns);
+            const paddedCells = window.MathCmsRenderStructuredMath
+                .padEqnarrayCells(cells, maxColumns);
 
             return paddedCells.map(cell => {
                 const cleanCell = normalizeMatrixCell(cell);
@@ -5200,7 +4967,8 @@
             return [];
         }
 
-        const slashRows = splitEqnarrayRows(normalized);
+        const slashRows = window.MathCmsRenderStructuredMath
+            .splitEqnarrayRows(normalized);
 
         if (slashRows.length > 1) {
             return slashRows;
@@ -5222,7 +4990,8 @@
 
 
     function normalizeMatrixCell(cell) {
-        return normalizeEqnarrayHtmlArtifacts(cell)
+        return window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(cell)
             .replace(/\s+/g, " ")
             .trim();
     }
@@ -5774,10 +5543,15 @@
     function buildPiecewiseArrayHtml(prefix, body, options = {}) {
         const isInline = options.inline === true;
         const cleanPrefix = normalizePiecewiseMathCell(prefix);
-        const normalizedBody = normalizeEqnarrayHtmlArtifacts(body);
+        const normalizedBody = window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(body);
 
-        const rows = splitEqnarrayRows(normalizedBody)
-            .map(splitEqnarrayCells)
+        const rows = window.MathCmsRenderStructuredMath
+            .splitEqnarrayRows(normalizedBody)
+            .map(
+                window.MathCmsRenderStructuredMath
+                    .splitEqnarrayCells
+            )
             .filter(cells => cells.some(cell => cell.trim().length > 0));
 
         if (rows.length === 0) {
@@ -5974,7 +5748,8 @@
     }
 
     function normalizePiecewiseMathCell(value) {
-        return normalizeEqnarrayHtmlArtifacts(value)
+        return window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(value)
             .replace(/\\textrm\{([^{}]*)\}/gi, "\\text{$1}")
             .replace(/\\mbox\{([^{}]*)\}/gi, "\\text{$1}")
             .replace(/\s+/g, " ")
@@ -6505,7 +6280,9 @@
 
         // Repair HTML paragraph artifacts inside cases/array environments before
         // literal < and > characters are protected for safe innerHTML insertion.
-        clean = normalizeStructuredMathHtmlArtifacts(clean);
+        clean =
+            window.MathCmsRenderStructuredMath
+                .normalizeStructuredMathHtmlArtifacts(clean);
 
         // Repair paragraph and line-break artifacts inside xymatrix bodies before
         // literal angle brackets inside math are protected as \lt and \gt.
