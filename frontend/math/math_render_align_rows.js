@@ -122,7 +122,26 @@
         return rows;
     }
 
+    function getAlignColumnAlign(index) {
+        // align/alignat cells naturally alternate:
+        // left expression & aligned relation/right expression
+        if (index % 2 === 0) {
+            return "right";
+        }
+
+        return "left";
+    }
+
+    function normalizeAlignCell(cell) {
+        return window.MathCmsRenderStructuredMath
+            .normalizeEqnarrayHtmlArtifacts(cell)
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
     window.MathCmsRenderAlignRows = {
-        splitAlignRows
+        splitAlignRows,
+        getAlignColumnAlign,
+        normalizeAlignCell
     };
 })();

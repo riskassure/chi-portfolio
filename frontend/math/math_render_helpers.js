@@ -150,8 +150,11 @@
                 .padEqnarrayCells(cells, maxColumns);
 
             const htmlCells = paddedCells.map((cell, index) => {
-                const align = getAlignColumnAlign(index);
-                const cleanCell = normalizeAlignCell(cell);
+                const align = window.MathCmsRenderAlignRows
+                    .getAlignColumnAlign(index);
+
+                const cleanCell = window.MathCmsRenderAlignRows
+                    .normalizeAlignCell(cell);
 
                 if (!cleanCell) {
                     return `<td style="padding:0.12rem 0.28rem; text-align:${align};"></td>`;
@@ -181,23 +184,6 @@
                 ${htmlRows}
             </table>
         `;
-    }
-
-    function getAlignColumnAlign(index) {
-        // align/alignat cells naturally alternate:
-        // left expression & aligned relation/right expression
-        if (index % 2 === 0) {
-            return "right";
-        }
-
-        return "left";
-    }
-
-    function normalizeAlignCell(cell) {
-        return window.MathCmsRenderStructuredMath
-            .normalizeEqnarrayHtmlArtifacts(cell)
-            .replace(/\s+/g, " ")
-            .trim();
     }
 
     function stripXyMatrixSetupMacros(tex) {
