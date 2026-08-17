@@ -81,7 +81,8 @@
                 continue;
             }
 
-            const braceEnd = findMatchingBrace(source, braceStart);
+            const braceEnd = window.MathCmsRenderStructuredMath
+                .findMatchingBrace(source, braceStart);
 
             if (braceEnd === -1) {
                 result += source.slice(cursor);
@@ -233,7 +234,8 @@
                 continue;
             }
 
-            const contentEnd = findMatchingBrace(source, contentStart);
+            const contentEnd = window.MathCmsRenderStructuredMath
+                .findMatchingBrace(source, contentStart);
 
             if (contentEnd === -1) {
                 result += source.slice(cursor);
@@ -262,7 +264,8 @@
                 contentEnd + 1 +
                 subscriptMatch[0].lastIndexOf("{");
 
-            const labelEnd = findMatchingBrace(source, labelStart);
+            const labelEnd = window.MathCmsRenderStructuredMath
+                .findMatchingBrace(source, labelStart);
 
             if (labelEnd === -1) {
                 result += source.slice(cursor);
@@ -278,7 +281,8 @@
             const matrixBraceEnd =
                 matrixBraceStart === -1
                     ? -1
-                    : findMatchingBrace(content, matrixBraceStart);
+                    : window.MathCmsRenderStructuredMath
+                        .findMatchingBrace(content, matrixBraceStart);
 
             if (matrixBraceEnd === -1) {
                 result += source.slice(cursor, labelEnd + 1);
@@ -398,7 +402,8 @@
                 continue;
             }
 
-            const braceEnd = findMatchingBrace(tex, braceStart);
+            const braceEnd = window.MathCmsRenderStructuredMath
+                .findMatchingBrace(tex, braceStart);
 
             if (braceEnd === -1) {
                 result += tex.slice(cursor, matrixIndex + "\\xymatrix".length);
@@ -602,49 +607,6 @@
     function findNextNonSpaceIndex(text, startIndex) {
         for (let i = startIndex; i < text.length; i += 1) {
             if (!/\s/.test(text[i])) {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
-    function findMatchingBrace(text, openIndex) {
-        const source = String(text || "");
-        let depth = 0;
-
-        for (let i = openIndex; i < source.length; i += 1) {
-            const char = source[i];
-
-            if (char !== "{" && char !== "}") {
-                continue;
-            }
-
-            // A brace is escaped only when preceded by an odd number of
-            // consecutive backslashes.
-            //
-            //   \{    escaped brace
-            //   \\{   xymatrix row break followed by a real opening brace
-            let backslashCount = 0;
-
-            for (let j = i - 1; j >= 0 && source[j] === "\\"; j -= 1) {
-                backslashCount += 1;
-            }
-
-            const isEscaped = backslashCount % 2 === 1;
-
-            if (isEscaped) {
-                continue;
-            }
-
-            if (char === "{") {
-                depth += 1;
-                continue;
-            }
-
-            depth -= 1;
-
-            if (depth === 0) {
                 return i;
             }
         }
@@ -2221,7 +2183,8 @@
             return null;
         }
 
-        const arrowLabelEnd = findMatchingBrace(source, cursor);
+        const arrowLabelEnd = window.MathCmsRenderStructuredMath
+            .findMatchingBrace(source, cursor);
 
         if (arrowLabelEnd === -1) {
             return null;
@@ -2238,7 +2201,8 @@
             return null;
         }
 
-        const innerLabelEnd = findMatchingBrace(source, cursor);
+        const innerLabelEnd = window.MathCmsRenderStructuredMath
+            .findMatchingBrace(source, cursor);
 
         if (innerLabelEnd === -1) {
             return null;
@@ -6357,7 +6321,8 @@
                 return null;
             }
 
-            const end = findMatchingBrace(source, cursor);
+            const end = window.MathCmsRenderStructuredMath
+                .findMatchingBrace(source, cursor);
 
             if (end === -1) {
                 return null;

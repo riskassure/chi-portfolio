@@ -216,6 +216,49 @@
         );
     }
 
+    function findMatchingBrace(text, openIndex) {
+        const source = String(text || "");
+        let depth = 0;
+
+        for (let i = openIndex; i < source.length; i += 1) {
+            const char = source[i];
+
+            if (char !== "{" && char !== "}") {
+                continue;
+            }
+
+            // A brace is escaped only when preceded by an odd number of
+            // consecutive backslashes.
+            //
+            //   \{    escaped brace
+            //   \\{   xymatrix row break followed by a real opening brace
+            let backslashCount = 0;
+
+            for (let j = i - 1; j >= 0 && source[j] === "\\"; j -= 1) {
+                backslashCount += 1;
+            }
+
+            const isEscaped = backslashCount % 2 === 1;
+
+            if (isEscaped) {
+                continue;
+            }
+
+            if (char === "{") {
+                depth += 1;
+                continue;
+            }
+
+            depth -= 1;
+
+            if (depth === 0) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
     function readLatexEnvironmentAt(text, index) {
         const source = String(text || "");
         const remainder = source.slice(index);
@@ -262,6 +305,7 @@
         splitEqnarrayRows,
         splitEqnarrayCells,
         padEqnarrayCells,
+        findMatchingBrace,
         readLatexEnvironmentAt,
         isNestedLatexEnvironment
     };
