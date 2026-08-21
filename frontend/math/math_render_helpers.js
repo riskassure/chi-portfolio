@@ -4381,20 +4381,6 @@
             .trim();
     }
 
-    function buildDisplayMatrixHtml(envName, body, trailingPunctuation = "") {
-        const matrixHtml = window.MathCmsRenderMatrixCore
-            .buildMatrixEnvironmentHtml(envName, body);
-        const punctuationHtml = trailingPunctuation
-            ? `<span style="display:inline-block; vertical-align:middle; margin-left:0.08rem;">${window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell(trailingPunctuation)}</span>`
-            : "";
-
-        return `
-            <div class="pm-matrix-display tex2jax_process" style="text-align:center; margin:1rem 0;">
-                ${matrixHtml}${punctuationHtml}
-            </div>
-        `;
-    }
-
     function cleanLaTeXEnvironments(tex) {
         if (!tex) return "";
 
