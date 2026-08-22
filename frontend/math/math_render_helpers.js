@@ -105,28 +105,6 @@
         return result;
     }
 
-    function stripXyMatrixSetupMacros(tex) {
-        if (!tex) return "";
-
-        return String(tex)
-            .replace(/\\UseAllTwocells\b/g, "")
-            .replace(/\\UseComputerModernTips\b/g, "");
-    }
-
-    function renderXyMatrixConnectorMath(tex) {
-        if (!tex) return "";
-
-        return String(tex)
-            .replace(
-                /\\quad\s*\{:=\}\s*\\quad/g,
-                '<span class="pm-xymatrix-connector" style="display:inline-block; margin:0 0.55rem;">\\({:=}\\)</span>'
-            )
-            .replace(
-                /\\quad\s*\{=\}\s*\\quad/g,
-                '<span class="pm-xymatrix-connector" style="display:inline-block; margin:0 0.55rem;">\\({=}\\)</span>'
-            );
-    }
-
     function convertUnderbracedXyMatrixToHtml(tex) {
         const source = String(tex || "");
 
@@ -4117,7 +4095,9 @@
         clean = clean.replace(/\\nobreak\b/g, "");
 
         // Remove Xy-pic setup commands that have no visible page meaning.
-        clean = stripXyMatrixSetupMacros(clean);
+        clean =
+            window.MathCmsRenderXyCleanup
+                .stripXyMatrixSetupMacros(clean);
 
         clean = convertUnderbracedXyMatrixToHtml(clean);
         clean = convertXyMatrixToHtml(clean);
@@ -4126,7 +4106,9 @@
         clean = unwrapConvertedXyMatrixMathWrappers(clean);
 
         // Render operators stranded between converted xymatrix blocks.
-        clean = renderXyMatrixConnectorMath(clean);
+        clean =
+            window.MathCmsRenderXyCleanup
+                .renderXyMatrixConnectorMath(clean);
 
         // Temporarily protect generated xymatrix HTML while literal angle brackets
         // in the remaining TeX are normalized.
