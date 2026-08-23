@@ -70,10 +70,12 @@
                 break;
             }
 
-            const braceStart = findXyMatrixBodyStart(
-                source,
-                matrixIndex + "\\xymatrix".length
-            );
+            const braceStart =
+                window.MathCmsRenderXyParser
+                    .findXyMatrixBodyStart(
+                        source,
+                        matrixIndex + "\\xymatrix".length
+                    );
 
             if (braceStart === -1) {
                 result += source.slice(cursor, matrixIndex + "\\xymatrix".length);
@@ -119,10 +121,12 @@
                 break;
             }
 
-            const contentStart = findNextNonSpaceIndex(
-                source,
-                underbraceIndex + "\\underbrace".length
-            );
+            const contentStart =
+                window.MathCmsRenderXyParser
+                    .findNextNonSpaceIndex(
+                        source,
+                        underbraceIndex + "\\underbrace".length
+                    );
 
             if (contentStart === -1 || source[contentStart] !== "{") {
                 result += source.slice(cursor, underbraceIndex + "\\underbrace".length);
@@ -169,10 +173,12 @@
             }
 
             const matrixStart = content.indexOf("\\xymatrix");
-            const matrixBraceStart = findXyMatrixBodyStart(
-                content,
-                matrixStart + "\\xymatrix".length
-            );
+            const matrixBraceStart =
+                window.MathCmsRenderXyParser
+                    .findXyMatrixBodyStart(
+                        content,
+                        matrixStart + "\\xymatrix".length
+                    );
 
             const matrixBraceEnd =
                 matrixBraceStart === -1
@@ -287,10 +293,12 @@
                 break;
             }
 
-            const braceStart = findXyMatrixBodyStart(
-                tex,
-                matrixIndex + "\\xymatrix".length
-            );
+            const braceStart =
+                window.MathCmsRenderXyParser
+                    .findXyMatrixBodyStart(
+                        tex,
+                        matrixIndex + "\\xymatrix".length
+                    );
 
             if (braceStart === -1) {
                 result += tex.slice(cursor, matrixIndex + "\\xymatrix".length);
@@ -428,86 +436,6 @@
         }
 
         return result;
-    }
-
-    function findXyMatrixBodyStart(text, startIndex) {
-        let i = findNextNonSpaceIndex(text, startIndex);
-
-        if (i === -1) {
-            return -1;
-        }
-
-        // Ordinary case:
-        // \xymatrix{...}
-        if (text[i] === "{") {
-            return i;
-        }
-
-        // Extended PlanetMath / Xy-pic option cases:
-        // \xymatrix@C=1.5cm{...}
-        // \xymatrix@R-=2pt{...}
-        // \xymatrix@+=1.5cm{...}
-        // \xymatrix@1{...}
-        // \xymatrix @R=1pt @C=1.5cm {...}
-        // \xymatrix @!=1pt {...}
-        if (text[i] !== "@") {
-            return -1;
-        }
-
-        const limit = Math.min(text.length, i + 180);
-
-        while (i < limit) {
-            while (i < limit && /\s/.test(text[i])) {
-                i += 1;
-            }
-
-            if (i >= limit) {
-                return -1;
-            }
-
-            if (text[i] === "{" && text[i - 1] !== "\\") {
-                return i;
-            }
-
-            if (text[i] !== "@") {
-                return -1;
-            }
-
-            // Consume one @ option token.
-            // Examples:
-            //   @C=1.5cm
-            //   @R-=2pt
-            //   @+=3pc
-            //   @1
-            //   @!
-            //   @!=1pt
-            //   @-2ex
-            i += 1;
-
-            while (i < limit) {
-                if (text[i] === "{" && text[i - 1] !== "\\") {
-                    return i;
-                }
-
-                if (/\s/.test(text[i]) || text[i] === "@") {
-                    break;
-                }
-
-                i += 1;
-            }
-        }
-
-        return -1;
-    }
-
-    function findNextNonSpaceIndex(text, startIndex) {
-        for (let i = startIndex; i < text.length; i += 1) {
-            if (!/\s/.test(text[i])) {
-                return i;
-            }
-        }
-
-        return -1;
     }
 
     function calculateXyMatrixArrowLayout(sourceRows) {
