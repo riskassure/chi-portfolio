@@ -3559,116 +3559,6 @@
         `;
     }
 
-    function unwrapConvertedXyMatrixMathWrappers(value) {
-        let output = String(value || "");
-
-        const tablePattern =
-            '<table\\b[^>]*class=["\'][^"\']*\\bpm-xymatrix-table\\b[^"\']*["\'][^>]*>[\\s\\S]*?<\\/table>';
-
-        const containsConvertedXyMatrixTable = inner =>
-            /\bpm-xymatrix-table\b/i.test(
-                String(inner || "")
-            );
-
-        /*
-        * Match each complete equation wrapper first.
-        *
-        * Only unwrap it when that exact wrapper contains a converted
-        * xymatrix table. This prevents the regex from crossing an earlier
-        * closing delimiter while searching for a table farther down.
-        */
-        output = output.replace(
-            /\\begin\{(equation\*?)\}([\s\S]*?)\\end\{\1\}/gi,
-            function(fullMatch, environmentName, inner) {
-                if (!containsConvertedXyMatrixTable(inner)) {
-                    return fullMatch;
-                }
-
-                return window.MathCmsRenderXySequences
-                    .renderMixedXyMatrixWrapperContent(inner);
-            }
-        );
-
-        /*
-        * Apply the same nearest-wrapper rule to $$ ... $$ displays.
-        */
-        output = output.replace(
-            /\$\$([\s\S]*?)\$\$/g,
-            function(fullMatch, inner) {
-                if (!containsConvertedXyMatrixTable(inner)) {
-                    return fullMatch;
-                }
-
-                return window.MathCmsRenderXySequences
-                    .renderMixedXyMatrixWrapperContent(inner);
-            }
-        );
-
-        /*
-        * Apply the same nearest-wrapper rule to \[ ... \] displays.
-        */
-        output = output.replace(
-            /\\\[([\s\S]*?)\\\]/g,
-            function(fullMatch, inner) {
-                if (!containsConvertedXyMatrixTable(inner)) {
-                    return fullMatch;
-                }
-
-                return window.MathCmsRenderXySequences
-                    .renderMixedXyMatrixWrapperContent(inner);
-            }
-        );
-
-        /*
-        * Process each complete single-dollar wrapper independently.
-        *
-        * This supports both:
-        *
-        *   $table$
-        *   $table = table$
-        *
-        * without searching beyond that wrapper into surrounding prose.
-        */
-        output = output.replace(
-            /(^|[^\\$])\$(?!\$)((?:\\.|[^\\$])*)\$(?!\$)/g,
-            function (
-                fullMatch,
-                prefix,
-                inner
-            ) {
-                if (
-                    !containsConvertedXyMatrixTable(
-                        inner
-                    )
-                ) {
-                    return fullMatch;
-                }
-
-                return (
-                    prefix
-                    + window.MathCmsRenderXySequences
-                        .renderMixedXyMatrixWrapperContent(
-                            inner
-                        )
-                );
-            }
-        );
-
-        /*
-        * Same narrow rule for \( ... \).
-        */
-        output = output.replace(
-            new RegExp(
-                `\\\\\\(\\s*(${tablePattern})\\s*([,.;:!?]?)\\s*\\\\\\)`,
-                "gi"
-            ),
-            (_, tableHtml, punctuation) =>
-                `${tableHtml}${punctuation || ""}`
-        );
-
-        return output;
-    }
-
     function makeUnsupportedXyMatrixPlaceholder(body) {
         return `
             <div class="mathjax-diagnostic-ignore" style="margin:1rem 0; padding:0.75rem; border:1px dashed #cbd5e1; border-radius:6px; background:#f8fafc; color:#64748b;">
@@ -3806,7 +3696,8 @@
         clean = convertXyMatrixToHtml(clean);
 
         // Remove display wrappers left around generated Xy-pic HTML.
-        clean = unwrapConvertedXyMatrixMathWrappers(clean);
+        clean = window.MathCmsRenderXySequences
+            .unwrapConvertedXyMatrixMathWrappers(clean);
 
         // Render operators stranded between converted xymatrix blocks.
         clean =
