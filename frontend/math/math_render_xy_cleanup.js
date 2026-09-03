@@ -23,8 +23,60 @@
             );
     }
 
+    function normalizeXyMatrixHtmlArtifacts(value) {
+        const source = String(value || "");
+
+        let result = "";
+        let cursor = 0;
+
+        while (cursor < source.length) {
+            const matrixIndex = source.indexOf("\\xymatrix", cursor);
+
+            if (matrixIndex === -1) {
+                result += source.slice(cursor);
+                break;
+            }
+
+            const braceStart =
+                window.MathCmsRenderXyParser
+                    .findXyMatrixBodyStart(
+                        source,
+                        matrixIndex + "\\xymatrix".length
+                    );
+
+            if (braceStart === -1) {
+                result += source.slice(cursor, matrixIndex + "\\xymatrix".length);
+                cursor = matrixIndex + "\\xymatrix".length;
+                continue;
+            }
+
+            const braceEnd = window.MathCmsRenderStructuredMath
+                .findMatchingBrace(source, braceStart);
+
+            if (braceEnd === -1) {
+                result += source.slice(cursor);
+                break;
+            }
+
+            const body = source.slice(braceStart + 1, braceEnd);
+
+            const normalizedBody =
+                window.MathCmsRenderStructuredMath
+                    .normalizeEqnarrayHtmlArtifacts(body);
+
+            result += source.slice(cursor, braceStart + 1);
+            result += normalizedBody;
+            result += "}";
+
+            cursor = braceEnd + 1;
+        }
+
+        return result;
+    }
+
     window.MathCmsRenderXyCleanup = {
         stripXyMatrixSetupMacros,
-        renderXyMatrixConnectorMath
+        renderXyMatrixConnectorMath,
+        normalizeXyMatrixHtmlArtifacts
     };
 })();
