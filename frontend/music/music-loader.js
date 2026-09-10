@@ -4,6 +4,8 @@ let masterMusicData = [];
 
 // Unified Column Metadata Registry
 const FIELD_REGISTRY = {
+    rank: { label: "Rank", isCore: true, type: "number" },
+    plays: { label: "My Plays (6 months)", isCore: true, type: "number" },
     spotify_playlist: { label: "Source Playlist", isCore: true,  type: "string" },
     genre:            { label: "Genre",           isCore: true,  type: "string" },
     composition_name: { label: "Composition",     isCore: true,  type: "string" },
@@ -42,51 +44,41 @@ function unlockLocalPageControls() {
     // Force the global bar to expand vertically to accommodate text elements easily
     adminDock.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; min-height: 45px; background-color: #34495e;";
 
-    // Check if the page-size selector already exists to prevent duplicate injection
-    if (document.getElementById('admin-page-size-selector')) return;
-
-    // Create a wrapper container for our new control element
-    const controlWrapper = document.createElement('div');
-    controlWrapper.id = 'admin-page-size-selector';
-    
-    // Explicit flex structure with high padding background color to insulate text readability
-    controlWrapper.style.cssText = "display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-left: auto; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;";
-
-    // Using an inline block with explicit width parameters guarantees it cannot collapse to zero dimensions
-    controlWrapper.innerHTML = `
-        <span style="color: #ffffff !important; display: inline-block; white-space: nowrap; font-weight: bold; font-size: 14px;">Table Display Limit:</span>
-        <select id="row-size-select" style="padding: 6px 10px; border-radius: 4px; border: 1px solid #1abc9c; background: #2c3e50; color: white; cursor: pointer; font-weight: bold; font-size: 13px;">
-            <option value="10">10 Rows</option>
-            <option value="25" selected>25 Rows</option>
-            <option value="50">50 Rows</option>
-            <option value="100">100 Rows</option>
-        </select>
-    `;
-
-    adminDock.appendChild(controlWrapper);
-
-    // Wire up the change listener to update layout paging state immediately
-    document.getElementById('row-size-select').addEventListener('change', (e) => {
-        recordsPerPage = parseInt(e.target.value, 10);
-        currentPage = 1; // Snaps back to first page to avoid layout overflow bounds
-        loadMusicData(); // Fires fresh API fetch to retrieve targeted window slice
-    });
 }
 
 // Fetch live backend metrics
+let musicRequestNumber = 0;
 function loadMusicData() {
-    fetch(`http://127.0.0.1:5000/api/music?page=${currentPage}&per_page=${recordsPerPage}`, {
+    const requestNumber = ++musicRequestNumber;
+    const params = new URLSearchParams({page: currentPage, per_page: recordsPerPage,
+        search: activeFilters.searchQuery, playlist: activeFilters.spotify_playlist,
+        sort: JSON.stringify(sortSequence)});
+    fetch(`http://127.0.0.1:5000/api/music?${params}`, {
         credentials: "include"
     })
-        .then(response => response.json())
+        .then(response => { if (!response.ok) throw new Error("Catalog unavailable"); return response.json(); })
         .then(payload => {
+            if (requestNumber !== musicRequestNumber) return;
+            currentPage = payload.page;
             masterMusicData = payload.data; 
             buildColumnCheckboxes();
-            populatePlaylistFilter(payload.data);
+            populatePlaylistFilter(payload.playlists || []);
+            const status = document.getElementById("ranking-status");
+            if (status) {
+                const ranking = payload.ranking;
+                status.textContent = ranking
+                    ? `Top ${ranking.target_count.toLocaleString()} playlist tracks, ordered by my verified plays of at least 30 seconds. ` +
+                      `Window: ${ranking.window_start.slice(0, 10)} to ${ranking.window_end.slice(0, 10)} (UTC). ` +
+                      `History through ${(ranking.history_latest || "unknown").slice(0, 10)}. ` +
+                      `Updated ${ranking.published_at.slice(0, 10)}. Tracks with no verified plays follow those with plays.` +
+                      (ranking.inaccessible_playlists ? ` ${ranking.inaccessible_playlists} playlists could not be read.` : "")
+                    : "Original catalog: ranked publication is being prepared.";
+            }
             processAndRenderTable();
             renderPaginationButtons(payload.total_pages, payload.page);
         })
         .catch(err => {
+            if (requestNumber !== musicRequestNumber) return;
             console.error("Database connection failed:", err);
             document.getElementById("table-body").innerHTML = `<tr><td colspan="12" style="text-align:center; color:#e74c3c;">⚠️ Connection failed. Check app server logs.</td></tr>`;
         });
@@ -117,7 +109,8 @@ function buildColumnCheckboxes() {
                 activeOptionalColumns = activeOptionalColumns.filter(k => k !== key);
                 sortSequence = sortSequence.filter(rule => rule.column !== key);
             }
-            processAndRenderTable();
+            currentPage = 1;
+            loadMusicData();
         });
 
         labelEl.appendChild(chk);
@@ -128,15 +121,17 @@ function buildColumnCheckboxes() {
 
 function populatePlaylistFilter(data) {
     const select = document.getElementById("filter-playlist");
-    if (!select || select.options.length > 1) return; 
+    if (!select) return;
+    select.innerHTML = '<option value="all">All Playlists</option>';
     
-    const uniquePlaylists = [...new Set(data.map(item => item.spotify_playlist).filter(Boolean))];
+    const uniquePlaylists = [...new Set(data.filter(Boolean))];
     uniquePlaylists.sort().forEach(p => {
         const opt = document.createElement("option");
         opt.value = p; 
         opt.textContent = p;
         select.appendChild(opt);
     });
+    select.value = activeFilters.spotify_playlist;
 }
 
 function getActiveViewportColumns() {
@@ -147,47 +142,7 @@ function getActiveViewportColumns() {
 function processAndRenderTable() {
     const currentFields = getActiveViewportColumns();
 
-    // STAGE 1: FILTER RUNNEL
-    let processedData = masterMusicData.filter(item => {
-        if (activeFilters.spotify_playlist !== "all" && item.spotify_playlist !== activeFilters.spotify_playlist) {
-            return false;
-        }
-        if (activeFilters.searchQuery) {
-            const query = activeFilters.searchQuery.toLowerCase();
-            const matchFound = currentFields.some(fieldKey => {
-                const val = item[fieldKey];
-                return val && val.toString().toLowerCase().includes(query);
-            });
-            if (!matchFound) return false;
-        }
-        return true;
-    });
-
-    // STAGE 2: TYPE-AWARE SEQUENTIAL SORT
-    if (sortSequence.length > 0) {
-        processedData.sort((a, b) => {
-            for (let sortRule of sortSequence) {
-                const col = sortRule.column;
-                const dir = sortRule.direction === "asc" ? 1 : -1;
-                const dataType = FIELD_REGISTRY[col]?.type || "string";
-
-                let valA = a[col] !== null && a[col] !== undefined ? a[col] : "";
-                let valB = b[col] !== null && b[col] !== undefined ? b[col] : "";
-
-                if (dataType === "number") {
-                    if (Number(valA) !== Number(valB)) {
-                        return (Number(valA) - Number(valB)) * dir;
-                    }
-                } else {
-                    let strA = valA.toString().toLowerCase();
-                    let strB = valB.toString().toLowerCase();
-                    if (strA < strB) return -1 * dir;
-                    if (strA > strB) return 1 * dir;
-                }
-            }
-            return 0;
-        });
-    }
+    const processedData = masterMusicData; // Filtering and sorting happen before server pagination.
 
     // STAGE 3: OUTPUT GENERATION
     generateTableHeaders(currentFields);
@@ -218,6 +173,12 @@ function generateTableHeaders(fields) {
     headerRow.appendChild(linkTh);
 }
 
+function escapeMusicText(value) {
+    return String(value).replace(/[&<>"']/g, character => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[character]);
+}
+
 function renderTableBody(dataList, fields) {
     const tableBody = document.getElementById("table-body");
     if (!tableBody) return;
@@ -239,10 +200,12 @@ function renderTableBody(dataList, fields) {
             let cellValue = item[fieldKey];
             if (cellValue === null || cellValue === undefined || cellValue === "") {
                 cellValue = '<span style="color:#bbb;">--</span>';
+            } else {
+                cellValue = escapeMusicText(cellValue);
             }
 
             if (fieldKey === 'composition_name') {
-                innerCellsHTML += `<td data-field="composition_name" style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>${cellValue}</strong> <small style="color:#7f8c8d;">${item.unit_name || ''}</small></td>`;
+                innerCellsHTML += `<td data-field="composition_name" style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>${cellValue}</strong> <small style="color:#7f8c8d;">${escapeMusicText(item.unit_name || '')}</small></td>`;
             } else if (fieldKey === 'spotify_playlist') {
                 innerCellsHTML += `<td data-field="spotify_playlist" style="padding: 10px; border-bottom: 1px solid #ddd; color: #7f8c8d; font-size: 0.9em;">${cellValue}</td>`;
             } else if (fieldKey === 'popularity' && typeof item[fieldKey] === 'number') {
@@ -257,7 +220,7 @@ function renderTableBody(dataList, fields) {
             }
         });
 
-        const linkTag = item.track_id 
+        const linkTag = /^[A-Za-z0-9]{22}$/.test(item.track_id || "")
             ? `<button onclick="playTrackInline('${item.track_id}')" style="background: #1ed760; color: white; border: none; padding: 6px 12px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 0.85em;">Load Player 🎧</button>` 
             : `<span style="color:#ccc;">Unavailable</span>`;
 
@@ -276,20 +239,23 @@ function handleHeaderClick(column) {
     } else {
         sortSequence.splice(existingIndex, 1);
     }
-    processAndRenderTable();
+    currentPage = 1;
+    loadMusicData();
 }
 
 function setupEventListeners() {
     const playlistFilter = document.getElementById("filter-playlist");
     playlistFilter?.addEventListener("change", (e) => {
         activeFilters.spotify_playlist = e.target.value;
-        processAndRenderTable();
+        currentPage = 1;
+        loadMusicData();
     });
 
     const searchBar = document.getElementById("search-bar");
     searchBar?.addEventListener("input", (e) => {
         activeFilters.searchQuery = e.target.value;
-        processAndRenderTable();
+        currentPage = 1;
+        loadMusicData();
     });
 
     document.getElementById("reset-filters")?.addEventListener("click", () => {
@@ -301,7 +267,8 @@ function setupEventListeners() {
         if (searchBar) searchBar.value = "";
         
         buildColumnCheckboxes();
-        processAndRenderTable();
+        currentPage = 1;
+        loadMusicData();
     });
 
     // Wire up Action Buttons safely with null guards (?.)
@@ -333,7 +300,7 @@ window.playTrackInline = function(trackId) {
     if (!dock) return;
     
     dock.innerHTML = `
-        <iframe src="https://open.spotify.com/embed/track/$${trackId}?utm_source=generator&theme=0" 
+        <iframe src="https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0"
                 width="100%" height="90" frameBorder="0" allowfullscreen="" 
                 allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"
                 style="border-radius: 12px;">
@@ -368,7 +335,7 @@ function renderPaginationButtons(totalPages, activePage) {
     
     const nextBtn = document.createElement("button");
     nextBtn.innerText = "Next ▶";
-    nextBtn.disabled = activePage === totalPages;
+    nextBtn.disabled = activePage >= totalPages;
     nextBtn.style.cssText = "padding: 6px 12px; font-weight: bold; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; background: white;";
     if (!nextBtn.disabled) nextBtn.onclick = () => { currentPage++; loadMusicData(); };
     controlsContainer.appendChild(nextBtn);
@@ -410,7 +377,7 @@ function enterTableEditMode() {
             const cell = row.querySelector(`[data-field="${fieldKey}"]`);
             if (cell) {
                 const currentText = cell.innerText === '--' ? '' : cell.innerText;
-                cell.innerHTML = `<input type="text" value="${currentText}" style="width: 95%; padding: 4px; box-sizing: border-box;">`;
+                cell.innerHTML = `<input type="text" value="${escapeMusicText(currentText)}" style="width: 95%; padding: 4px; box-sizing: border-box;">`;
             }
         });
     }
@@ -481,7 +448,9 @@ async function saveTableChanges() {
         const response = await fetch("http://127.0.0.1:5000/api/music/update", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ updates: updatesPayload }),
+            body: JSON.stringify({ changes: updatesPayload.flatMap(update =>
+                Object.entries(update).filter(([field]) => field !== "track_id")
+                    .map(([field, value]) => ({track_id: update.track_id, field, value}))) }),
             credentials: "include"
         });
 

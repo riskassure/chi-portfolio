@@ -13,41 +13,21 @@ def get_music_catalog():
     if request.method == "OPTIONS":
         return jsonify({"status": "CORS preflight ok"}), 200
 
+    from services.music.music_catalog import read_catalog
+    import json
+    page = max(1, request.args.get('page', default=1, type=int))
+    per_page = min(100, max(1, request.args.get('per_page', default=25, type=int)))
     try:
-        page = request.args.get('page', default=1, type=int)
-        per_page = request.args.get('per_page', default=25, type=int)
-        offset = (page - 1) * per_page
-
-        # Connect to SQLite using the absolute path string from config
-        conn = sqlite3.connect(str(DB_PATH))
-        conn.row_factory = sqlite3.Row 
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT COUNT(*) FROM music_catalog;")
-        total_records = cursor.fetchone()[0]
-        
-        cursor.execute("""
-            SELECT spotify_playlist, genre, composition_name, unit_name, 
-                   track_name, composer, performer, album_name, 
-                   release_date, duration_string, popularity, track_id 
-            FROM music_catalog
-            LIMIT ? OFFSET ?;
-        """, (per_page, offset))
-        
-        catalog_list = [dict(row) for row in cursor.fetchall()]
-        total_pages = (total_records + per_page - 1) // per_page
-        
-        return jsonify({
-            "total_records": total_records,
-            "page": page,
-            "per_page": per_page,
-            "total_pages": total_pages,
-            "data": catalog_list
-        })
-    except sqlite3.Error as e:
-        return jsonify({"error": f"Database transaction failed: {str(e)}"}), 500
-    finally:
-        conn.close()
+        sorts = json.loads(request.args.get('sort', '[]'))
+        if not isinstance(sorts, list) or not all(isinstance(rule, dict) for rule in sorts):
+            return jsonify(error="Invalid sorting parameters."), 400
+    except ValueError:
+        return jsonify(error="Invalid sorting parameters."), 400
+    try:
+        return jsonify(read_catalog(DB_PATH, page, per_page, request.args.get('search', ''),
+                                    request.args.get('playlist', 'all'), sorts))
+    except sqlite3.Error:
+        return jsonify(error="The music catalog could not be read."), 500
 
 @music_bp.route("/api/music/update", methods=["POST", "OPTIONS"])
 def update_music_catalog():
@@ -69,6 +49,8 @@ def update_music_catalog():
         try:
             conn = sqlite3.connect(str(DB_PATH))
             cursor = conn.cursor()
+            from services.music.music_catalog import tables
+            tables(conn)
             
             for change in payload_changes:
                 track_id = change.get("track_id")
@@ -80,6 +62,8 @@ def update_music_catalog():
 
                 query = f"UPDATE music_catalog SET {field} = ? WHERE track_id = ?;"
                 cursor.execute(query, (new_value, track_id))
+                cursor.execute("INSERT OR REPLACE INTO music_overrides VALUES (?, ?, ?)",
+                               (track_id, field, new_value))
 
             conn.commit()
             return jsonify({"success": True, "message": f"Successfully committed {len(payload_changes)} adjustments."})

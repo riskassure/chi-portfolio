@@ -21,6 +21,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'None' if IS_PRODUCTION else 'Lax'
 
 # Master password configuration (Easy to move to database/hashes later)
 ADMIN_PASSWORD = "SuperSecretPassword123"
+app.config['ADMIN_PASSWORD'] = ADMIN_PASSWORD
 
 
 # ==========================================================================
@@ -62,7 +63,7 @@ def login_admin():
         return jsonify({"status": "CORS preflight ok"}), 200
 
     data = request.get_json() or {}
-    if data.get("password") == ADMIN_PASSWORD:
+    if data.get("password") == app.config['ADMIN_PASSWORD']:
         session["is_admin"] = True
         return jsonify({"success": True, "message": "Welcome Admin."})
     return jsonify({"success": False, "message": "Invalid credentials."}), 401
@@ -83,10 +84,12 @@ def check_session_status():
 from routes.admin_music import music_bp
 from routes.admin_photography import photography_bp
 from routes.admin_math import math_bp
+from routes.music_spotify import spotify_bp
 
 app.register_blueprint(music_bp)
 app.register_blueprint(photography_bp)
 app.register_blueprint(math_bp)
+app.register_blueprint(spotify_bp)
 
 
 # ==========================================================================
