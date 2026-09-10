@@ -190,7 +190,26 @@
         return template.innerHTML;
     }
 
+    function normalizeSketchProofHeading(clean) {
+        /*
+        * A TeX \par before "Sketch of proof." can be flattened inside the
+        * current list item. Keep the proof in that item, but start its heading
+        * on a new visual line.
+        */
+        clean = clean.replace(
+            /<strong\b([^>]*)>\s*Sketch of proof\.\s*<\/strong>/gi,
+            `<strong$1 style="
+                display:block;
+                margin-top:0.75rem;
+                margin-bottom:0.2rem;
+            ">Sketch of proof.</strong>`
+        );
+
+        return clean;
+    }
+
     window.MathCmsRenderProofLayout = {
-        splitProofLeadParagraphs
+        splitProofLeadParagraphs,
+        normalizeSketchProofHeading
     };
 })();

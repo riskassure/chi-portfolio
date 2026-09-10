@@ -48,7 +48,40 @@
         return template.innerHTML;
     }
 
+    function normalizeStandardListEnvironments(clean) {
+        clean = clean.replace(
+            /\\begin{enumerate}/gi,
+            "<ol class='pm-tex-list' style='margin:0.65rem 0 0.9rem; padding-left:1.75rem;'>"
+        );
+        clean = clean.replace(/\\end{enumerate}/gi, "</ol>");
+
+        clean = clean.replace(
+            /\\begin{itemize}/gi,
+            "<ul class='pm-tex-list' style='margin:0.65rem 0 0.9rem; padding-left:1.75rem; list-style-type:disc;'>"
+        );
+        clean = clean.replace(/\\end{itemize}/gi, "</ul>");
+
+        clean = clean.replace(
+            /\\item/gi,
+            "<li style='margin-bottom:0.6rem; padding-block:0.06rem; line-height:1.5;'>"
+        );
+
+        return clean;
+    }
+
+    function normalizeBibliographyEnvironments(clean) {
+        clean = clean.replace(
+            /\\begin\{(?:the)?bibliography\}\{[\s\S]*?\}/gi,
+            "<div style='margin-top: 1.5rem; border-top: 1px dashed #cbd5e1; padding-top: 1rem;'><strong>References & Bibliography:</strong><ul style='list-style-type: square; padding-left: 1.5rem;'>"
+        );
+        clean = clean.replace(/\\end\{(?:the)?bibliography\}/gi, "</ul></div>");
+
+        return clean;
+    }
+
     window.MathCmsRenderLegacyLists = {
-        normalizeLegacyRomanList
+        normalizeLegacyRomanList,
+        normalizeStandardListEnvironments,
+        normalizeBibliographyEnvironments
     };
 })();

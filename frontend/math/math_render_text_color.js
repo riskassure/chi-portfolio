@@ -34,8 +34,21 @@ function normalizeTextColorMacros(value) {
 }
 
 
+    function normalizeLegacyTableColors(clean) {
+        // PlanetMath table color macros.
+        // These commonly appear as \red0.01, \blue0.20, or \red{0.01}.
+        clean = clean.replace(/\\red\{([^{}]*)\}/gi, '<span class="pm-tex-red">$1</span>');
+        clean = clean.replace(/\\blue\{([^{}]*)\}/gi, '<span class="pm-tex-blue">$1</span>');
+
+        clean = clean.replace(/\\red\s*([+-]?\d+(?:\.\d+)?)/gi, '<span class="pm-tex-red">$1</span>');
+        clean = clean.replace(/\\blue\s*([+-]?\d+(?:\.\d+)?)/gi, '<span class="pm-tex-blue">$1</span>');
+
+        return clean;
+    }
+
 window.MathCmsRenderTextColor = {
-    normalizeTextColorMacros
+    normalizeTextColorMacros,
+    normalizeLegacyTableColors
 };
 
 })();

@@ -133,9 +133,21 @@ function normalizeDiagramImageUrls(
 }
 
 
+    function normalizeStarredIncludeGraphics(clean) {
+        // Normalize the starred legacy form so the existing image converter
+        // handles both \includegraphics and \includegraphics*.
+        clean = clean.replace(
+            /\\includegraphics\*/gi,
+            "\\includegraphics"
+        );
+
+        return clean;
+    }
+
 window.MathCmsRenderImages = {
     normalizeLatexImageArtifacts,
-    normalizeDiagramImageUrls
+    normalizeDiagramImageUrls,
+    normalizeStarredIncludeGraphics
 };
 
 })();

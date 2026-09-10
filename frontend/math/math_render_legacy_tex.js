@@ -121,9 +121,17 @@ function normalizeCommonTextAccentMacros(tex) {
     return output;
 }
 
+    function removeNoBreakCommands(clean) {
+        // TeX line-break control has no visible HTML or MathJax meaning.
+        clean = clean.replace(/\\nobreak\b/g, "");
+
+        return clean;
+    }
+
 window.MathCmsRenderLegacyTex = {
     normalizeLegacyOverFractions,
-    normalizeCommonTextAccentMacros
+    normalizeCommonTextAccentMacros,
+    removeNoBreakCommands
 };
 
 })();

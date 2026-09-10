@@ -74,9 +74,52 @@
         return result;
     }
 
+    function protectXyMatrixHtml(clean) {
+        // Temporarily protect generated xymatrix HTML while literal angle brackets
+        // in the remaining TeX are normalized.
+        const xymatrixHtmlBlocks = [];
+
+        // Protect the entire underbraced xymatrix wrapper first.
+        clean = clean.replace(
+            /<figure\b[^>]*class=["'][^"']*\bpm-underbraced-xymatrix\b[^"']*["'][^>]*>[\s\S]*?<\/figure>/gi,
+            (figureHtml) => {
+                const index = xymatrixHtmlBlocks.length;
+                xymatrixHtmlBlocks.push(figureHtml);
+                return `PMXYMATRIXHTMLPLACEHOLDER${index}END`;
+            }
+        );
+
+        // Protect ordinary generated xymatrix tables.
+        clean = clean.replace(
+            /<table\b[^>]*class=["'][^"']*\bpm-xymatrix-table\b[^"']*["'][^>]*>[\s\S]*?<\/table>/gi,
+            (tableHtml) => {
+                const index = xymatrixHtmlBlocks.length;
+                xymatrixHtmlBlocks.push(tableHtml);
+                return `PMXYMATRIXHTMLPLACEHOLDER${index}END`;
+            }
+        );
+
+        return { text: clean, blocks: xymatrixHtmlBlocks };
+    }
+
+    function restoreXyMatrixHtml(clean, xymatrixHtmlBlocks) {
+        // Restore the generated HTML after TeX angle-bracket normalization.
+        clean = clean.replace(
+            /PMXYMATRIXHTMLPLACEHOLDER(\d+)END/g,
+            (match, indexText) => {
+                const index = Number(indexText);
+                return xymatrixHtmlBlocks[index] ?? match;
+            }
+        );
+
+        return clean;
+    }
+
     window.MathCmsRenderXyCleanup = {
         stripXyMatrixSetupMacros,
         renderXyMatrixConnectorMath,
-        normalizeXyMatrixHtmlArtifacts
+        normalizeXyMatrixHtmlArtifacts,
+        protectXyMatrixHtml,
+        restoreXyMatrixHtml
     };
 })();

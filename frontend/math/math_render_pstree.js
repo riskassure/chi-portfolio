@@ -418,8 +418,19 @@
         );
     }
 
+    function replaceUnsupportedPspictureEnvironments(clean) {
+        // existing pspicture/list/etc cleanup continues below...
+        clean = clean.replace(
+            /\\begin\{pspicture\}[\s\S]*?\\end\{pspicture\}/gi,
+            `<div class="img-placeholder mathjax-diagnostic-ignore"><em>[PSTricks diagram placeholder]</em></div>`
+        );
+
+        return clean;
+    }
+
     window.MathCmsRenderPstree = {
         convertSimpleDeductionPstreeToHtml,
-        convertRootedTreePstreeToHtml
+        convertRootedTreePstreeToHtml,
+        replaceUnsupportedPspictureEnvironments
     };
 })();
