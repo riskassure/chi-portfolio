@@ -1,4 +1,4 @@
-// frontend/math/math_render_xy_conversion.js
+// frontend/math/render/xy/math_render_xy_conversion.js
 
 (function () {
     function convertUnderbracedXyMatrixToHtml(tex) {

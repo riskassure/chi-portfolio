@@ -1,4 +1,4 @@
-// frontend/math/math_render_tabular.js
+// frontend/math/render/math_render_tabular.js
 
 (function () {
     function convertTabularEnvironmentsToHtml(clean) {

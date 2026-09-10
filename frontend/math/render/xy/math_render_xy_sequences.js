@@ -1,4 +1,4 @@
-// frontend/math/math_render_xy_sequences.js
+// frontend/math/render/xy/math_render_xy_sequences.js
 
 (function () {
     function renderMixedXyMatrixWrapperContent(content) {

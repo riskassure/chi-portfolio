@@ -1,4 +1,4 @@
-// frontend/math/math_render_comments.js
+// frontend/math/render/math_render_comments.js
 
 (function () {
     function removeLatexComments(clean) {

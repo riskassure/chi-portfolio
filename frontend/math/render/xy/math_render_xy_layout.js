@@ -1,4 +1,4 @@
-// frontend/math/math_render_xy_layout.js
+// frontend/math/render/xy/math_render_xy_layout.js
 
 (function () {
     function calculateXyMatrixArrowLayout(sourceRows) {

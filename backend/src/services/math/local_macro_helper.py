@@ -170,7 +170,7 @@ def extract_local_newcommands(
 ) -> LocalMacroHarvestResult:
     """
     Harvest the concept-local ``\\newcommand`` subset currently supported
-    by frontend/math/math_local_macros.js.
+    by frontend/math/render/math_local_macros.js.
 
     Supported forms:
 

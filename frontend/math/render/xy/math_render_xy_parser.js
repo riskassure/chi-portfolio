@@ -1,4 +1,4 @@
-// frontend/math/math_render_xy_parser.js
+// frontend/math/render/xy/math_render_xy_parser.js
 
 (function () {
     function findXyMatrixBodyStart(text, startIndex) {

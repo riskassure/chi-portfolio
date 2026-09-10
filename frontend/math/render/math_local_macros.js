@@ -1,4 +1,4 @@
-// frontend/math/math_local_macros.js
+// frontend/math/render/math_local_macros.js
 
 (function (root) {
     "use strict";

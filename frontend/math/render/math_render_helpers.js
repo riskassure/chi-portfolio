@@ -1,4 +1,4 @@
-// frontend/math/math_render_helpers.js
+// frontend/math/render/math_render_helpers.js
 
 (function () {
     const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";

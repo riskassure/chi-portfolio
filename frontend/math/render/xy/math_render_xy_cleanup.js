@@ -1,4 +1,4 @@
-// frontend/math/math_render_xy_cleanup.js
+// frontend/math/render/xy/math_render_xy_cleanup.js
 
 (function () {
     function stripXyMatrixSetupMacros(tex) {

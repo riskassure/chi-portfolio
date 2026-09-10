@@ -1,4 +1,4 @@
-// frontend/math/math_render_xy_cells.js
+// frontend/math/render/xy/math_render_xy_cells.js
 
 (function () {
     function renderDiagonalArrow(

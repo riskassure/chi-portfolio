@@ -1,4 +1,4 @@
-// frontend/math/math_render_xy_table.js
+// frontend/math/render/xy/math_render_xy_table.js
 
 (function () {
     const XY_PLAIN_HORIZONTAL_LINE = "__PM_XY_PLAIN_HORIZONTAL_LINE__";
