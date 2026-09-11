@@ -167,6 +167,36 @@ class SpotifyTests(unittest.TestCase):
         self.assertNotIn("access_token", status.text)
         self.assertNotIn("refresh_token", status.text)
 
+    def test_manual_refresh_requires_admin_and_valid_csrf(self):
+        path = '/api/music/spotify/refresh'
+        with patch('services.music.spotify_jobs.run_local_job', return_value={'status': 'ok'}) as run:
+            self.assertEqual(self.client.post(path, base_url=self.base, json={}).status_code, 400)
+            with self.client.session_transaction(base_url=self.base) as session:
+                session['spotify_update_csrf'] = 'valid'
+            response = self.client.post(path, base_url=self.base, json={'csrf': 'valid'})
+            self.assertEqual(response.status_code, 200)
+            run.assert_called_once_with(force=True)
+            with self.client.session_transaction(base_url=self.base) as session:
+                session.clear()
+            self.assertEqual(self.client.post(path, base_url=self.base, json={'csrf': 'valid'}).status_code, 403)
+            self.assertEqual(run.call_count, 1)
+
+    def test_manual_refresh_busy_and_backoff_responses(self):
+        with self.client.session_transaction(base_url=self.base) as session:
+            session['spotify_update_csrf'] = 'valid'
+        for status, code in [('busy', 409), ('waiting', 429), ('error', 502)]:
+            with patch('services.music.spotify_jobs.run_local_job', return_value={'status': status}):
+                response = self.client.post('/api/music/spotify/refresh', base_url=self.base, json={'csrf': 'valid'})
+                self.assertEqual(response.status_code, code)
+
+    def test_manual_refresh_preflight_needs_no_session_and_never_runs_job(self):
+        with self.client.session_transaction(base_url=self.base) as session:
+            session.clear()
+        with patch('services.music.spotify_jobs.run_local_job') as run:
+            response = self.client.options('/api/music/spotify/refresh', base_url=self.base)
+            self.assertEqual(response.status_code, 204)
+            run.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -42,7 +42,7 @@ function unlockLocalPageControls() {
     if (!adminDock) return;
     
     // Force the global bar to expand vertically to accommodate text elements easily
-    adminDock.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; min-height: 45px; background-color: #34495e;";
+    adminDock.style.cssText = "display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; padding: 10px 20px; min-height: 45px; background-color: #34495e;";
 
 }
 

@@ -32,7 +32,7 @@ def timestamp(value):
     return parsed.astimezone(timezone.utc).isoformat(timespec="microseconds")
 
 
-def import_history(archive, database):
+def import_history(archive, database, on_import=None):
     """Atomic import. Exact repeats of (track, end timestamp, duration) count once."""
     database = Path(database)
     database.parent.mkdir(parents=True, exist_ok=True)
@@ -75,6 +75,8 @@ def import_history(archive, database):
                     stats["inserted" if cursor.rowcount else "duplicate_records"] += 1
         count, first, last = connection.execute(
             "SELECT COUNT(*), MIN(ended_at), MAX(ended_at) FROM spotify_history").fetchone()
+        if on_import is not None:
+            on_import(connection)
     return {**stats, "stored_records": count, "first_record": first, "last_record": last}
 
 

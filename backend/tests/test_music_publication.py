@@ -1,5 +1,5 @@
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
 from pathlib import Path
 import sqlite3
@@ -13,6 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from services.music.music_catalog import publish, read_catalog
 from services.music.spotify_history import import_history
 from services.music.spotify_jobs import run_job
+from services.music.spotify_jobs import run_local_job
+from services.music.spotify_auth import SpotifyError
 from services.music.spotify_api import SpotifyApi, SpotifyApiError
 from services.music.spotify_sync import collect_recent, connect, sync_playlists
 
@@ -105,6 +107,41 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(tracks['a'*22]['playlists'], {'x', 'y'})
         sync_playlists(api, self.history)
         self.assertEqual(api.calls, 2)
+
+    def test_missed_weekly_run_catches_up_on_next_invocation(self):
+        with patch('services.music.spotify_jobs.collect_recent', return_value=0), patch(
+                'services.music.spotify_jobs.sync_playlists', return_value=(self.candidates, {})) as sync:
+            run_job(self.catalog, self.history, None, self.now)
+            returned = self.now + timedelta(days=9)
+            result = run_job(self.catalog, self.history, None, returned)
+            self.assertIn('publication', result)
+            self.assertEqual(sync.call_count, 2)
+            # Another invocation after sign-in does not publish twice.
+            run_job(self.catalog, self.history, None, returned + timedelta(minutes=15))
+            self.assertEqual(sync.call_count, 2)
+
+    def test_offline_logon_retries_without_losing_due_update(self):
+        with patch('services.music.spotify_jobs.collect_recent', side_effect=SpotifyError('Network unavailable')):
+            self.assertEqual(run_job(self.catalog, self.history, None, self.now)['status'], 'error')
+        with patch('services.music.spotify_jobs.collect_recent', return_value=0), patch(
+                'services.music.spotify_jobs.sync_playlists', return_value=(self.candidates, {})):
+            result = run_job(self.catalog, self.history, None, self.now + timedelta(minutes=5))
+            self.assertIn('publication', result)
+
+    def test_manual_update_bypasses_weekly_interval(self):
+        with patch('services.music.spotify_jobs.collect_recent', return_value=0), patch(
+                'services.music.spotify_jobs.sync_playlists', return_value=(self.candidates, {})) as sync:
+            run_job(self.catalog, self.history, None, self.now)
+            self.assertIn('publication', run_job(self.catalog, self.history, None, self.now, force=True))
+            self.assertEqual(sync.call_count, 2)
+
+    def test_manual_and_scheduled_jobs_share_lock(self):
+        with closing(sqlite3.connect(self.root / 'spotify-job-lock.db')) as db:
+            db.execute('BEGIN IMMEDIATE')
+            with patch('services.music.spotify_jobs.token_path', return_value=self.root/'tokens.json'), patch(
+                    'services.music.spotify_jobs.run_job') as run:
+                self.assertEqual(run_local_job(force=True)['status'], 'busy')
+                run.assert_not_called()
 
     def test_pagination_rejects_external_urls_before_reading_token(self):
         with patch('services.music.spotify_api.SpotifyAuth') as auth:

@@ -46,6 +46,26 @@ end timestamps, and listening durations are stored in `spotify-history.db` besid
 the private token file. IP addresses, devices, locations and other export fields
 are not stored. Podcast and other records without track URIs are excluded.
 The entire available music history is retained privately for later recalculation.
+
+### Automatic download import
+
+The installed task and **Update now** also check the Windows user's
+`~/Downloads` folder (on this laptop, `C:/Users/riska/Downloads`). Request and
+download Extended Streaming History yourself; Spotify's export request and
+download are not automated. Leave `spotify` in the ZIP filename, for example
+`my_spotify_data.zip` or `my_spotify_data (1).zip`. Other ZIPs are ignored.
+The existing 15-minute task picks it up while logged in and online, or you can
+press **Update now**. Files modified within the last minute or accompanied by
+download-in-progress files are deferred to a later check.
+
+SHA-256 fingerprints in the private history database identify previously imported
+contents, even when renamed. Recording the fingerprint and marking publication
+pending happen in the same transaction as the history import. New archives force
+a ranking refresh without waiting a week; failed Spotify requests keep that refresh
+pending for retry. The same completed archive does not repeatedly trigger refreshes.
+Malformed archives are left untouched and reported to the admin; corrected files
+can be retried. Originals are never moved, deleted, or extracted. Archives must be
+at most 512 MiB, with individual history JSON files at most 100 MiB.
 Exact repeated `(track ID, end timestamp, duration)` tuples count once, including
 across imports. Malformed track records roll back the import.
 
@@ -74,9 +94,28 @@ The laptop must be awake and online. This does not deploy the website or change
 power settings. The job runs independently of Flask and the frontend server.
 Disable it with `Disable-ScheduledTask -TaskName 'Chi Portfolio Spotify Refresh'`.
 
+After a shutdown, the sign-in trigger checks the persisted last successful
+publication immediately. If seven days have elapsed, that run publishes the missed
+weekly update; it does not wait for another weekly date. This is a per-user task,
+so it runs after Windows sign-in, not on the lock screen before anyone logs in.
+`StartWhenAvailable` catches missed scheduled starts, and the task requires a
+network connection. Failed runs retry every five minutes up to three times, in
+addition to the regular 15-minute schedule. Temporary network/local failures use
+a five-minute backoff; Spotify HTTP failures retain the longer one-hour minimum
+and any longer Retry-After. No update can succeed while Spotify is unreachable or
+reauthorization is required.
+
+The music page's admin controls include **Update now**. It performs a full playlist
+and ranking refresh even if the weekly update is not due, using an authenticated,
+CSRF-protected POST to `/api/music/spotify/refresh`. The button shows progress and
+reloads the displayed catalog after success. A concurrent update or a Spotify
+retry window is reported without launching duplicate work or bypassing throttling.
+The manual and scheduled paths share the same cross-process SQLite lock. Manual
+updates require the local backend to be running; scheduled updates do not.
+
 The scheduler code checks the seven-day interval itself, so a missed weekly run
 can be performed by the next successful run. A separate SQLite lock prevents
-overlapping jobs. Spotify failures back off for at least an hour (respecting a
+overlapping jobs. Spotify HTTP failures back off for at least an hour (respecting a
 longer Retry-After) and retain the previous publication. Completed playlists are
 cached by snapshot ID privately; failed partial playlist reads are never cached.
 Current playlists returning 403/404 are excluded and the publication reports how
@@ -102,7 +141,7 @@ remain private. `/api/music/spotify/status` is accessible only to the local admi
 their timestamps are not interchangeable with export end timestamps. They are
 stored separately in `recent_activity`, deduplicated by track ID and played_at,
 and NEVER added to duration-verified counts. Future exports are still required to
-verify new 30-second plays. Automatic publication refreshes membership and the
+verify new 30-second plays; downloaded ZIPs are now imported automatically. Automatic publication refreshes membership and the
 rolling window, but cannot invent missing listening durations. The API also cannot
 guarantee complete collection after sleep/offline gaps. The public history-through
 date makes the export cutoff visible.

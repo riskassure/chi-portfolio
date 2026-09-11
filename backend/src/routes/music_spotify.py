@@ -15,6 +15,8 @@ def local_admin_only():
     if (os.environ.get("FLASK_ENV") == "production" or
             request.remote_addr != "127.0.0.1" or request.host != "127.0.0.1:5000"):
         return jsonify(error="Spotify setup is available only at http://127.0.0.1:5000 on this laptop."), 403
+    if request.method == "OPTIONS":
+        return "", 204
     if not session.get("is_admin") and request.endpoint != "spotify.login":
         if request.endpoint == "spotify.connect" and request.method == "GET":
             return redirect("/api/music/spotify/login")
@@ -117,5 +119,22 @@ def sync_status():
             if db.execute("SELECT 1 FROM sqlite_master WHERE name='sync_state'").fetchone():
                 row = db.execute("SELECT value FROM sync_state WHERE key='job_status'").fetchone()
                 report = json.loads(row[0]) if row else None
-    return jsonify(connected=auth.connected(), last_job=report,
+    session.setdefault("spotify_update_csrf", secrets.token_urlsafe(32))
+    return jsonify(connected=auth.connected(), last_job=report, update_csrf=session["spotify_update_csrf"],
                    counting_rule="Only export records with at least 30 seconds count. Recent API events await duration verification.")
+
+
+@spotify_bp.post("/refresh")
+def refresh_catalog():
+    import sqlite3
+    from services.music.spotify_jobs import run_local_job
+    data = request.get_json(silent=True)
+    expected = session.get("spotify_update_csrf", "")
+    supplied = data.get("csrf") if isinstance(data, dict) else None
+    if not expected or not isinstance(supplied, str) or not secrets.compare_digest(expected.encode(), supplied.encode()):
+        return jsonify(status="error", message="Reload the music page and try again."), 400
+    try:
+        report = run_local_job(force=True)
+    except (OSError, ValueError, sqlite3.Error):
+        return jsonify(status="error", message="The local update could not start. Check the backend and try again."), 500
+    return jsonify(report), {"ok": 200, "busy": 409, "waiting": 429, "error": 502}[report["status"]]
