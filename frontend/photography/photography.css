@@ -3,6 +3,16 @@
    ========================================================================== */
 
 /* The outer grid array container */
+.google-photos-connect {
+    display: inline-block;
+    padding: 10px 16px;
+    background: #2563eb;
+    color: white;
+    border-radius: 5px;
+    text-decoration: none;
+}
+.google-photos-connect:focus-visible { outline: 3px solid #172554; outline-offset: 3px; }
+
 .gallery-grid {
     display: grid;
     /* 📸 ONE PICTURE PER ROW: Forces a strict single-column stream layout */

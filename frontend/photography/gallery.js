@@ -9,17 +9,32 @@ const galleryContainer = document.getElementById("photography-gallery");
 let isAdmin = false;
 let photoPageSize = 3;         // Curation Grid Density limit variable
 let refreshIntervalMinutes = 5; // Museum cycle execution pace anchor
+let navbarSizeObserver = null;
 let rotationTimerId = null;    // Tracks the background window interval loop
 
 // 🛠️ HOOK: Called automatically by navbar.js ONLY if authenticated!
 function unlockLocalPageControls() {
+    const googleControls = document.getElementById('google-photos-controls');
+    if (googleControls) googleControls.hidden = false;
     isAdmin = true; // Flip the local layout state switch to enable editing cards
     
     const adminDock = document.getElementById('admin-controls-dock');
     if (!adminDock) return;
     
-    // Force the admin controls bar to remain completely STICKY at the top of the viewport
-    adminDock.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; min-height: 45px; background-color: #34495e; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.15);";
+    // Keep the edit strip below the navigation, including after resizing or zooming.
+    adminDock.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; min-height: 45px; background-color: #34495e; position: sticky; top: var(--photography-navbar-height, 0px); z-index: 999; box-shadow: 0 2px 10px rgba(0,0,0,0.15);";
+
+    const navbar = document.querySelector('.navbar');
+    if (navbar && !navbarSizeObserver) {
+        const updateNavbarHeight = () => {
+            adminDock.style.setProperty('--photography-navbar-height', `${navbar.getBoundingClientRect().height}px`);
+        };
+        updateNavbarHeight();
+        navbarSizeObserver = new ResizeObserver(updateNavbarHeight);
+        navbarSizeObserver.observe(navbar);
+    } else if (navbar) {
+        adminDock.style.setProperty('--photography-navbar-height', `${navbar.getBoundingClientRect().height}px`);
+    }
 
     // Safeguard - if control panel already exists, do NOT duplicate it
     if (document.getElementById('admin-gallery-controls')) {
@@ -81,6 +96,10 @@ function unlockLocalPageControls() {
 }
 
 // Helper to construct the dynamic cards on the page from a list of records
+function escapePhotoText(value) {
+    return String(value).replace(/[&<>"']/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
+}
+
 function renderGalleryCards(photoList) {
     galleryContainer.innerHTML = "";
 
@@ -99,13 +118,13 @@ function renderGalleryCards(photoList) {
     photoList.forEach(photo => {
         try {
             const imageSourcePath = `../${photo.file_path || ''}`;
-            const photoTitleClean = photo.title || 'Untitled Landscape';
+            const photoTitleClean = escapePhotoText(photo.title || 'Untitled Landscape');
             
             const locationMarkup = isAdmin 
                 ? `
                     <div class="admin-edit-panel" style="margin-top: 14px; background: #f8fafc; padding: 12px; border-radius: 4px; border: 1px solid #e2e8f0; width: 100%; box-sizing: border-box;">
                         <label style="display:block; font-size: 0.8rem; font-weight:bold; margin-bottom:4px; color:#34495e;">Location Context:</label>
-                        <input type="text" id="loc-${photo.image_id}" value="${photo.location_name || ''}" placeholder="e.g. Yosemite Valley, CA" style="width:100%; padding:5px; margin-bottom:8px; border:1px solid #ccc; border-radius:3px; box-sizing: border-box;">
+                        <input type="text" id="loc-${photo.image_id}" value="${escapePhotoText(photo.location_name || '')}" placeholder="e.g. Yosemite Valley, CA" style="width:100%; padding:5px; margin-bottom:8px; border:1px solid #ccc; border-radius:3px; box-sizing: border-box;">
                         
                         <div style="display:flex; gap: 8px;">
                             <div style="flex:1;">
@@ -123,7 +142,7 @@ function renderGalleryCards(photoList) {
                   `
                 : `
                     <p class="photo-location">
-                        📍 ${photo.location_name || 'Unknown Location'}
+                        📍 ${escapePhotoText(photo.location_name || 'Unknown Location')}
                     </p>
                   `;
 

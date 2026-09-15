@@ -85,11 +85,13 @@ from routes.admin_music import music_bp
 from routes.admin_photography import photography_bp
 from routes.admin_math import math_bp
 from routes.music_spotify import spotify_bp
+from routes.google_photos import google_photos_bp
 
 app.register_blueprint(music_bp)
 app.register_blueprint(photography_bp)
 app.register_blueprint(math_bp)
 app.register_blueprint(spotify_bp)
+app.register_blueprint(google_photos_bp)
 
 
 # ==========================================================================

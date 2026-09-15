@@ -1,0 +1,15 @@
+body { margin: 0; background: #f5f7fa; color: #243247; font: 16px/1.5 system-ui, sans-serif; }
+main { max-width: 1100px; margin: auto; padding: 32px 20px; }
+h1 { margin-bottom: 8px; }
+a { color: #1d4ed8; }
+button { background: #2563eb; color: white; border: 0; padding: 10px 16px; border-radius: 6px; cursor: pointer; font: inherit; }
+button:disabled { opacity: .55; cursor: wait; }
+button:focus-visible, a:focus-visible { outline: 3px solid #0f172a; outline-offset: 3px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
+.drafts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; }
+article { background: white; border: 1px solid #dbe2ea; border-radius: 8px; padding: 16px; }
+article img { width: 100%; height: 220px; object-fit: contain; }
+label { display: block; margin: 10px 0; }
+input { display: block; box-sizing: border-box; width: 100%; padding: 8px; border: 1px solid #94a3b8; border-radius: 4px; font: inherit; }
+#progress { min-height: 24px; }
+[hidden] { display: none !important; }
