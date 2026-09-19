@@ -55,3 +55,130 @@ body {
 .nav-links a:hover {
     color: #3498db;                 /* Changes text to a crisp sky blue on hover */
 }
+
+/* Keep navigation legible when page-specific link colors are applied later. */
+.home-page .nav-links a,
+.bio-page .nav-links a {
+    color: #f4f7f8;
+    font-weight: 600;
+}
+
+.home-page .nav-links a:hover,
+.bio-page .nav-links a:hover {
+    color: #75d2cd;
+}
+
+.home-page, .bio-page { color: #203347; background: #f5f7f6; line-height: 1.6; }
+.home-page *, .bio-page * { box-sizing: border-box; }
+.home-page main, .bio-page main { max-width: 1200px; margin: auto; padding: 0 30px; }
+.home-skip-link { position: fixed; left: 16px; top: -100px; z-index: 2000; padding: 10px 16px; background: #fff; color: #203347; }
+.home-skip-link:focus { top: 10px; }
+.home-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .92fr); align-items: stretch; margin-top: 64px; background: #fff; border-top: 5px solid #267b79; box-shadow: 0 18px 55px rgba(36, 55, 71, .08); }
+.home-hero-copy { display: flex; flex-direction: column; justify-content: center; padding: clamp(40px, 6vw, 72px); }
+.home-eyebrow { margin: 0 0 12px; color: #256d6b; font-size: .8rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.home-hero h1 { margin: 0; font-size: clamp(2.7rem, 5vw, 5rem); line-height: 1.08; letter-spacing: -.05em; }
+.home-lede { max-width: 600px; margin: 24px 0 30px; font-size: 1.15rem; color: #506477; }
+.home-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 20px; }
+.home-button { display: inline-block; padding: 12px 19px; border-radius: 5px; background: #245f65; color: white; font-weight: 700; text-decoration: none; }
+.home-button:hover { background: #173f44; }
+.home-text-link, .home-card a, .bio-page a { color: #245f65; font-weight: 700; text-underline-offset: 4px; }
+.home-page a:focus-visible, .bio-page a:focus-visible { outline: 3px solid #b46712; outline-offset: 4px; }
+.home-credentials { display: grid; grid-template-columns: repeat(3, 1fr); gap: 17px; margin: 43px 0 0; padding-top: 25px; border-top: 1px solid #dce4e8; }
+.home-credentials div { min-width: 0; }
+.home-credentials dt { color: #72808b; font-size: .67rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.home-credentials dd { margin: 3px 0 0; color: #203347; font-size: .86rem; font-weight: 700; }
+.home-hero-image { position: relative; display: flex; min-height: 580px; margin: 0; overflow: hidden; }
+.home-hero-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.home-hero-image figcaption { position: absolute; display: flex; justify-content: space-between; align-items: center; gap: 15px; right: 20px; bottom: 20px; left: 20px; margin: 0; padding: 11px 14px; color: #fff; background: rgba(20, 38, 51, .82); backdrop-filter: blur(5px); font-size: .76rem; }
+.home-hero-image figcaption a { color: #fff; font-weight: 700; text-underline-offset: 3px; }
+.home-statement { display: flex; justify-content: space-between; align-items: end; gap: 45px; max-width: 960px; margin: 80px auto 90px; padding: 0 34px 28px; border-bottom: 1px solid #b8cccd; }
+.home-statement p { max-width: 750px; margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.55rem, 3vw, 2.35rem); line-height: 1.4; color: #304957; }
+.home-statement a { flex-shrink: 0; color: #245f65; font-size: .85rem; font-weight: 700; text-underline-offset: 4px; }
+.home-section { padding: 0 0 90px; }
+.home-section-heading { display: flex; justify-content: space-between; align-items: end; gap: 40px; margin-bottom: 32px; }
+.home-section-heading > p { max-width: 300px; margin: 0 0 5px; color: #637180; }
+.home-section h2, .home-contact h2 { margin: 0 0 27px; font-size: clamp(1.7rem, 3vw, 2.5rem); line-height: 1.2; letter-spacing: -.035em; }
+.home-section-heading h2 { margin-bottom: 0; }
+.home-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.home-card { display: flex; flex-direction: column; min-height: 280px; padding: 30px; background: white; border-top: 3px solid #267b79; box-shadow: 0 6px 24px rgba(36, 55, 71, .05); transition: transform .25s ease, box-shadow .25s ease; }
+.home-card:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(36, 55, 71, .1); }
+.home-card-top { display: flex; justify-content: space-between; align-items: center; }
+.home-card-number { color: #256d6b; font-size: .8rem; font-weight: 700; }
+.home-card-label { color: #778590; font-size: .67rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.home-card h3 { margin: 35px 0 12px; font-size: 1.55rem; letter-spacing: -.025em; }
+.home-card p { max-width: 470px; margin: 0 0 26px; color: #506477; font-size: 1rem; }
+.home-card a { margin-top: auto; }
+.home-contact { display: flex; justify-content: space-between; align-items: center; gap: 25px; padding: 40px 45px; margin-bottom: 70px; color: #fff; background: #203347; }
+.home-contact .home-eyebrow { color: #8cc0bd; }
+.home-contact h2 { margin-bottom: 8px; }
+.home-contact p:last-child { margin: 0; color: #d6e0e6; }
+.home-contact .home-button { background: #fff; color: #203347; }
+.home-contact .home-button:hover { background: #dcebea; }
+.bio-page main { max-width: 1080px; padding-top: 64px; padding-bottom: 80px; }
+.bio-skip-link { position: fixed; left: 16px; top: -100px; z-index: 2000; padding: 10px 16px; background: #fff; color: #203347; }
+.bio-skip-link:focus { top: 10px; }
+.bio-hero { position: relative; overflow: hidden; padding: clamp(35px, 6vw, 70px); background: #fff; border-top: 5px solid #267b79; box-shadow: 0 18px 55px rgba(36, 55, 71, .08); }
+.bio-hero::after { content: ""; position: absolute; width: 260px; height: 260px; left: -135px; bottom: -145px; border: 42px solid #e7f0ef; border-radius: 50%; }
+.bio-hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 320px; align-items: center; gap: clamp(35px, 6vw, 70px); }
+.bio-hero-copy { min-width: 0; }
+.bio-page h1 { position: relative; z-index: 1; margin: 0 0 22px; max-width: 760px; font-size: clamp(3rem, 7vw, 5.6rem); line-height: .98; letter-spacing: -.055em; }
+.bio-page .bio-intro { position: relative; z-index: 1; max-width: 790px; margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.2rem, 2vw, 1.5rem); line-height: 1.65; color: #405669; }
+.bio-portrait { position: relative; height: 500px; margin: 0; overflow: hidden; background: #e7efed; box-shadow: 16px 16px 0 #e7f0ef; }
+.bio-portrait img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.bio-portrait figcaption { position: absolute; right: 0; bottom: 0; left: 0; padding: 10px 13px; color: #fff; background: rgba(28, 48, 61, .82); font-size: .72rem; letter-spacing: .03em; }
+.bio-highlights { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 42px; background: #dce4e8; border: 1px solid #dce4e8; }
+.bio-highlights div { display: flex; flex-direction: column; padding: 20px 22px; background: #f7faf9; }
+.bio-highlights strong { color: #256d6b; font-size: clamp(1.8rem, 3vw, 2.4rem); line-height: 1; letter-spacing: -.04em; }
+.bio-highlights span { margin-top: 7px; color: #5b6c7a; font-size: .76rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.bio-story { max-width: 850px; margin: 70px auto 0; counter-reset: chapter; }
+.bio-chapter { position: relative; padding: 0 0 50px 88px; margin: 0; border-left: 1px solid #cbd8da; counter-increment: chapter; }
+.bio-chapter::before { content: counter(chapter, decimal-leading-zero); position: absolute; left: -25px; top: -6px; display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid #b8cccd; border-radius: 50%; background: #f5f7f6; color: #256d6b; font-size: .75rem; font-weight: 700; letter-spacing: .08em; }
+.bio-chapter:last-child { padding-bottom: 0; border-left-color: transparent; }
+.bio-page .bio-chapter h2 { margin: 0 0 20px; color: #203347; font-size: clamp(1.55rem, 3vw, 2rem); line-height: 1.2; letter-spacing: -.03em; }
+.bio-chapter p { margin: 0 0 17px; color: #415667; font-size: 1.02rem; line-height: 1.8; }
+.bio-chapter cite { color: #203347; }
+.bio-purpose { margin-top: 10px; padding: 30px 34px 34px 88px; border-left: 0; background: #e7f0ef; }
+.bio-purpose::before { left: 18px; top: 27px; background: #fff; }
+.bio-purpose p { margin-bottom: 0; color: #324d56; font-family: Georgia, "Times New Roman", serif; font-size: 1.15rem; }
+.bio-connect { display: flex; justify-content: space-between; align-items: center; gap: 30px; margin-top: 65px; padding: 35px 40px; color: #fff; background: #203347; }
+.bio-connect h2 { margin: 0; font-size: 1.65rem; }
+.bio-connect p { margin: 0; }
+.bio-page .bio-connect a { display: inline-block; padding: 10px 16px; border: 1px solid #8cb8b6; border-radius: 4px; color: #fff; text-decoration: none; white-space: nowrap; }
+.bio-page .bio-connect a:hover { background: #fff; color: #203347; }
+@media (max-width: 900px) {
+    .navbar { flex-wrap: wrap; gap: 12px; }
+    .nav-links { flex-wrap: wrap; gap: 10px 18px; }
+    .home-hero { grid-template-columns: 1fr; }
+    .home-hero-image { min-height: 430px; }
+    .home-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 650px) {
+    .navbar { position: static; padding: 18px 20px; }
+    .home-page main, .bio-page main { padding-left: 20px; padding-right: 20px; }
+    .home-hero { grid-template-columns: 1fr; margin-top: 25px; }
+    .home-hero-copy { padding: 38px 24px; }
+    .home-credentials { grid-template-columns: 1fr; gap: 12px; }
+    .home-hero-image { min-height: 300px; }
+    .home-statement { display: block; margin: 52px auto 60px; padding: 0 8px 25px; }
+    .home-statement a { display: inline-block; margin-top: 22px; }
+    .home-section-heading { display: block; }
+    .home-section-heading > p { margin-top: 14px; }
+    .home-cards { grid-template-columns: 1fr; }
+    .home-section { padding-bottom: 55px; }
+    .home-contact { display: block; padding: 27px; margin-bottom: 40px; }
+    .home-contact .home-button { margin-top: 20px; }
+    .bio-page main { padding-top: 25px; padding-bottom: 40px; }
+    .bio-hero { padding: 32px 24px; }
+    .bio-hero::after { width: 170px; height: 170px; left: -100px; bottom: -100px; border-width: 28px; }
+    .bio-hero-grid { grid-template-columns: 1fr; gap: 34px; }
+    .bio-portrait { width: 100%; max-width: 340px; height: 480px; box-shadow: 10px 10px 0 #e7f0ef; }
+    .bio-highlights { grid-template-columns: 1fr; }
+    .bio-highlights div { padding: 15px 18px; }
+    .bio-story { margin-top: 48px; }
+    .bio-chapter { padding: 0 0 42px 46px; }
+    .bio-chapter::before { left: -18px; width: 34px; height: 34px; font-size: .64rem; }
+    .bio-purpose { padding: 25px 24px; }
+    .bio-purpose::before { display: none; }
+    .bio-connect { display: block; margin-top: 45px; padding: 28px 24px; }
+    .bio-connect p { margin-top: 15px; }
+}

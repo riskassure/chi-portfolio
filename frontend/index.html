@@ -3,15 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chi Portfolio</title>
+    <meta name="description" content="Chi-Chih Woo is a data consultant with a lifelong interest in mathematics, photography, and classical music.">
+    <title>Chi-Chih Woo | Data, Mathematics & Creative Work</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260916-nav-contrast">
 </head>
-<body>
-    <hr> 
-    <h1>Welcome to My Digital Garden</h1>
-    <p>This is the central hub for my work in mathematics, photography, music, and geography.</p>
+<body class="home-page">
+    <a class="home-skip-link" href="#main-content">Skip to main content</a>
+    <main id="main-content">
+        <section class="home-hero" aria-labelledby="home-title">
+            <div class="home-hero-copy">
+                <p class="home-eyebrow">Data consultant · Mathematician at heart · Creative</p>
+                <h1 id="home-title">Making sense of complex things.</h1>
+                <p class="home-lede">I build thoughtful data systems and explore the patterns that connect mathematics, photography, and classical music.</p>
+                <div class="home-actions">
+                    <a class="home-button" href="resume.html">Explore my professional work</a>
+                    <a class="home-text-link" href="bio.html">Get to know me</a>
+                </div>
+                <dl class="home-credentials" aria-label="Professional highlights">
+                    <div><dt>Experience</dt><dd>30+ years</dd></div>
+                    <div><dt>Focus</dt><dd>Data &amp; automation</dd></div>
+                    <div><dt>Based in</dt><dd>Southern California</dd></div>
+                </dl>
+            </div>
+            <figure class="home-hero-image">
+                <img src="images/photography/img_0422.webp" alt="Golden sand dunes with distant mountains beneath a blue sky" width="1920" height="1080">
+                <figcaption><span>Desert study</span><a href="photography/index.html">View photography</a></figcaption>
+            </figure>
+        </section>
 
+        <section class="home-statement" aria-label="Personal philosophy">
+            <p>“Creativity and beauty can be found in a mathematical idea, a well-designed system, a photograph, or a piece of music.”</p>
+            <a href="bio.html">Read my story <span aria-hidden="true">→</span></a>
+        </section>
+
+        <section class="home-section" aria-labelledby="explore-title">
+            <div class="home-section-heading">
+                <div>
+                    <p class="home-eyebrow">Selected pursuits</p>
+                    <h2 id="explore-title">Work, knowledge, and creative life</h2>
+                </div>
+                <p>Four parts of my life, brought together in one place.</p>
+            </div>
+            <div class="home-cards">
+                <article class="home-card home-card-professional">
+                    <div class="home-card-top"><span class="home-card-number">01</span><span class="home-card-label">Professional</span></div>
+                    <h3>Data &amp; analytics</h3>
+                    <p>More than 30 years designing reporting systems, automating workflows, and helping people use data clearly.</p>
+                    <a href="resume.html">Read my résumé <span aria-hidden="true">→</span></a>
+                </article>
+                <article class="home-card">
+                    <div class="home-card-top"><span class="home-card-number">02</span><span class="home-card-label">Knowledge</span></div>
+                    <h3>Mathematics</h3>
+                    <p>A searchable library of advanced concepts and articles, created to preserve and share the beauty of mathematics.</p>
+                    <a href="math/index.html">Browse the library <span aria-hidden="true">→</span></a>
+                </article>
+                <article class="home-card">
+                    <div class="home-card-top"><span class="home-card-number">03</span><span class="home-card-label">Visual</span></div>
+                    <h3>Photography</h3>
+                    <p>Landscapes, patterns, and memories photographed for the emotional response they carry.</p>
+                    <a href="photography/index.html">View the gallery <span aria-hidden="true">→</span></a>
+                </article>
+                <article class="home-card">
+                    <div class="home-card-top"><span class="home-card-number">04</span><span class="home-card-label">Listening</span></div>
+                    <h3>Classical music</h3>
+                    <p>A personal catalog celebrating the music that has inspired, energized, and consoled me throughout my life.</p>
+                    <a href="music/index.html">Explore the catalog <span aria-hidden="true">→</span></a>
+                </article>
+            </div>
+        </section>
+        <section class="home-contact" aria-labelledby="contact-title">
+            <div><p class="home-eyebrow">Connect</p><h2 id="contact-title">Interested in my work?</h2><p>I am based in Jurupa Valley, California. You can reach me by email.</p></div>
+            <a class="home-button" href="mailto:chi_woo_1990@yahoo.com">Email me</a>
+        </section>
+    </main>
     <script src="navbar.js"></script>
 </body>
 </html>
