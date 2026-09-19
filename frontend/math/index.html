@@ -6,7 +6,7 @@
     <title>Mathematics Archive - Chi-Chih Woo</title>
     
     <link rel="stylesheet" href="../style.css">
-    <link rel="stylesheet" href="math.css">
+    <link rel="stylesheet" href="math.css?v=admin-tools-v1">
     
     <script>
         window.MathJax = {
@@ -27,6 +27,15 @@
                 <input type="text" id="classSearch" class="search-box" placeholder="Type 3+ characters to search concepts or codes (e.g., group or 20K)..." autocomplete="off" style="width: 100%;">
                 <div id="searchDropdownMenu"></div>
             </div>
+
+            <aside id="math-admin-tools" class="math-admin-tools" hidden aria-labelledby="math-admin-tools-heading">
+                <div>
+                    <p class="math-admin-eyebrow">Administrator tools</p>
+                    <h2 id="math-admin-tools-heading">Math rendering quality control</h2>
+                    <p>Check concepts for unresolved MathJax commands, layout overflow, and rendering placeholders.</p>
+                </div>
+                <a href="mathjax_audit.html" class="math-admin-tool-link">Open MathJax audit</a>
+            </aside>
         </div>
 
         <div id="classCardGrid" class="class-card-grid">
@@ -36,6 +45,6 @@
     </div>
 
     <script src="../navbar.js"></script>
-    <script src="math_index.js?v=1000"></script>
+    <script src="math_index.js?v=admin-tools-v1"></script>
 </body>
 </html>

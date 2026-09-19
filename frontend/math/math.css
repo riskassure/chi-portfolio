@@ -794,3 +794,70 @@
 .pm-textcolor-magenta {
     color: magenta;
 }
+.math-admin-tools {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+    margin-top: 1.5rem;
+    padding: 1.15rem 1.3rem;
+    border: 1px solid #99c7c3;
+    border-left: 4px solid #267b79;
+    border-radius: 8px;
+    background: #f0f8f7;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.math-admin-tools[hidden] {
+    display: none;
+}
+
+.math-admin-tools h2 {
+    margin: 0.1rem 0 0.35rem;
+    color: #173f44;
+    font-size: 1.05rem;
+}
+
+.math-admin-tools p {
+    margin: 0;
+    color: #506477;
+    line-height: 1.5;
+}
+
+.math-admin-eyebrow {
+    color: #256d6b !important;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.math-admin-tool-link {
+    flex-shrink: 0;
+    padding: 0.7rem 1rem;
+    border-radius: 5px;
+    background: #245f65;
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.math-admin-tool-link:hover {
+    background: #173f44;
+}
+
+.math-admin-tool-link:focus-visible {
+    outline: 3px solid #b46712;
+    outline-offset: 3px;
+}
+
+@media (max-width: 680px) {
+    .math-admin-tools {
+        display: block;
+    }
+
+    .math-admin-tool-link {
+        display: inline-block;
+        margin-top: 1rem;
+    }
+}

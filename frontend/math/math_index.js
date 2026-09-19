@@ -17,6 +17,14 @@ const MATCH_TYPE_LABELS = {
     classification: "MSC"
 };
 
+// Called by navbar.js only after the shared admin session check succeeds.
+function unlockLocalPageControls() {
+    const adminTools = document.getElementById("math-admin-tools");
+    if (adminTools) {
+        adminTools.hidden = false;
+    }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     bootClassificationHub();
     setupUnifiedSearchEngine();
