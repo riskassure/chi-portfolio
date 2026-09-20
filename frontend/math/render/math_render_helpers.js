@@ -298,6 +298,10 @@
             window.MathCmsRenderProofLayout
                 .splitProofLeadParagraphs(clean);
 
+        clean =
+            window.MathCmsRenderProofLayout
+                .standardizeProofEndings(clean);
+
         // Remove theorem/definition wrappers whose bodies became empty
         clean =
             window.MathCmsRenderMathEnv

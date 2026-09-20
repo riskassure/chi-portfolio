@@ -748,6 +748,7 @@ def render_simple_latex_block_environments_to_html(html: str) -> str:
 THEOREM_LIKE_ENVIRONMENTS = {
     "proof": "Proof",
     "prop": "Proposition",
+    "proposition": "Proposition",
     "thm": "Theorem",
     "thm*": "Theorem",
     "thmplain": "Theorem",
@@ -756,9 +757,11 @@ THEOREM_LIKE_ENVIRONMENTS = {
     "lemma": "Lemma",
     "lemma*": "Lemma",
     "cor": "Corollary",
+    "corollary": "Corollary",
     "defn": "Definition",
     "definition": "Definition",
     "rem": "Remark",
+    "remark": "Remark",
     "example": "Example",
     "example*": "Example",
 }

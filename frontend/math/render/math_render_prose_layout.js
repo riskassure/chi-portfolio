@@ -170,7 +170,7 @@
             }
         );
 
-        // Legacy PlanetMath proof marker:
+        // Standalone PlanetMath proof marker and preferred source shorthand:
         //
         //   \proof
         //
@@ -269,8 +269,10 @@
         output = output.replace(/\\LaTeX\b\s*\{\}/g, "LaTeX");
         output = output.replace(/\\LaTeX\b/g, "LaTeX");
 
-        // End-of-proof marker used in prose.
-        output = output.replace(/\\qed\b/gi, "∎");
+        // Explicit end-of-proof marker used in prose. Keep this hollow to
+        // match standalone proof sections without turning the surrounding
+        // discussion into a formal proof block.
+        output = output.replace(/\\qed\b/gi, "\u25A1");
 
         // Paired TeX prose quotation marks:
         //   ``quoted text'' -> “quoted text”

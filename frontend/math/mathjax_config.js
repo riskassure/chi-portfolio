@@ -19,10 +19,11 @@
                 "[+]": ["ams", "noerrors", "noundefined", "textmacros"]
             },
 
-            // PlanetMath compatibility aliases.
-            // Add newly discovered macros here as smoke tests reveal them.
+            // Shared notation and PlanetMath compatibility aliases.
+            // AUTHORING_STANDARDS.md identifies the preferred forms for new
+            // and revised entries. Other aliases remain available so imported
+            // articles continue to render correctly.
             macros: {
-                down: "{\\mathord{\\downarrow}}",
                 dom: "\\operatorname{dom}",
                 sgn: "\\operatorname{sgn}",
                 N: "\\mathbb{N}",
@@ -98,6 +99,7 @@
 
                 R: "\\mathbb{R}",
                 C: "\\mathbb{C}",
+                Q: "\\mathbb{Q}",
                 Z: "\\mathbb{Z}",
                 sR: "\\mathbb{R}",
                 reals: "\\mathbb{R}",

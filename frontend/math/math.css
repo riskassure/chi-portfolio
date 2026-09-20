@@ -616,12 +616,26 @@
     margin-bottom: 0.5rem;
 }
 
+.math-env-proof > .math-env-label {
+    font-style: italic;
+    font-weight: 400;
+}
+
 .math-env-body > p:first-child {
     margin-top: 0;
 }
 
 .math-env-body > p:last-child {
     margin-bottom: 0;
+}
+
+.math-proof-end {
+    display: block;
+    margin-top: 0.35rem;
+    color: #0f172a;
+    font-size: 1.05em;
+    line-height: 1;
+    text-align: right;
 }
 
 .math-center {
