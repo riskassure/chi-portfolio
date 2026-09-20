@@ -1,0 +1,11 @@
+\documentclass[tikz,border=7pt]{standalone}
+\begin{document}
+\begin{tikzpicture}[scale=.88]
+\draw[->,gray!65] (-3.3,0)--(3.3,0) node[right] {$x$};
+\draw[->,gray!65] (0,-3.3)--(0,3.3) node[above] {$y$};
+\draw[blue!75!black,very thick,samples=600,domain=24:720,smooth,variable=\t]
+  plot ({70/\t*cos(\t)},{70/\t*sin(\t)});
+\fill (0,0) circle (1.4pt);
+\node[font=\bfseries] at (0,-3.8) {Hyperbolic spiral: $r=1.22/\theta$};
+\end{tikzpicture}
+\end{document}

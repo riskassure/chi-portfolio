@@ -907,6 +907,29 @@
     }
 }
 
+.pm-polar-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2rem;
+    align-items: center;
+    margin: 1.5rem auto;
+}
+
+.pm-polar-pair .pm-reconstructed-image {
+    margin: 0 !important;
+}
+
+.pm-polar-pair img {
+    max-height: 22rem !important;
+}
+
+@media (max-width: 700px) {
+    .pm-polar-pair {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
 .pm-reidemeister-row {
     display: block;
     margin: 1.5rem auto;

@@ -72,6 +72,9 @@ function normalizeLatexImageArtifacts(
     output = groupReidemeisterPair(output, "twist", "untwist", "Type I");
     output = groupReidemeisterPair(output, "parallel", "passover", "Type II");
     output = groupReidemeisterPair(output, "r3", "r3", "Type III", true);
+    output = groupLegacyImagePair(output, "polar_curve_1", "polar_curve_2");
+    output = groupLegacyImagePair(output, "polar_curve_4", "polar_curve_5");
+    output = groupLegacyImagePair(output, "polar_curve_8", "polar_curve_9");
 
     // Preserve captions as readable prose.
     output = output.replace(
@@ -95,6 +98,22 @@ function normalizeLatexImageArtifacts(
     );
 
     return output;
+}
+
+
+function groupLegacyImagePair(output, leftStem, rightStem) {
+    const escapePattern = value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const image = stem =>
+        `(<div\\b[^>]*data-legacy-image="${escapePattern(stem)}"[^>]*>[\\s\\S]*?<\\/div>)`;
+    const pairPattern = new RegExp(
+        `${image(leftStem)}[\\s\\S]*?${image(rightStem)}`,
+        "i"
+    );
+
+    return output.replace(
+        pairPattern,
+        '<div class="pm-polar-pair mathjax-diagnostic-ignore">$1$2</div>'
+    );
 }
 
 
@@ -151,6 +170,8 @@ const availableLegacyImageStems = new Set([
     "cevian",
     "chisquared0",
     "construct.1",
+    "const",
+    "curve",
     "dtree",
     "ecircuit",
     "epath",
@@ -162,6 +183,7 @@ const availableLegacyImageStems = new Set([
     "mealy",
     "moore",
     "nasty_unknot",
+    "ncchisquared",
     "parallel",
     "passover",
     "polar_1",
@@ -169,10 +191,20 @@ const availableLegacyImageStems = new Set([
     "polar_3",
     "polar_4",
     "polar_5",
+    "polar_curve_1",
+    "polar_curve_2",
+    "polar_curve_3",
+    "polar_curve_4",
+    "polar_curve_5",
+    "polar_curve_6",
+    "polar_curve_7",
+    "polar_curve_8",
+    "polar_curve_9",
     "sector",
     "semiautomaton",
     "simplified_automaton",
     "r3",
+    "refl",
     "t_dist",
     "tdist",
     "trefoil",
@@ -247,7 +279,7 @@ function makeLatexImageOrPlaceholder(
     }
 
     return `
-        <div class="pm-latex-image pm-reconstructed-image mathjax-diagnostic-ignore" style="margin:1.25rem auto; text-align:center;">
+        <div class="pm-latex-image pm-reconstructed-image mathjax-diagnostic-ignore" data-legacy-image="${escapeHtml(stem)}" style="margin:1.25rem auto; text-align:center;">
             <img src="${escapeHtml(src)}" alt="Reconstructed mathematical diagram: ${escapeHtml(cleanFilename)}" loading="lazy" style="display:block; width:auto; max-width:100%; max-height:28rem; margin:0 auto;" />
         </div>
     `;

@@ -1,0 +1,11 @@
+\documentclass[tikz,border=7pt]{standalone}
+\begin{document}
+\begin{tikzpicture}[scale=.9]
+\draw[->,gray!65] (-3,0)--(3,0) node[right] {$x$};
+\draw[->,gray!65] (0,-3)--(0,3) node[above] {$y$};
+\draw[blue!75!black,very thick] (215:3.2)--(35:3.2);
+\draw[orange!85!black,->,thick] (0:1)--(35:1) node[midway,right] {$c$};
+\fill (0,0) circle (1.5pt);
+\node[font=\bfseries] at (0,-3.45) {Line: $\theta=c$};
+\end{tikzpicture}
+\end{document}
