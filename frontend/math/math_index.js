@@ -213,6 +213,26 @@ function renderUnifiedDropdownMenu(results, query, container) {
 
     container.innerHTML = combinedHtml;
     container.style.display = "block";
+    typesetQuickSearchTitles(container);
+}
+
+async function typesetQuickSearchTitles(container) {
+    if (
+        !container ||
+        !window.MathJax ||
+        typeof window.MathJax.typesetPromise !== "function"
+    ) {
+        return;
+    }
+
+    try {
+        if (typeof window.MathJax.typesetClear === "function") {
+            window.MathJax.typesetClear([container]);
+        }
+        await window.MathJax.typesetPromise([container]);
+    } catch (error) {
+        console.warn("Unable to typeset quick-search titles:", error);
+    }
 }
 
 function buildDropdownSectionHeader(label, extraStyle = "") {

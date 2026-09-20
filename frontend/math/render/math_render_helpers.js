@@ -44,7 +44,11 @@
             );
         }
 
-        clean = cleanLaTeXEnvironments(clean);
+        clean = cleanLaTeXEnvironments(
+            clean,
+            apiEndpoint,
+            options.context || {}
+        );
         clean =
             window.MathCmsRenderMathText
                 .restoreUnderlineHtmlInsideMath(clean);
@@ -61,7 +65,11 @@
             .renderXyMatrixDiagonalOverlays(root);
     }
 
-    function cleanLaTeXEnvironments(tex) {
+    function cleanLaTeXEnvironments(
+        tex,
+        apiEndpoint = DEFAULT_API_ENDPOINT,
+        context = {}
+    ) {
         if (!tex) return "";
 
         let clean = String(tex || "");
@@ -182,7 +190,9 @@
         // Replace old LaTeX/EPS image commands with readable placeholders.
         clean = window.MathCmsRenderImages.normalizeLatexImageArtifacts(
             clean,
-            window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell
+            window.MathCmsRenderHtmlUtils.escapeHtmlForMathCell,
+            apiEndpoint,
+            context
         );
         
         // Arrange related placeholders while legacy layout markers

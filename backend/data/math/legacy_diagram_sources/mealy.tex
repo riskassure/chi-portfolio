@@ -1,0 +1,9 @@
+\documentclass[tikz,border=7pt]{standalone}
+\usetikzlibrary{automata,positioning,arrows.meta}
+\begin{document}
+\begin{tikzpicture}[>=Stealth,node distance=4cm,on grid,auto]
+\node[state] (s) {$s$}; \node[state] (t) [right=of s] {$t$};
+\path[->] (s) edge[loop above] node {$b\mid y$} () edge[bend left] node {$a\mid y$} (t)
+ (t) edge[loop above] node {$b\mid y$} () edge[bend left] node {$a\mid x$} (s);
+\end{tikzpicture}
+\end{document}

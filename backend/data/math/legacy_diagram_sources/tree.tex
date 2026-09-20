@@ -1,0 +1,10 @@
+\documentclass[tikz,border=7pt]{standalone}
+\usetikzlibrary{trees}
+\begin{document}
+\begin{tikzpicture}[level distance=10mm,level 1/.style={sibling distance=12mm},level 2/.style={sibling distance=9mm}]
+\node {$\sigma$} child {node {$a$}} child {node {$b$}} child {node {$\sigma$} child {node {$a$}}} child {node {$b$}};
+\begin{scope}[xshift=6cm]
+\node {$\sigma$} child {node {$a$}} child {node {$X$} child {node {$b$}} child {node {$\sigma$} child {node {$a$}}}} child {node {$b$}};
+\end{scope}
+\end{tikzpicture}
+\end{document}

@@ -39,7 +39,12 @@ Thumbs.db
 # 🧮 MATHEMATICS GENERATED ASSETS
 # ==========================================================================
 # Block generated PSTricks/SVG conversion outputs and temporary LaTeX build files
-backend/data/math/diagrams/
+backend/data/math/diagrams/*
+!backend/data/math/diagrams/legacy/
+!backend/data/math/diagrams/legacy/*.svg
+!backend/data/math/diagrams/legacy/*.gif
+!backend/data/math/diagrams/legacy/*.jpg
+!backend/data/math/diagrams/legacy/*.png
 backend/data/math/temp/
 
 # Block generated math diagnostics reports

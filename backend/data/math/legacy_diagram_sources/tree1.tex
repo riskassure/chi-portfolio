@@ -1,0 +1,7 @@
+\documentclass[tikz,border=7pt]{standalone}
+\usetikzlibrary{trees}
+\begin{document}
+\begin{tikzpicture}[level distance=11mm,level 1/.style={sibling distance=25mm},level 2/.style={sibling distance=10mm}]
+\node {} child {node {} child {node {}} child {node {}}} child {node {} child {node {}} child {node {}} child {node {}} child {node {}} child {node {}}} child {node {}};
+\end{tikzpicture}
+\end{document}

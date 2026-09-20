@@ -1,0 +1,11 @@
+\documentclass[tikz,border=7pt]{standalone}
+\usepackage{amssymb}
+\usetikzlibrary{automata,positioning,arrows.meta}
+\begin{document}
+\begin{tikzpicture}[>=Stealth,node distance=2.3cm,on grid,auto]
+\node at (0,1.2) {$\varnothing$}; \node[state,initial] (e) at (0,0) {$q$};
+\node at (4,1.2) {$\{\lambda\}$}; \node[state,initial,accepting] (l) at (4,0) {$q$};
+\node at (8,1.2) {$\{a\}$}; \node[state,initial] (a0) at (7.2,0) {$q_0$}; \node[state,accepting] (a1) at (9.5,0) {$q_1$};
+\path[->] (a0) edge node {$a$} (a1);
+\end{tikzpicture}
+\end{document}

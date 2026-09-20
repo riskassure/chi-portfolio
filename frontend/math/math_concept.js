@@ -34,7 +34,9 @@ async function renderConceptPage(concept) {
     try {
         // Set page metadata attributes
         document.title = `${concept.title || "Math Concept"} | Library`;
-        document.getElementById("conceptTitle").innerText = concept.title || "Untitled Concept";
+        const conceptTitle = concept.title || "Untitled Concept";
+        const conceptTitleElement = document.getElementById("conceptTitle");
+        conceptTitleElement.textContent = conceptTitle;
         document.getElementById("metaCreated").innerText = concept.created_at || "Unknown";
         document.getElementById("metaUpdated").innerText = concept.updated_at || "Unknown";
 
@@ -67,6 +69,19 @@ async function renderConceptPage(concept) {
 
         // 3. #4 Render Footers layout
         renderFooterArrays(concept);
+
+        // Titles may contain inline TeX, so process the heading with MathJax.
+        if (
+            window.MathCmsMathJax &&
+            typeof window.MathCmsMathJax.typesetElement === "function"
+        ) {
+            await window.MathCmsMathJax.typesetElement(conceptTitleElement, {
+                page: "concept_title",
+                concept_id: concept.id || null,
+                slug: concept.slug || currentSlug || null,
+                title: conceptTitle
+            });
+        }
 
         // 4. #1 & #2 Process TeX payload
         const rawTexContent = window.MathCmsRender

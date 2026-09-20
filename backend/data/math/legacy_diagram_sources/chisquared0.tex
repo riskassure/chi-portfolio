@@ -1,0 +1,13 @@
+\documentclass[tikz,border=7pt]{standalone}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\begin{document}
+\begin{tikzpicture}
+\begin{axis}[width=11cm,height=6.5cm,axis lines=left,xmin=0,xmax=18,ymin=0,samples=180,xlabel={$x$},ylabel={density}]
+\addplot[blue,thick,domain=.01:18] {.0625*x^2*exp(-x/2)};
+\addplot[blue!25,draw=none,domain=10:18] {.0625*x^2*exp(-x/2)} \closedcycle;
+\draw[dashed] (axis cs:10,0)--(axis cs:10,.085) node[above] {$c$};
+\node at (axis cs:13,.035) {$p=P(X\ge c)$};
+\end{axis}
+\end{tikzpicture}
+\end{document}

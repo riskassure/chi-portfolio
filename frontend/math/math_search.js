@@ -129,6 +129,7 @@ function renderFullResults(query, results) {
     }
 
     container.innerHTML = chunks.join("");
+    typesetSearchResultTitles(container);
 }
 
 function renderConceptSection(title, items) {
@@ -198,7 +199,7 @@ function renderConceptCard(item) {
 
     return `
         <a href="${href}" style="display: block; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; text-decoration: none; color: #1e293b; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);">
-            <div style="font-weight: 800; color: #0f172a; font-size: 1rem; line-height: 1.35;">
+            <div class="math-search-concept-title tex2jax_process" style="font-weight: 800; color: #0f172a; font-size: 1rem; line-height: 1.35;">
                 ${escapeHtml(item.title || item.label || "Untitled concept")}
             </div>
 
@@ -266,4 +267,22 @@ function escapeHtml(value) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+async function typesetSearchResultTitles(container) {
+    if (
+        !container ||
+        !window.MathCmsMathJax ||
+        typeof window.MathCmsMathJax.typesetElement !== "function"
+    ) {
+        return;
+    }
+
+    try {
+        await window.MathCmsMathJax.typesetElement(container, {
+            page: "search_titles"
+        });
+    } catch (error) {
+        console.warn("Unable to typeset search-result titles:", error);
+    }
 }
