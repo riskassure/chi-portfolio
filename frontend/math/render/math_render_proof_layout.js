@@ -209,6 +209,45 @@
         return clean;
     }
 
+    function normalizeFormalResultHeadings(value) {
+        const source = String(value || "");
+
+        if (!/<strong\b/i.test(source)) {
+            return source;
+        }
+
+        const template = document.createElement("template");
+        template.innerHTML = source;
+        const headingPattern =
+            /^(Theorem|Lemma|Proposition|Corollary)\b([\s\S]*?)\.?$/i;
+
+        template.content.querySelectorAll("strong").forEach(heading => {
+            if (heading.closest(".math-env")) {
+                return;
+            }
+
+            const text = String(heading.textContent || "")
+                .replace(/\s+/g, " ")
+                .trim();
+            const match = headingPattern.exec(text);
+
+            if (!match || !isStandaloneHeading(heading)) {
+                return;
+            }
+
+            const kind = match[1].toLowerCase();
+            const suffix = String(match[2] || "").replace(/\.+$/, "");
+
+            heading.classList.add(
+                "pm-formal-result-heading",
+                `pm-formal-${kind}-heading`
+            );
+            heading.textContent = `${match[1]}${suffix}.`;
+        });
+
+        return template.innerHTML;
+    }
+
     function standardizeProofEndings(value) {
         const source = String(value || "");
 
@@ -240,7 +279,7 @@
             .forEach(heading => {
                 if (
                     /^Proof\.?$/i.test(String(heading.textContent || "").trim())
-                    && isStandaloneProofHeading(heading)
+                    && isStandaloneHeading(heading)
                 ) {
                     const normalizedHeading = document.createElement("em");
                     normalizedHeading.className = "pm-detected-proof-heading";
@@ -392,7 +431,7 @@
         appendProofEndAfter(lastTextNode);
     }
 
-    function isStandaloneProofHeading(heading) {
+    function isStandaloneHeading(heading) {
         const paragraph = heading.closest("p");
 
         if (!paragraph) {
@@ -528,6 +567,7 @@
     window.MathCmsRenderProofLayout = {
         splitProofLeadParagraphs,
         normalizeSketchProofHeading,
+        normalizeFormalResultHeadings,
         standardizeProofEndings
     };
 })();

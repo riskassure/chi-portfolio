@@ -158,7 +158,7 @@
 
                 return `
                     <span
-                        class="pm-legacy-theorem-heading"
+                        class="pm-legacy-theorem-heading pm-formal-result-heading pm-formal-theorem-heading"
                         style="
                             display:block;
                             margin:1rem 0 0.3rem;

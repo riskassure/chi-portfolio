@@ -621,6 +621,13 @@
     font-weight: 400;
 }
 
+.pm-formal-result-heading {
+    display: block;
+    margin: 0.9rem 0 0.3rem;
+    color: #172033;
+    line-height: 1.35;
+}
+
 .math-env-body > p:first-child {
     margin-top: 0;
 }
