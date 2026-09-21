@@ -84,8 +84,8 @@ an entry may have more than one.
 
 - Add `Definition` when the entry contains a formal definition section.
 - Add `Proof` when the entry contains a formal standalone proof section.
-- Add `Example` when the entry contains a formal example section. Remarks are
-  supporting content and do not currently have a separate document type.
+- Add `Example` when the entry contains a formal example section.
+- Add `Remark` when the entry contains a formal remark section.
 - Retain a primary type such as `Theorem`, `Example`, `Algorithm`, or `Topic`
   when `Definition` or `Proof` is added.
 - Do not add `Definition` or `Proof` merely because the prose mentions a
@@ -119,6 +119,8 @@ refer to those exact labels.
   substitute for a formal section environment.
 - Emphasize a term at its defining occurrence, normally the first occurrence
   in its formal definition. Later uses should remain unstyled.
+- A definition that introduces only notation, a map, or a list of conditions
+  does not need an artificially emphasized term.
 - Begin with a concise sentence that explains the subject or motivates the
   entry. Avoid merely repeating the page title before the definition.
 - Use `\begin{thebibliography} ... \end{thebibliography}` with `\bibitem`
@@ -131,6 +133,24 @@ refer to those exact labels.
 - Use semantic lists and aligned equations instead of manual spacing.
 - Keep diagrams and tables close to the paragraph that introduces them and
   provide a short label or explanation when their meaning is not immediate.
+
+## Concept links
+
+- Concept titles, synonyms, and defined terms may be linked automatically in
+  prose. Because matching is context-free, review ordinary-language homonyms
+  and suppress them at the entry level when their mathematical sense is not
+  intended.
+- Add a catalog synonym for a common plural or inflected form only when it has
+  the same mathematical meaning everywhere it is likely to occur. Use an
+  explicit concept link for a context-dependent synonym.
+- Grammatical words such as `and`, `or`, `not`, `if`, and `then` are never
+  autolinked, even if they also name a mathematical operation or concept.
+- Use `\PMlinkescapeword{term}` or `\PMlinkescapephrase{multiword term}` when
+  an otherwise eligible target has the wrong meaning throughout one entry.
+- Use `\PMlinkescapetext{visible passage}` to suppress autolinking only in a
+  particular occurrence or short passage.
+- Preserve deliberate explicit links. Do not add an explicit link solely to
+  maximize link density; it should help a reader understand the present entry.
 
 ## Review checklist
 

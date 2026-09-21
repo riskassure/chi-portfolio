@@ -4,6 +4,16 @@ import re
 from urllib.parse import quote, unquote
 
 
+# These words are grammatical connective tissue in ordinary prose. Even if a
+# concept, synonym, or defined term uses one of them, context-free matching is
+# too likely to produce a misleading link.
+AUTOLINK_STOP_WORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "but", "by", "for",
+    "from", "if", "in", "is", "it", "not", "of", "on", "or", "that",
+    "the", "then", "this", "to", "was", "were", "with",
+}
+
+
 def resolve_explicit_math_link_targets(tex_content, db_cursor):
     """
     Convert explicit PlanetMath links whose href target is a legacy
@@ -79,7 +89,7 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
 
     # 2. Parse inline explicit macro overrides.
     escaped_macros = re.findall(
-        r"\\PMlinkescapeword\{([^}]+)\}",
+        r"\\PMlinkescape(?:word|phrase)\{([^}]+)\}",
         tex_content
     )
 
@@ -123,7 +133,9 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
 
     for row in db_cursor.fetchall():
         if row[0] and row[1]:
-            targets[row[0].lower().strip()] = row[1]
+            # An exact concept title is a stronger destination than a synonym.
+            # Keep it when two concepts expose the same visible link text.
+            targets.setdefault(row[0].lower().strip(), row[1])
 
     # Platform defined terms.
     db_cursor.execute("""
@@ -136,13 +148,19 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
 
     for row in db_cursor.fetchall():
         if row[0] and row[1]:
-            targets[row[0].lower().strip()] = row[1]
+            # Defined terms are the broadest and most collision-prone source,
+            # so they must not replace titles or synonyms.
+            targets.setdefault(row[0].lower().strip(), row[1])
 
     # Filter out target dictionary terms that match exclusions.
     active_targets = {
         k: v
         for k, v in targets.items()
-        if k not in local_exclusions and len(k) > 2
+        if (
+            k not in local_exclusions
+            and k not in AUTOLINK_STOP_WORDS
+            and len(k) > 2
+        )
     }
 
     if not active_targets:
