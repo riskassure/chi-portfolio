@@ -75,15 +75,13 @@ function renderClassificationCards(categories) {
 
         card.innerHTML = `
             <span class="class-card-code">${escapeHtml(item.code)}</span>
-            <span class="class-card-text">${escapeHtml(item.text)}</span>
+            <span class="class-card-text">${escapeHtml(normalizeClassificationMath(item.text))}</span>
         `;
 
         grid.appendChild(card);
     });
 
-    if (window.MathJax && typeof window.MathJax.typesetPromise === "function") {
-        window.MathJax.typesetPromise();
-    }
+    typesetDirectoryContent(grid);
 }
 
 // 2. Quick-launch dropdown backed by /api/math/search.
@@ -213,26 +211,25 @@ function renderUnifiedDropdownMenu(results, query, container) {
 
     container.innerHTML = combinedHtml;
     container.style.display = "block";
-    typesetQuickSearchTitles(container);
+    typesetDirectoryContent(container);
 }
 
-async function typesetQuickSearchTitles(container) {
-    if (
-        !container ||
-        !window.MathJax ||
-        typeof window.MathJax.typesetPromise !== "function"
-    ) {
-        return;
-    }
-
+async function typesetDirectoryContent(container) {
+    if (!container || !window.MathCmsMathJax) return;
     try {
-        if (typeof window.MathJax.typesetClear === "function") {
-            window.MathJax.typesetClear([container]);
-        }
-        await window.MathJax.typesetPromise([container]);
+        await window.MathCmsMathJax.typesetElement(container, {
+            page: "math_directory",
+            section: container.id
+        });
     } catch (error) {
-        console.warn("Unable to typeset quick-search titles:", error);
+        console.warn("Unable to typeset math directory content:", error);
     }
+}
+
+function normalizeClassificationMath(value) {
+    // Imported MSC labels may contain two literal backslashes per TeX command.
+    // Decode that extra layer only for classification prose, not concept TeX.
+    return String(value ?? "").replace(/\\\\/g, "\\");
 }
 
 function buildDropdownSectionHeader(label, extraStyle = "") {
@@ -289,7 +286,7 @@ function renderClassificationSearchRow(item) {
         <a href="${href}" class="dropdown-item-row" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.75rem 1rem; text-decoration: none; color: #1e293b; border-bottom: 1px solid #f1f5f9;">
             <span style="min-width: 0;">
                 <span class="dropdown-row-title" style="font-weight: 500; display: block;">
-                    ${escapeHtml(item.text || item.label || "Untitled classification")}
+                    ${escapeHtml(normalizeClassificationMath(item.text || item.label || "Untitled classification"))}
                 </span>
                 <span style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem; display: block;">
                     MSC classification
