@@ -628,6 +628,55 @@
     line-height: 1.35;
 }
 
+.pm-formal-example-heading,
+.pm-formal-remark-heading {
+    color: #31465f;
+}
+
+dfn {
+    font-style: italic;
+}
+
+.math-entry-introduction {
+    color: #334155;
+    font-size: 1.03em;
+    line-height: 1.65;
+}
+
+.math-bibliography {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #d7e0e9;
+}
+
+.math-bibliography h3 {
+    margin: 0 0 0.65rem;
+}
+
+.math-bibliography ol {
+    margin: 0;
+    padding-left: 1.75rem;
+}
+
+.math-list,
+.math-generic-list,
+.pm-tex-list,
+.math-description-list {
+    margin: 0.75rem 0 1rem;
+    padding-left: 1.75rem;
+}
+
+.math-list > li,
+.math-generic-list > li,
+.pm-tex-list > li {
+    margin-bottom: 0.45rem;
+    line-height: 1.55;
+}
+
+.math-list-label {
+    font-weight: 600;
+}
+
 .math-env-body > p:first-child {
     margin-top: 0;
 }

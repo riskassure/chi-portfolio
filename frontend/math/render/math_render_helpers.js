@@ -293,7 +293,10 @@
             .normalizeSketchProofHeading(clean);
 
         clean = window.MathCmsRenderProofLayout
-            .normalizeFormalResultHeadings(clean);
+            .normalizeFormalSectionHeadings(clean);
+
+        clean = window.MathCmsRenderProofLayout
+            .normalizeSemanticEntrySections(clean);
 
         // Start proof-related lead labels in their own paragraphs when
         // backend HTML has flattened several TeX \par sections together.

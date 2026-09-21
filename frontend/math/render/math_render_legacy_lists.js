@@ -72,9 +72,12 @@
     function normalizeBibliographyEnvironments(clean) {
         clean = clean.replace(
             /\\begin\{(?:the)?bibliography\}\{[\s\S]*?\}/gi,
-            "<div style='margin-top: 1.5rem; border-top: 1px dashed #cbd5e1; padding-top: 1rem;'><strong>References & Bibliography:</strong><ul style='list-style-type: square; padding-left: 1.5rem;'>"
+            '<section class="math-bibliography"><h3>References</h3><ol>'
         );
-        clean = clean.replace(/\\end\{(?:the)?bibliography\}/gi, "</ul></div>");
+        clean = clean.replace(
+            /\\end\{(?:the)?bibliography\}/gi,
+            "</ol></section>"
+        );
 
         return clean;
     }

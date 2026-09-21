@@ -209,7 +209,7 @@
         return clean;
     }
 
-    function normalizeFormalResultHeadings(value) {
+    function normalizeFormalSectionHeadings(value) {
         const source = String(value || "");
 
         if (!/<strong\b/i.test(source)) {
@@ -219,7 +219,7 @@
         const template = document.createElement("template");
         template.innerHTML = source;
         const headingPattern =
-            /^(Theorem|Lemma|Proposition|Corollary)\b([\s\S]*?)\.?$/i;
+            /^(Theorem|Lemma|Proposition|Corollary|Example|Remarks?|Algorithm|Application|Axiom|Conjecture)\b([\s\S]*?)\.?$/i;
 
         template.content.querySelectorAll("strong").forEach(heading => {
             if (heading.closest(".math-env")) {
@@ -235,15 +235,78 @@
                 return;
             }
 
-            const kind = match[1].toLowerCase();
+            const kind = match[1].toLowerCase().replace(/s$/, "");
             const suffix = String(match[2] || "").replace(/\.+$/, "");
 
+            absorbFollowingHeadingPeriod(heading);
             heading.classList.add(
                 "pm-formal-result-heading",
                 `pm-formal-${kind}-heading`
             );
             heading.textContent = `${match[1]}${suffix}.`;
         });
+
+        return template.innerHTML;
+    }
+
+    function normalizeSemanticEntrySections(value) {
+        const source = String(value || "");
+
+        if (!source.includes("<")) {
+            return source;
+        }
+
+        const template = document.createElement("template");
+        template.innerHTML = source;
+
+        template.content
+            .querySelectorAll(".math-env-definition .math-env-body")
+            .forEach(body => {
+                const firstParagraph = body.querySelector(":scope > p:first-child")
+                    || body.querySelector("p");
+                const definedTerm = firstParagraph
+                    ? firstParagraph.querySelector("em")
+                    : null;
+
+                if (definedTerm && !definedTerm.closest("dfn")) {
+                    const semanticTerm = document.createElement("dfn");
+                    semanticTerm.innerHTML = definedTerm.innerHTML;
+                    definedTerm.replaceWith(semanticTerm);
+                }
+            });
+
+        template.content.querySelectorAll("strong").forEach(heading => {
+            if (
+                !/^Definition\.?$/i.test(
+                    String(heading.textContent || "").trim()
+                )
+                || !isStandaloneHeading(heading)
+            ) {
+                return;
+            }
+
+            const paragraph = heading.closest("p");
+            const definedTerm = paragraph ? paragraph.querySelector("em") : null;
+
+            if (definedTerm && !definedTerm.closest("dfn")) {
+                const semanticTerm = document.createElement("dfn");
+                semanticTerm.innerHTML = definedTerm.innerHTML;
+                definedTerm.replaceWith(semanticTerm);
+            }
+        });
+
+        const firstParagraph = Array.from(
+            template.content.querySelectorAll("p")
+        ).find(paragraph =>
+            !paragraph.closest(
+                ".math-env, .math-bibliography, blockquote, li, td, th"
+            )
+            && String(paragraph.textContent || "").trim().length >= 40
+        );
+
+        if (firstParagraph) {
+            firstParagraph.classList.add("math-entry-introduction");
+        }
 
         return template.innerHTML;
     }
@@ -281,6 +344,7 @@
                     /^Proof\.?$/i.test(String(heading.textContent || "").trim())
                     && isStandaloneHeading(heading)
                 ) {
+                    absorbFollowingHeadingPeriod(heading);
                     const normalizedHeading = document.createElement("em");
                     normalizedHeading.className = "pm-detected-proof-heading";
                     normalizedHeading.textContent = "Proof.";
@@ -311,6 +375,27 @@
                 + "|\\\\(?:qed|QED|Box|square|blacksquare))",
             flags
         );
+    }
+
+    function absorbFollowingHeadingPeriod(heading) {
+        let sibling = heading ? heading.nextSibling : null;
+
+        while (sibling) {
+            if (sibling.nodeType === Node.TEXT_NODE) {
+                const text = String(sibling.nodeValue || "");
+
+                if (!text.trim()) {
+                    sibling = sibling.nextSibling;
+                    continue;
+                }
+
+                if (/^\s*\.(?=\s|$)/.test(text)) {
+                    sibling.nodeValue = text.replace(/^\s*\.\s*/, "");
+                }
+            }
+
+            break;
+        }
     }
 
     function meaningfulTextNodes(root) {
@@ -567,7 +652,8 @@
     window.MathCmsRenderProofLayout = {
         splitProofLeadParagraphs,
         normalizeSketchProofHeading,
-        normalizeFormalResultHeadings,
+        normalizeFormalSectionHeadings,
+        normalizeSemanticEntrySections,
         standardizeProofEndings
     };
 })();

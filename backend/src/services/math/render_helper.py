@@ -346,36 +346,44 @@ def render_latex_list_block(match: re.Match) -> str:
     if not body:
         return match.group(0)
 
-    # Normalize optional labels:
-    # \item[foo] text  ->  \item text
-    body = re.sub(
-        r"\\item\s*\[[^\]]*\]",
-        r"\\item",
-        body,
+    item_pattern = re.compile(
+        r"\\item(?:\s*\[([^\]]*)\])?\s*",
         flags=re.IGNORECASE,
     )
-
-    raw_items = re.split(
-        r"\\item\b",
-        body,
-        flags=re.IGNORECASE,
-    )
-
+    item_matches = list(item_pattern.finditer(body))
     items = []
 
-    for raw_item in raw_items:
-        cleaned = raw_item.strip()
+    if item_matches:
+        leading_content = body[:item_matches[0].start()].strip()
+
+        if leading_content:
+            items.append(f"<li>{leading_content}</li>")
+
+    for index, item_match in enumerate(item_matches):
+        item_start = item_match.end()
+        item_end = (
+            item_matches[index + 1].start()
+            if index + 1 < len(item_matches)
+            else len(body)
+        )
+        cleaned = body[item_start:item_end].strip()
 
         if not cleaned:
             continue
 
-        items.append(f"<li>{cleaned}</li>")
+        label = (item_match.group(1) or "").strip()
+        label_html = (
+            f'<span class="math-list-label">{label}</span> '
+            if label
+            else ""
+        )
+        items.append(f"<li>{label_html}{cleaned}</li>")
 
     if not items:
         return match.group(0)
 
     return (
-        f"<{html_tag}>\n"
+        f'<{html_tag} class="math-list math-list-{env_name}">\n'
         + "\n".join(items)
         + f"\n</{html_tag}>"
     )
