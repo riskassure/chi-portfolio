@@ -761,6 +761,7 @@ THEOREM_LIKE_ENVIRONMENTS = {
     "thm*": "Theorem",
     "thmplain": "Theorem",
     "theorem": "Theorem",
+    "conjecture": "Conjecture",
     "lem": "Lemma",
     "lemma": "Lemma",
     "lemma*": "Lemma",

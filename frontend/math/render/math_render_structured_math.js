@@ -178,7 +178,8 @@
             }
 
             /*
-             * Split only a genuine top-level eqnarray row.
+             * Split only a genuine top-level row, accepting both \\
+             * and the TeX alignment separator \cr.
              *
              * Do not split \\ inside grouped macro arguments such
              * as:
@@ -189,7 +190,7 @@
                 nestedDepth === 0
                 && braceDepth === 0
                 && text[i] === "\\"
-                && text[i + 1] === "\\"
+                && (text[i + 1] === "\\" || /^\\cr\b/.test(text.slice(i)))
             ) {
                 rows.push(
                     text
@@ -200,7 +201,7 @@
                         .trim()
                 );
 
-                i += 1;
+                i += text[i + 1] === "\\" ? 1 : 2;
                 start = i + 1;
             }
         }
