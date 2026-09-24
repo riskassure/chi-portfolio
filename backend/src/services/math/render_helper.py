@@ -1696,7 +1696,9 @@ def protect_mathjax_environments(
     pattern = re.compile(
         rf"\\begin\{{({environment_pattern})\}}"
         rf"[\s\S]*?"
-        rf"\\end\{{\1\}}",
+        rf"\\end\{{\1\}}"
+        # Keep diagram row separators out of the prose-to-HTML cleanup.
+        r"|\\\[(?:(?!\\\])[\s\S])*?\\xymatrix\b(?:(?!\\\])[\s\S])*?\\\]",
         flags=re.IGNORECASE,
     )
 

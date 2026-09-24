@@ -450,7 +450,16 @@
                 colIndex += 1;
             }
 
-            return `<tr>${htmlCells.join("")}</tr>`;
+            // Give long connecting arrows (e.g. the snake lemma) vertical
+            // room in each inter-object row they cross.
+            const needsConnectingArrowSpace = rowIndex % 2 === 1
+                && diagonalArrows.some(arrow =>
+                    Math.abs(arrow.targetCol - arrow.sourceCol) > 1
+                    && rowIndex > 2 * Math.min(arrow.sourceRow, arrow.targetRow)
+                    && rowIndex < 2 * Math.max(arrow.sourceRow, arrow.targetRow)
+                );
+            const rowStyle = needsConnectingArrowSpace ? ' style="height:5em;"' : "";
+            return `<tr${rowStyle}>${htmlCells.join("")}</tr>`;
         }).join("");
 
         return `
