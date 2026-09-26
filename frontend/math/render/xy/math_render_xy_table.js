@@ -53,6 +53,12 @@
             && !hasNamedReferenceTwoCell;
 
         const diagonalArrows = [];
+        // Hasse diagrams have unlabelled, undirected edges. Overlay edges do
+        // not take up table space, so reserve gaps between their vertices.
+        const allArrows = sourceRows.flat().flatMap(cell => cell.arrows || []);
+        const isHasseDiagram = useDiagonalOverlay && allArrows.length > 0
+            && allArrows.every(arrow => arrow.style === "-"
+                && !arrow.label && !arrow.isSelfLoop);
 
         if (useDiagonalOverlay) {
             sourceRows.forEach((row, sourceRow) => {
@@ -143,7 +149,7 @@
                 )
             );
 
-        const wideDiagonalGapWidthEm = Math.max(
+        const wideDiagonalGapWidthEm = isHasseDiagram ? 2.4 : Math.max(
             arrowLayout.horizontalWidthEm || 3.6,
             4.2
         );
@@ -387,7 +393,7 @@
                     colIndex % 2 === 1;
 
                 const reservedGapStyle =
-                    hasWideDiagonal && isArrowSpaceColumn
+                    (hasWideDiagonal || isHasseDiagram) && isArrowSpaceColumn
                         ? `
                             width:${wideDiagonalGapWidthEm}em;
                             min-width:${wideDiagonalGapWidthEm}em;
@@ -395,7 +401,7 @@
                         : "";
 
                 const reservedGapHtml =
-                    hasWideDiagonal
+                    (hasWideDiagonal || isHasseDiagram)
                     && isArrowSpaceColumn
                     && !cellHtml
                         ? `
@@ -458,7 +464,8 @@
                     && rowIndex > 2 * Math.min(arrow.sourceRow, arrow.targetRow)
                     && rowIndex < 2 * Math.max(arrow.sourceRow, arrow.targetRow)
                 );
-            const rowStyle = needsConnectingArrowSpace ? ' style="height:5em;"' : "";
+            const rowStyle = needsConnectingArrowSpace ? ' style="height:5em;"'
+                : isHasseDiagram && rowIndex % 2 === 1 ? ' style="height:2.4em;"' : "";
             return `<tr${rowStyle}>${htmlCells.join("")}</tr>`;
         }).join("");
 
