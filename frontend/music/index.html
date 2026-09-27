@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="../runtime-config.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Music Catalog | Chi-Chih Woo</title>
@@ -32,7 +33,7 @@
             <div id="admin-controls-dock" style="display: none; border-top: 1px solid #ddd; padding-top: 12px; align-items: center; gap: 15px;">
                 <button id="admin-update-music" type="button">Update now</button>
                 <span id="admin-update-message" role="status" style="color: white;"></span>
-                <a href="http://127.0.0.1:5000/api/music/spotify/status" target="_blank" rel="noopener" style="color: white;">Spotify refresh status</a>
+                <a href="/api/music/spotify/status" target="_blank" rel="noopener" style="color: white;">Spotify refresh status</a>
                 <strong style="color: #2563eb;">🛠️ Edit Mode Active:</strong>
                 <button id="admin-edit-btn" style="padding: 6px 14px; background-color: #3498db; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Edit Table ✏️</button>
                 <button id="admin-save-btn" style="display: none; padding: 6px 14px; background-color: #2ecc71; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Save Changes 💾</button>

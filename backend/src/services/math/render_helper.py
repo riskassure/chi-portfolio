@@ -313,7 +313,7 @@ def make_diagram_img_tag(svg_filename: str) -> str:
 
     return (
         '<div class="math-diagram-wrap">'
-        f'<img src="http://127.0.0.1:5000/api/math/diagrams/{svg_filename}" '
+        f'<img src="/api/math/diagrams/{svg_filename}" '
         'class="math-diagram" '
         'alt="Mathematical diagram">'
         '</div>'

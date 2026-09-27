@@ -1,6 +1,7 @@
 # backend/src/config.py
 
 from pathlib import Path
+import os
 
 # 1. Establish the base anchor points
 CONFIG_DIR = Path(__file__).resolve().parent          # backend/src/
@@ -22,7 +23,7 @@ UTILS_DIR = CONFIG_DIR / "utils"
 MATH_UTILS_DIR = UTILS_DIR / "math"
 
 # 2. Define Global, Absolute Paths for the Entire Application Suite
-DB_PATH = BACKEND_DIR / "portfolio.db"
+DB_PATH = Path(os.environ.get("PORTFOLIO_DB_PATH", str(BACKEND_DIR / "portfolio.db")))
 
 PLANETMATH_CACHE_DIR = Path(r"C:\Development\planetmath_data")
 
@@ -35,7 +36,7 @@ PHOTO_RAW_DIR = BACKEND_DIR / "data" / "photos" / "raw"
 MATH_DATA_DIR = BACKEND_DIR / "data" / "math"
 SOURCE_CSV_PATH = MATH_DATA_DIR / "msc_master_source.csv"
 
-MATH_DIAGRAM_DIR = MATH_DATA_DIR / "diagrams"
+MATH_DIAGRAM_DIR = Path(os.environ.get("MATH_DIAGRAM_DIR", str(MATH_DATA_DIR / "diagrams")))
 MATH_TEMP_DIR = MATH_DATA_DIR / "temp"
 
 # Frontend Asset Targets

@@ -2,7 +2,7 @@
    ISOLATED ADMIN SWITCHBOARD CONTROLLER ENGINE
    ========================================================================== */
 
-const API_BASE = "http://127.0.0.1:5000/api";
+const API_BASE = `${window.PORTFOLIO_API_BASE}`;
 
 // Instantly run session diagnostic check when page mounts
 window.addEventListener('DOMContentLoaded', () => {

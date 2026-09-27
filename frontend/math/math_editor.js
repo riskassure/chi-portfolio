@@ -1,6 +1,6 @@
 // frontend/math/math_editor.js
 
-const API_ENDPOINT = "http://127.0.0.1:5000/api";
+const API_ENDPOINT = `${window.PORTFOLIO_API_BASE}`;
 
 const urlParams = new URLSearchParams(window.location.search);
 const editorMode = document.body.dataset.editorMode || "create";

@@ -1,7 +1,7 @@
 // frontend/math/render/math_render_helpers.js
 
 (function () {
-    const DEFAULT_API_ENDPOINT = "http://127.0.0.1:5000/api";
+    const DEFAULT_API_ENDPOINT = `${window.PORTFOLIO_API_BASE}`;
 
     window.MathCmsRender = {
         debugVersion: "multline-protection-v1",

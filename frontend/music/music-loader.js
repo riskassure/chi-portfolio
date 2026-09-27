@@ -53,7 +53,7 @@ function loadMusicData() {
     const params = new URLSearchParams({page: currentPage, per_page: recordsPerPage,
         search: activeFilters.searchQuery, playlist: activeFilters.spotify_playlist,
         sort: JSON.stringify(sortSequence)});
-    fetch(`http://127.0.0.1:5000/api/music?${params}`, {
+    fetch(`${window.PORTFOLIO_API_BASE}/music?${params}`, {
         credentials: "include"
     })
         .then(response => { if (!response.ok) throw new Error("Catalog unavailable"); return response.json(); })
@@ -445,7 +445,7 @@ async function saveTableChanges() {
     }
 
     try {
-        const response = await fetch("http://127.0.0.1:5000/api/music/update", {
+        const response = await fetch(`${window.PORTFOLIO_API_BASE}/music/update`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ changes: updatesPayload.flatMap(update =>

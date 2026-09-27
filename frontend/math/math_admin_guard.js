@@ -1,7 +1,7 @@
 // Prevent the audit interface from being shown outside an authenticated admin session.
 (async function guardMathAdminPage() {
     try {
-        const response = await fetch("http://127.0.0.1:5000/api/session-check", {
+        const response = await fetch(`${window.PORTFOLIO_API_BASE}/session-check`, {
             credentials: "include"
         });
 

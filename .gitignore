@@ -10,6 +10,12 @@ backend/*.db
 # ==========================================================================
 # Block local computer-compiled execution files
 __pycache__/
+.venv/
+.venv313/
+.python-runtimes/
+.uv-cache/
+.env
+.env.*
 *.pyc
 *.pyo
 *.pyd

@@ -1,8 +1,8 @@
 // frontend/photography/gallery.js
 
-const API_URL = "http://127.0.0.1:5000/api/photography/current";
-const ROTATE_URL = "http://127.0.0.1:5000/api/photography/rotate";
-const UPDATE_URL = "http://127.0.0.1:5000/api/photography/update";
+const API_URL = `${window.PORTFOLIO_API_BASE}/photography/current`;
+const ROTATE_URL = `${window.PORTFOLIO_API_BASE}/photography/rotate`;
+const UPDATE_URL = `${window.PORTFOLIO_API_BASE}/photography/update`;
 const galleryContainer = document.getElementById("photography-gallery");
 
 // Global mutable view states for runtime configuration
@@ -188,10 +188,11 @@ async function triggerSmoothExhibitionRefresh(mutateDatabase = false) {
         await new Promise(resolve => setTimeout(resolve, 600));
     }
 
-    if (mutateDatabase) {
+    if (mutateDatabase && isAdmin) {
         try {
             const response = await fetch(ROTATE_URL, {
                 method: "POST",
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ limit: photoPageSize })
             });

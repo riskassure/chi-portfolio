@@ -1,6 +1,6 @@
 // frontend/math/mathjax_audit.js
 
-const API_ENDPOINT = "http://127.0.0.1:5000/api";
+const API_ENDPOINT = `${window.PORTFOLIO_API_BASE}`;
 const AUDIT_VERSION = "mathjax-audit-overflow-v1";
 
 let latestAuditRows = [];

@@ -255,7 +255,7 @@ function makeLatexImageOrPlaceholder(
         return makeLatexImagePlaceholder(filename, escapeHtml);
     }
 
-    const baseEndpoint = String(apiEndpoint || "http://127.0.0.1:5000/api")
+    const baseEndpoint = String(apiEndpoint || `${window.PORTFOLIO_API_BASE}`)
         .replace(/\/$/, "");
     const extension = legacyImageExtensions.get(stem) || "svg";
     const src = `${baseEndpoint}/math/diagrams/legacy/${encodeURIComponent(stem)}.${extension}`;

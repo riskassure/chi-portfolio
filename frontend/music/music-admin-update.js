@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
     button.addEventListener("click", async () => {
         button.disabled = true;
         message.textContent = "Updating playlists and rankings. This may take a few minutes...";
-        const base = "http://127.0.0.1:5000/api/music/spotify";
+        const base = `${window.PORTFOLIO_API_BASE}/music/spotify`;
         try {
             const status = await fetch(`${base}/status`, {credentials: "include", cache: "no-store"});
             if (!status.ok) throw new Error("Please sign in as admin again, then retry.");
