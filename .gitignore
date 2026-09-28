@@ -14,6 +14,7 @@ __pycache__/
 .venv313/
 .python-runtimes/
 .uv-cache/
+dist/
 .env
 .env.*
 *.pyc
