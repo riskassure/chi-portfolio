@@ -43,7 +43,11 @@ async function bootClassificationHub() {
         }
 
         cachedClassifications = json.data;
-        renderClassificationCards(cachedClassifications);
+        renderSubjectBrowser();
+        window.addEventListener('hashchange', () => {
+            renderSubjectBrowser();
+            document.getElementById('subjectHeading').focus();
+        });
 
     } catch (err) {
         grid.innerHTML = `
@@ -52,6 +56,45 @@ async function bootClassificationHub() {
             </div>
         `;
     }
+}
+
+function renderSubjectBrowser() {
+    const labels = Object.fromEntries(Object.entries(window.MSC_SUBJECTS || {})
+        .map(([code, text]) => [code, normalizeClassificationMath(text)]));
+    const match = location.hash.match(/^#subject=(\d{2}[A-Z]?)$/);
+    const prefix = match ? match[1] : '';
+    const categories = cachedClassifications.filter(item => item.code.startsWith(prefix));
+    const breadcrumbs = document.getElementById('subjectBreadcrumbs');
+    breadcrumbs.innerHTML = '<a href="#">All subjects</a>';
+    if (prefix.length === 3) {
+        const parent = prefix.slice(0, 2);
+        breadcrumbs.innerHTML += ` <span aria-hidden="true">/</span> <a href="#subject=${parent}">${escapeHtml(labels[parent] || parent)}</a>`;
+    }
+    if (prefix) breadcrumbs.innerHTML += ` <span aria-hidden="true">/</span> <span aria-current="page">${escapeHtml(labels[prefix] || prefix)}</span>`;
+    document.getElementById('subjectHeading').textContent = prefix ? `${prefix} · ${labels[prefix] || 'Subject topics'}` : 'Browse subjects';
+    document.getElementById('subjectSummary').textContent = prefix.length === 3
+        ? 'Choose a topic to see its entries.' : 'Choose a subject to explore. Search above covers the entire library.';
+    const groups = new Map();
+    for (const item of categories) {
+        const code = item.code.trim();
+        // General-purpose codes such as 47-00 are direct topics under 47.
+        const key = !prefix ? code.slice(0, 2)
+            : prefix.length === 2 && /^\d{2}[A-Z]/.test(code) ? code.slice(0, 3) : code;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(item);
+    }
+    const items = [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([code, children]) => {
+        const branch = code.length < 5;
+        return {
+            code,
+            text: branch ? (labels[code] || `Subject ${code}`) : children[0].text,
+            href: branch ? `#subject=${code}` : `list.html?classification=${encodeURIComponent(code)}`,
+            count: branch ? `${children.length} topic${children.length === 1 ? '' : 's'}` : ''
+        };
+    });
+    renderClassificationCards(items);
+    typesetDirectoryContent(breadcrumbs);
+    typesetDirectoryContent(document.getElementById('subjectHeading'));
 }
 
 function renderClassificationCards(categories) {
@@ -71,11 +114,12 @@ function renderClassificationCards(categories) {
         const card = document.createElement("a");
 
         card.className = "classification-card";
-        card.href = `list.html?classification=${encodeURIComponent(item.code.trim())}`;
+        card.href = item.href || `list.html?classification=${encodeURIComponent(item.code.trim())}`;
 
         card.innerHTML = `
             <span class="class-card-code">${escapeHtml(item.code)}</span>
             <span class="class-card-text">${escapeHtml(normalizeClassificationMath(item.text))}</span>
+            ${item.count ? `<span class="subject-count">${escapeHtml(item.count)}</span>` : ''}
         `;
 
         grid.appendChild(card);
@@ -91,7 +135,7 @@ function setupUnifiedSearchEngine() {
 
     if (!searchInput || !dropdownMenu) return;
 
-    searchInput.placeholder = "Search concepts, synonyms, defined terms, or MSC categories...";
+    searchInput.placeholder = "Search concepts or codes…";
 
     searchInput.addEventListener("input", (e) => {
         const query = e.target.value.trim();

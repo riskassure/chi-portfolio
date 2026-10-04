@@ -1,6 +1,12 @@
 /* frontend/math/math.css */
 
 /* THE DIRECTORY CONTROLLER */
+.subject-breadcrumbs { display: flex; flex-wrap: wrap; gap: 0.5rem; line-height: 1.6; }
+.subject-count { font-size: 0.75rem; color: inherit; white-space: nowrap; margin-left: auto; }
+.math-index .classification-card { flex-wrap: wrap; }
+.math-index .class-card-text { flex: 1; min-width: 8rem; }
+.math-index #subjectHeading { overflow-wrap: anywhere; }
+
 .class-card-grid {
     display: block; 
     column-count: 3; 
@@ -62,9 +68,39 @@
     font-size: 0.95rem;
     font-weight: 500;
     line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* Give classifications room to read instead of squeezing three columns onto phones. */
+@media (max-width: 1050px) {
+    .class-card-grid {
+        column-count: 2;
+        column-gap: 1.25rem;
+    }
+}
+
+@media (max-width: 680px) {
+    .class-card-grid {
+        column-count: 1;
+        margin-top: 1.25rem;
+    }
+
+    .classification-card {
+        align-items: flex-start;
+        min-height: 44px;
+        box-sizing: border-box;
+    }
+}
+
+.math-index .search-box {
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 0.65rem 0.75rem;
+    font-size: 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
 }
 
 /* frontend/math/math.css */

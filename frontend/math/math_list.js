@@ -58,7 +58,7 @@ async function bootCategoryListView() {
                 );
                 
                 if (masterMatch && (masterMatch.text || masterMatch.name)) {
-                    document.getElementById("listHeaderSubName").innerText = masterMatch.text || masterMatch.name;
+                    document.getElementById("listHeaderSubName").textContent = String(masterMatch.text || masterMatch.name).replace(/\\\\/g, "\\");
                 } else {
                     document.getElementById("listHeaderSubName").innerText = "Specialized Research Domain";
                 }
@@ -75,6 +75,7 @@ async function bootCategoryListView() {
         
         // Trigger initial chunk card draw sequence
         resetAndDrawGridChunks();
+        typesetListElement(document.getElementById("listHeaderSubName"));
     } catch (err) {
         grid.innerHTML = `<div class="msg-box">Failed to populate catalog list: ${err.message}</div>`;
     }
@@ -133,8 +134,15 @@ function appendNextConceptChunk() {
     }
 
     // Call MathJax typesetter promise over freshly injected nodes
-    if (window.MathJax && typeof window.MathJax.typesetPromise === "function") {
-        window.MathJax.typesetPromise();
+    typesetListElement(grid);
+}
+
+async function typesetListElement(element) {
+    if (!window.MathCmsMathJax) return;
+    try {
+        await window.MathCmsMathJax.typesetElement(element, {page: 'math_list', section: element.id});
+    } catch (error) {
+        console.warn('Unable to typeset math list content:', error);
     }
 }
 

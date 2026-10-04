@@ -7,12 +7,12 @@
     <title>Mathematics Archive - Chi-Chih Woo</title>
     
     <link rel="stylesheet" href="../style.css">
-    <link rel="stylesheet" href="math.css?v=admin-tools-v1">
+    <link rel="stylesheet" href="math.css?v=subject-browser-v1">
     
     <script src="mathjax_config.js?v=directory-math-v2"></script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
 </head>
-<body>
+<body class="math-index">
 
     <div style="max-width: 1200px; margin: 2.5rem auto; padding: 0 1.5rem;">
         
@@ -21,7 +21,7 @@
             <p style="color: #64748b; margin-bottom: 1.5rem;">Search for concepts across the entire library instantly, or choose a category below to browse matching papers.</p>
             
             <div class="search-box-wrapper" style="position: relative; max-width: 600px;">
-                <input type="text" id="classSearch" class="search-box" placeholder="Type 3+ characters to search concepts or codes (e.g., group or 20K)..." autocomplete="off" style="width: 100%;">
+                <input type="text" id="classSearch" class="search-box" aria-label="Search mathematics concepts or classification codes" placeholder="Search concepts or codes…" autocomplete="off" style="width: 100%;">
                 <div id="searchDropdownMenu"></div>
             </div>
 
@@ -35,6 +35,9 @@
             </aside>
         </div>
 
+        <nav id="subjectBreadcrumbs" class="subject-breadcrumbs" aria-label="Subject hierarchy"></nav>
+        <h2 id="subjectHeading" tabindex="-1">Browse subjects</h2>
+        <p id="subjectSummary" aria-live="polite"></p>
         <div id="classCardGrid" class="class-card-grid">
             <div class="msg-box">Querying index classifications node map...</div>
         </div>
@@ -42,6 +45,7 @@
     </div>
 
     <script src="../navbar.js"></script>
-    <script src="math_index.js?v=directory-math-v2"></script>
+    <script src="msc_subjects.js?v=1"></script>
+    <script src="math_index.js?v=subject-typeset-v2"></script>
 </body>
 </html>
