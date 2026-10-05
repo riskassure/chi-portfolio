@@ -65,6 +65,29 @@ Never unpack the first-deployment ZIP over the live site.
 
 ## Math, music, photographs and other database content
 
+### Resume and biography editor
+
+Once the page-editor release is installed, log in as administrator and visit the
+resume or biography. Choose **Edit page text**, edit the outlined text, then
+**Save changes** or **Cancel**. Existing formatting and link destinations stay
+fixed; this editor does not add or remove sections. Refresh after logging in if
+the edit button is absent. Visitors cannot save through the API.
+
+Text overrides and prior revisions live in `profile_page_revisions` in the live
+database, created on the first save. Include it in database backups. Do not
+renumber/reuse `data-page-text` keys when changing HTML later: they identify saved
+text. Existing overrides take precedence over the original HTML text. Revision
+history is retained for recovery but has no restore button yet. The public pages
+need JavaScript to display overrides; original HTML is the fallback.
+
+First installation requires the updated resume.html and bio.html, page_editor.js,
+page_editor.css, backend/src/app.py and backend/src/routes/page_content.py. Back
+up the live database and those files before uploading. Upload the backend route
+before app.py, reload PythonAnywhere, then upload the frontend files. Verify
+logged-out viewing and denied saves, admin saving, printing, and cancellation.
+Do not upload the laptop database. This is a backend release, unlike the previous
+math layout update.
+
 - Small math edits: use the live admin editor after taking a backup.
 - Locally prepared content: download a fresh live database snapshot first and
   work on a separate local copy, leaving your existing local database intact.

@@ -1,0 +1,6 @@
+.page-editor { margin: 1rem 0; padding: 1rem; background: #eef5ff; border: 1px solid #a5b4fc; border-radius: 8px; }
+.page-editor[hidden], .page-editor button[hidden] { display: none; }
+.page-editor button { padding: .65rem 1rem; margin: .25rem; cursor: pointer; }
+[data-page-text][contenteditable="plaintext-only"] { outline: 1px dashed #2563eb; white-space: pre-wrap; }
+[data-page-text]:focus { outline: 2px solid #2563eb; }
+@media print { .page-editor { display: none !important; } [data-page-text] { outline: none !important; } }

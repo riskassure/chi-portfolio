@@ -31,6 +31,8 @@ if not password and not IS_PRODUCTION:
 FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
 login_attempts = defaultdict(deque)
 login_lock = Lock()
+LOCAL_ORIGINS = {"http://127.0.0.1:5000", "http://localhost:5000",
+                 "http://127.0.0.1:5500", "http://localhost:5500"}
 
 @app.before_request
 def protect_requests():
@@ -38,9 +40,7 @@ def protect_requests():
         return jsonify(error="Administrator login required."), 403
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("Origin")
-        allowed = {PUBLIC_ORIGIN} if IS_PRODUCTION else {
-            "http://127.0.0.1:5000", "http://localhost:5000",
-            "http://127.0.0.1:5500", "http://localhost:5500"}
+        allowed = {PUBLIC_ORIGIN} if IS_PRODUCTION else LOCAL_ORIGINS
         # Browsers supply Origin for state-changing requests. In production fail closed.
         if (IS_PRODUCTION and not origin) or (origin and origin not in allowed):
             return jsonify(error="Request origin rejected."), 403
@@ -137,12 +137,14 @@ def check_session_status():
 # 🔌 PLUG-IN MODULE REGISTER MAP (BLUEPRINTS)
 # ==========================================================================
 from routes.admin_music import music_bp
+from routes.page_content import pages_bp
 from routes.admin_photography import photography_bp
 from routes.admin_math import math_bp
 from routes.music_spotify import spotify_bp
 from routes.google_photos import google_photos_bp
 
 app.register_blueprint(music_bp)
+app.register_blueprint(pages_bp)
 app.register_blueprint(photography_bp)
 app.register_blueprint(math_bp)
 app.register_blueprint(spotify_bp)
