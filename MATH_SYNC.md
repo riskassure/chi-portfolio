@@ -1,5 +1,56 @@
 # Incremental math synchronization
 
+## Guided helper (recommended)
+
+### Bring website changes home (menu option 8)
+
+Stop the local server, then select **8** and type `STOPPED`. The helper downloads
+a new verified live snapshot using the existing SSH downloader (which may ask
+for the PythonAnywhere account password twice). It compares every database table
+against the remembered baseline and working copy, not just math fields.
+
+It allows a refresh only if each local table is unchanged from the baseline or
+already exactly matches live. This first version is deliberately conservative:
+different IDs, timestamps or audit rows can require manual review even when the
+visible content looks identical. It stops on divergent local rows, schema changes,
+or differences in media-related tables. It does not merge unpublished edits.
+
+On success it creates verified `base.db` and `working.db` in a new ignored
+`dist/home-sync/<unique-id>/` folder and remembers those paths. The original
+databases, downloaded snapshot, and previous workflow settings are preserved.
+Choose **6** to restart the local server on the refreshed working copy. The
+baseline must remain unchanged. A comparison report is saved on both successful
+and blocked comparisons. No live database writes or reloads are performed.
+
+This is database synchronization only. Website program files and media files
+are not downloaded or reconciled. Stop the local server before switching copies
+so it does not keep writing to the old database. Do not run concurrent helpers.
+
+```powershell
+.\.venv313\Scripts\python.exe backend/math_workflow.py
+```
+
+The numbered menu remembers the baseline and working database paths in ignored
+`dist/math-workflow.json`. It does not store passwords or API tokens. Choose
+Show local changes, then Prepare an entry and review the displayed diff. Next
+choose Stage, Check live, and Publish. Publishing requires typing `PUBLISH` and
+the transactional publisher still repeats the live checks. SSH may prompt for
+your PythonAnywhere account password. The existing private API settings are
+used for staging.
+
+Prepared packages, review reports and receipts are retained under ignored
+`dist/math-workflow/`. Baseline or package changes and edits to the selected local
+entry invalidate the prepared workflow. Conflicts prevent publication. A failed
+publication requires another live check before retrying. The helper supports new
+text-only entries and existing content/synonym updates; other metadata edits and
+deletions are listed as unsupported. Do not run multiple helpers simultaneously.
+
+After publication, verify the site and download a fresh baseline using the
+existing downloader. Preserve unpublished edits before refreshing the working
+copy, then choose Set baseline and working paths. No databases are automatically
+replaced. Start local server uses the remembered working copy and asks for the
+usual session password; stop any existing local server first.
+
 ## Upload a reviewed package through the API
 
 After configuring `backend/pythonanywhere_api.py setup` and passing its `check`,
