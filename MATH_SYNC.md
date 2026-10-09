@@ -46,7 +46,74 @@ that snapshot. Without it, live eligibility is explicitly not checked. Even
 with it, publication must repeat checks against the live database in a write
 transaction. The inspector never authorizes or applies publication itself.
 
-## Increment: publish one new text-only entry
+## Check a staged package against the live database
+
+In a regular VS Code terminal (not PowerShell ISE):
+
+```powershell
+.\.venv313\Scripts\python.exe backend/preflight_live_package.py REMOTE-STAGING-PATH --local dist/metric-space-review.zip --output dist/live-preflight.txt
+```
+
+Replace the staging path with the one printed by the uploader. SSH may prompt
+once for your PythonAnywhere account password. The tool sends the local reviewed
+checker modules through SSH to run in memory; it does not install scripts or run
+code from the ZIP. It verifies the staged ZIP against the local SHA-256 and opens
+the actual live database read-only in a consistent transaction.
+
+Read the report for `ALREADY PRESENT`, an eligible-for-further-review result, or
+`BLOCKED`/`CONFLICT`. Unsupported or malformed packages fail the check. A report
+is not publication approval: live content can change afterward, so a publisher
+must recheck under a write lock. No extraction, backup, database update or web
+reload is performed by this command. Each report requires a new output filename.
+
+## Publish one new text-only entry
+
+### Prepare an existing entry's content and synonym changes
+
+```powershell
+.\.venv313\Scripts\python.exe backend/prepare_math_patch.py --base dist/sync-first-test/base.db --local dist/sync-first-test/working.db --canonical CANONICAL-NAME --output dist/entry-update-review.zip
+```
+
+Use the actual unchanged baseline from which the working copy was created.
+The reusable preparer requires both copies to contain the entry and rejects
+changes outside content and synonyms. It packages the full expected baseline
+record plus the proposed content and optional replacement synonym list. Review
+the text diff and synonym additions/removals before staging. Existing text-only
+packages remain supported and preserve synonyms.
+
+Preflight checks the full expected entry, including its synonyms. Publication
+repeats that check under the write lock, creates a verified backup, then updates
+content and synonyms in the same transaction. A failure rolls back both changes.
+Synonym changes on the live entry cause a conflict, even if its text still
+matches. An already-applied package is skipped only when both content and
+synonyms match. These checks do not establish mathematical correctness or detect
+aliases belonging to other entries; review meaning and cross-entry naming before
+publication.
+
+### Publish a staged package after reviewing live preflight
+
+```powershell
+.\.venv313\Scripts\python.exe backend/publish_staged_package.py REMOTE-STAGING-PATH --local dist/REVIEWED-PACKAGE.zip --output dist/publication-receipt.json --apply
+```
+
+Use the same reviewed ZIP and staging path used for preflight. The explicit
+`--apply` command publishes one supported new entry or existing-entry text patch.
+It uses the host's `chi-portfolio` virtualenv and sends trusted local publisher
+modules through SSH; code bundled in the ZIP is never executed. The staged ZIP
+must still match the local digest. Identical existing content returns
+`ALREADY_PRESENT` without a backup or update. Otherwise the transactional updater
+rechecks duplicates/expected content under a write lock, creates a verified
+backup, applies only the selected entry, verifies it, and commits.
+
+The receipt records `APPLIED` and the backup path, or `ALREADY_PRESENT`. An SSH
+failure or interrupted command can leave a `PENDING` receipt even if the server
+committed. Keep it and run live preflight before retrying. Never assume a failed
+connection means an update was rolled back. Use a new receipt filename per run.
+After a successful change, verify the page and download a new baseline. No web
+reload is performed. This command does not publish site files, media, deletions,
+or biography/resume changes.
+
+### Prepare a new entry package
 
 Create the new concept in a working copy of a known live baseline. Download a
 fresh live snapshot and run the three-way comparison. Review the mathematics,

@@ -16,6 +16,7 @@ from pythonanywhere_api import HOST, SETTINGS, NoRedirects, validate
 from stage_pythonanywhere_package import MAX_BYTES, read_package, validate_package
 from publish_math_entry import validate as validate_entry, check_target
 from preview_math_sync import read_snapshot
+from apply_math_text_patch import patch_intended
 
 
 def fetch_verified(settings, remote, local):
@@ -36,7 +37,7 @@ def fetch_verified(settings, remote, local):
     return validate_package(data)
 
 
-def preview(data, snapshot=None):
+def preview(data, snapshot=None, *, live=False):
     validate_package(data)
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         names = archive.namelist()
@@ -49,19 +50,20 @@ def preview(data, snapshot=None):
     if not isinstance(payload, dict):
         raise ValueError('Invalid math payload.')
     if 'replacement_tex' in payload:
-        if set(payload) != {'canonical_name', 'expected', 'replacement_tex'}:
-            raise ValueError('Invalid text patch fields.')
+        intended = patch_intended(payload)
         canonical = payload['canonical_name']
         expected = payload['expected']
         validate_entry(dict(expected, canonical_name=canonical))
         validate_entry(dict(expected, canonical_name=canonical, cleaned_tex=payload['replacement_tex']))
-        report += ['Proposed operation: change existing entry text', 'Entry: ' + canonical]
+        report += ['Proposed operation: change existing entry text and/or synonyms', 'Entry: ' + canonical]
         report += list(difflib.unified_diff(expected['cleaned_tex'].splitlines(),
                       payload['replacement_tex'].splitlines(), fromfile='expected text',
                       tofile='proposed text', lineterm=''))
+        if 'replacement_synonyms' in payload:
+            report += ['Synonyms added: ' + json.dumps(sorted(set(intended['synonyms']) - set(expected['synonyms']))),
+                       'Synonyms removed: ' + json.dumps(sorted(set(expected['synonyms']) - set(intended['synonyms'])))]
         if snapshot:
             current = read_snapshot(snapshot).get(canonical)
-            intended = dict(expected, cleaned_tex=payload['replacement_tex'])
             status = ('ALREADY PRESENT — no update needed' if current == intended else
                       'EXPECTED TEXT MATCHES — eligible for further review' if current == expected else
                       'CONFLICT — snapshot differs from expected entry')
@@ -82,8 +84,9 @@ def preview(data, snapshot=None):
                     except ValueError as error:
                         status = 'BLOCKED — ' + str(error)
     if snapshot:
-        report += ['Comparison snapshot: ' + str(Path(snapshot).resolve()), status,
-                   'This checks the supplied snapshot, not the current live database.']
+        report += [('Live database: ' if live else 'Comparison snapshot: ') + str(Path(snapshot).resolve()), status,
+                   ('Checked in a consistent read-only transaction; live content may change after this check.'
+                    if live else 'This checks the supplied snapshot, not the current live database.')]
     else:
         report += ['Live eligibility NOT CHECKED: no database snapshot supplied.']
     report += ['Nothing extracted, executed, applied or reloaded. Publication requires separate live checks.']
