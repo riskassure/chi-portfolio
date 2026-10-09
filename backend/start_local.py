@@ -10,7 +10,14 @@ import sys
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=5001)
+    parser.add_argument('--database', type=Path, help='Use a separate working database for local testing.')
     args = parser.parse_args()
+    if args.database:
+        database = args.database.resolve()
+        if not database.is_file():
+            raise SystemExit(f'Database not found: {database}')
+        os.environ['PORTFOLIO_DB_PATH'] = str(database)
+        print(f'Local working database: {database}', flush=True)
     password = getpass.getpass('Choose a password for this local session (16+ characters): ')
     if len(password) < 16:
         raise SystemExit('Please choose at least 16 characters and run again.')

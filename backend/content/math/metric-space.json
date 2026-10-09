@@ -1,0 +1,41 @@
+{
+  "canonical_name": "MetricSpace",
+  "slug": "metric-space",
+  "title": "metric space",
+  "owner": "CWoo",
+  "cleaned_tex": "\\begin{definition}\nA \\emph{metric} on a set $X$ is a function $d:X\\times X\\to[0,\\infty)$ satisfying, for all $x,y,z\\in X$:\n\\begin{enumerate}\n\\item $d(x,y)=0$ if and only if $x=y$ (identity of indiscernibles);\n\\item $d(x,y)=d(y,x)$ (symmetry);\n\\item $d(x,z)\\le d(x,y)+d(y,z)$ (triangle inequality).\n\\end{enumerate}\nThe pair $(X,d)$ is a \\emph{metric space}. Nonnegativity is included in the specified codomain. Distances are finite real numbers. We allow $X$ to be empty.\n\\end{definition}\n\n\\section*{Examples}\n\\begin{example}\nOn $\\mathbb{R}$, $d(x,y)=|x-y|$ is the usual metric. On $\\mathbb{R}^n$, the Euclidean metric is\n\\[\nd(x,y)=\\left(\\sum_{i=1}^{n}(x_i-y_i)^2\\right)^{1/2}.\n\\]\n\\end{example}\n\\begin{example}\nOn any set $X$, put $d(x,x)=0$ and $d(x,y)=1$ whenever $x\\ne y$. This is the \\emph{discrete metric}. An open ball of radius $1/2$ consists of its center alone.\n\\end{example}\n\\begin{example}\nIf $Y\\subseteq X$, restricting $d$ to $Y\\times Y$ gives a metric on $Y$, called the \\emph{subspace metric}.\n\\end{example}\n\n\\section*{The induced topology}\nFor $x\\in X$ and $r>0$, the open ball is\n\\[\nB_d(x,r)=\\{y\\in X:d(x,y)<r\\}.\n\\]\n\\begin{definition}\nThe \\emph{metric topology} consists of those subsets $U\\subseteq X$ such that each $x\\in U$ has some $r>0$ with $B_d(x,r)\\subseteq U$.\nA topological space is \\emph{metrizable} if its topology is the metric topology for some metric on its underlying set. A metrizable space need not have a particular metric specified; a metric space does.\n\\end{definition}\n\\begin{proof}\nThe empty set satisfies the condition vacuously, and $X$ satisfies it. For a union, a point belongs to one member, whose ball also lies in the union. For the intersection of two open sets containing $x$, take the smaller of their two radii. Thus these sets form a topology. Moreover, if $y\\in B_d(x,r)$, the triangle inequality gives\n$B_d(y,r-d(x,y))\\subseteq B_d(x,r)$.\nHence balls are open and form a basis for this topology.\n\\end{proof}\n\n\\begin{theorem}\nEvery metric space, with its metric topology, is Hausdorff.\n\\end{theorem}\n\\begin{proof}\nFor distinct $x,y$, set $r=d(x,y)/3>0$. If $z$ belonged to both $B_d(x,r)$ and $B_d(y,r)$, then\n\\[\nd(x,y)\\le d(x,z)+d(z,y)<2r<d(x,y),\n\\]\na contradiction. These balls are disjoint open neighborhoods of the two points.\n\\end{proof}\n\n\\section*{Further connections}\nThe balls $B_d(x,1/n)$, for positive integers $n$, form a countable neighborhood basis at $x$: for any radius $r>0$, choose $n$ with $1/n<r$. Thus metric spaces are first countable.\nA metric space need not be second countable: an uncountable set with the discrete metric has every singleton open, so every basis must contain all singletons.\nDifferent metrics can induce the same topology; see metric equivalence.\n\n\\begin{thebibliography}{2}\n\\bibitem{munkres} J. R. Munkres, \\emph{Topology}, second edition, Prentice Hall, 2000, sections 20--21.\n\\bibitem{lebl} J. Lebl, \\emph{Basic Analysis I}, chapter 7, available at \\url{https://www.jirka.org/ra/html/ms_chapter.html}.\n\\end{thebibliography}\n",
+  "is_cleaned": 1,
+  "classifications": [
+    "54E35"
+  ],
+  "types": [
+    "Definition",
+    "Example",
+    "Proof",
+    "Theorem"
+  ],
+  "synonyms": [
+    "metric spaces"
+  ],
+  "definitions": [
+    "metric",
+    "metric topology",
+    "metrizable space",
+    "discrete metric",
+    "subspace metric"
+  ],
+  "link_exclusions": [
+    "space",
+    "pair",
+    "normal",
+    "field",
+    "ring"
+  ],
+  "related_concepts": [
+    "TopologicalSpace",
+    "Ball",
+    "MetricEquivalence",
+    "FirstCountability",
+    "SecondCountability"
+  ]
+}
