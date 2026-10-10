@@ -12,7 +12,7 @@ from stage_pythonanywhere_package import read_package
 
 # Only these local, reviewed modules are sent. Scripts inside the ZIP are never run.
 MODULES = ('pythonanywhere_api', 'stage_pythonanywhere_package', 'preview_math_sync',
-           'publish_math_entry', 'apply_math_text_patch', 'inspect_staged_package')
+           'publish_math_entry', 'apply_math_text_patch', 'profile_sync', 'inspect_staged_package')
 BOOTSTRAP = '''
 import sys, json, types, hashlib
 from pathlib import Path

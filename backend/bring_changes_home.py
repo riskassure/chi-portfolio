@@ -25,8 +25,22 @@ def inventory(db):
     for name, in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"):
         quoted = '"' + name.replace('"', '""') + '"'
         # Compare complete rows, including metadata omitted by the math preview.
-        tables[name] = Counter(hashlib.sha256(repr(tuple(row)).encode('utf-8')).hexdigest()
-                               for row in db.execute('SELECT * FROM ' + quoted))
+        if name == 'profile_page_revisions':
+            columns = [row[1] for row in db.execute('PRAGMA table_info(' + quoted + ')') if row[1] != 'saved_at']
+            projection = ','.join('"'+column.replace('"','""')+'"' for column in columns)
+            rows = []
+            for row in db.execute('SELECT ' + projection + ' FROM ' + quoted):
+                values = list(row)
+                if {'page', 'revision', 'content'} <= set(columns):
+                    index = columns.index('content')
+                    values[index] = json.dumps(json.loads(values[index]), sort_keys=True, ensure_ascii=False)
+                rows.append(tuple(values))
+            # Publishing appends the same revision at a different time. Preserve
+            # comparison of all history and fields, but ignore save time/JSON spacing.
+            tables[name] = Counter(hashlib.sha256(repr(row).encode('utf-8')).hexdigest() for row in rows)
+        else:
+            tables[name] = Counter(hashlib.sha256(repr(tuple(row)).encode('utf-8')).hexdigest()
+                                   for row in db.execute('SELECT * FROM ' + quoted))
     return schema, tables
 
 

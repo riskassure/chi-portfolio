@@ -1,5 +1,25 @@
 # Incremental math synchronization
 
+## Biography and resume updates
+
+Use **9. Prepare biography or resume update** in the existing helper. Enter
+`bio` or `resume` after editing and saving that page through the local admin UI.
+Review the before/after text fields, then use **3** (stage), **4** (live preflight),
+and **5** (explicit publication). The remembered baseline and working database
+paths are used. No separate paths or upload commands are needed.
+
+The package contains the expected page revision, replacement plain-text fields,
+and a fingerprint of the local HTML template. The live template must match and
+the expected revision must still be current. Publication creates a verified
+database backup and appends a new revision in one transaction, preserving history.
+Retired or unknown fields cannot be reintroduced. This transfers admin text edits;
+it does not publish HTML layout, links, PDFs, photos, or other files.
+
+After publication verify the page, then use Bring website changes home. Its
+comparison ignores profile save timestamps and JSON formatting, but checks all
+revision numbers and text fields, including history. Divergent history stops
+for review even when the latest visible text matches.
+
 ## Guided helper (recommended)
 
 ### Bring website changes home (menu option 8)

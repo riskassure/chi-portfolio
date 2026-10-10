@@ -19,6 +19,7 @@ from pythonanywhere_api import SETTINGS, validate
 from apply_math_text_patch import patch_intended
 from download_live_database import download
 from bring_changes_home import refresh
+import profile_sync
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / 'dist' / 'math-workflow.json'
@@ -95,9 +96,30 @@ def current_job(state):
         raise ValueError('Prepare a selected entry first.')
     if digest(state['base']) != state['base_sha256'] or digest(job['package']) != job['sha256']:
         raise ValueError('Baseline or package changed. Prepare a new review package.')
-    if read_snapshot(state['working']).get(job['canonical']) != job['proposed']:
+    current = (profile_sync.page_state(state['working'], job['canonical'])['fields']
+               if job.get('kind') == 'profile' else read_snapshot(state['working']).get(job['canonical']))
+    if job.get('kind') == 'profile' and profile_sync.template_info(ROOT/'frontend', job['canonical'])[0] != job['template_sha256']:
+        raise ValueError('Local profile template changed. Prepare again.')
+    if current != job['proposed']:
         raise ValueError('Local entry changed since preparation. Prepare it again before continuing.')
     return job
+
+
+def prepare_profile(state, page):
+    if digest(state['base']) != state['base_sha256']:
+        raise ValueError('Baseline changed. Select the correct baseline.')
+    payload = profile_sync.prepare_payload(state['base'], state['working'], page, ROOT/'frontend')
+    folder = ROOT/'dist'/'math-workflow'/uuid.uuid4().hex
+    folder.mkdir(parents=True)
+    package = folder/'package.zip'
+    with zipfile.ZipFile(package, 'x', compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr('profile.json', json.dumps(payload, ensure_ascii=False, indent=2))
+    report = preview(read_package(package))
+    (folder/'review.txt').write_text(report, encoding='utf-8')
+    state['job'] = dict(kind='profile', canonical=page, package=str(package), sha256=digest(package),
+                        proposed=payload['replacement'], template_sha256=payload['template_sha256'], remote=None, checked=False)
+    save(state)
+    return report
 
 
 def upload(state):
@@ -152,11 +174,11 @@ def publish_reviewed(state):
 def main():
     state = json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else None
     while True:
-        print('\nMath update helper')
+        print('\nWebsite update helper')
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -202,6 +224,9 @@ def main():
                     print('Choose 6 to restart the local server using this copy. No website files or media were downloaded.')
                 else:
                     print('Saved paths and existing databases are unchanged. Review the report before proceeding.')
+            elif choice == '9':
+                print(prepare_profile(state, input('Page to prepare (bio or resume): ').strip()))
+                print('Review the changes above, then choose 3 to stage, 4 to check live, and 5 to publish.')
             else:
                 print('Choose one of the listed numbers.')
         except (ValueError, RuntimeError, OSError, sqlite3.Error, subprocess.CalledProcessError) as error:

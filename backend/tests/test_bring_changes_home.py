@@ -74,6 +74,27 @@ class BringHomeTests(unittest.TestCase):
             self.edit(path, "UPDATE math_concepts SET content='published'")
         self.assertTrue(self.run_refresh()['safe'])
 
+    def test_profile_save_times_ignored_but_history_checked(self):
+        for path in (self.base, self.local, self.live):
+            with closing(sqlite3.connect(path)) as db:
+                db.execute('DROP TABLE profile_page_revisions')
+                db.execute('CREATE TABLE profile_page_revisions(page TEXT,revision INTEGER,content TEXT,saved_at TEXT)')
+                db.execute('INSERT INTO profile_page_revisions VALUES(?,?,?,?)', ('bio',1,'{"name":"Chi"}','original'))
+                db.commit()
+        self.state['base_sha256'] = self.hash(self.base)
+        for path, timestamp, content in ((self.local,'local time','{"name":"Chi Woo"}'),
+                                          (self.live,'live time','{ "name": "Chi Woo" }')):
+            with closing(sqlite3.connect(path)) as db:
+                db.execute('INSERT INTO profile_page_revisions VALUES(?,?,?,?)', ('bio',2,content,timestamp))
+                db.commit()
+        original_state = dict(self.state)
+        self.assertTrue(self.run_refresh()['safe'])
+        self.state = original_state
+        self.save.reset_mock()
+        self.edit(self.local, "UPDATE profile_page_revisions SET content='{\"name\":\"Unpublished\"}' WHERE revision=1")
+        self.assertFalse(self.run_refresh()['safe'])
+        self.save.assert_not_called()
+
     def test_changed_media_needs_review(self):
         self.edit(self.live, "INSERT INTO photography_catalog VALUES(1,'new-photo.jpg')")
         result = self.run_refresh()

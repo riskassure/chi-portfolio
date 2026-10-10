@@ -17,6 +17,7 @@ from stage_pythonanywhere_package import MAX_BYTES, read_package, validate_packa
 from publish_math_entry import validate as validate_entry, check_target
 from preview_math_sync import read_snapshot
 from apply_math_text_patch import patch_intended
+import profile_sync
 
 
 def fetch_verified(settings, remote, local):
@@ -49,7 +50,18 @@ def preview(data, snapshot=None, *, live=False):
         payload = json.loads(archive.read(payloads[0]))
     if not isinstance(payload, dict):
         raise ValueError('Invalid math payload.')
-    if 'replacement_tex' in payload:
+    if payload.get('kind') == 'profile':
+        profile_sync.validate_payload(payload)
+        report += ['Proposed operation: update profile page ' + payload['page']]
+        for key, value in sorted(payload['replacement'].items()):
+            old = payload['expected']['fields'].get(key)
+            if old != value:
+                report += ['Field: ' + key, 'Before: ' + json.dumps(old, ensure_ascii=False),
+                           'After: ' + json.dumps(value, ensure_ascii=False)]
+        if snapshot:
+            frontend = Path(snapshot).resolve().parent.parent/'frontend' if live else Path(__file__).resolve().parents[1]/'frontend'
+            status = profile_sync.status(snapshot, payload, frontend)
+    elif 'replacement_tex' in payload:
         intended = patch_intended(payload)
         canonical = payload['canonical_name']
         expected = payload['expected']
