@@ -1,4 +1,26 @@
-# Incremental math synchronization
+# Website content synchronization
+
+## Remembered local admin password (Windows)
+
+Option **6** now asks you to choose and confirm a password only on the first
+startup. Later startups reuse it. The encrypted file is
+`~/.config/chi-portfolio/local-admin-password.dpapi`, outside the project and Git.
+It uses Windows DPAPI current-user protection; software running under your Windows
+account can decrypt it. It is separate from the live admin and PythonAnywhere
+account passwords. Browser login is still required after a server restart.
+
+To change a forgotten password, stop the local server and run:
+
+```powershell
+.\.venv313\Scripts\python.exe backend/start_local.py --reset-password --database PATH-TO-YOUR-WORKING-DB
+```
+
+Use the working path shown in the helper. `--session-password` instead chooses a
+temporary password without overwriting the saved one (also usable off Windows).
+Neither command changes live credentials. Use the normal VS Code terminal, not
+PowerShell ISE. Never put passwords in command arguments or Git.
+
+Windows protection reference: https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata
 
 ## Biography and resume updates
 
@@ -47,7 +69,7 @@ are not downloaded or reconciled. Stop the local server before switching copies
 so it does not keep writing to the old database. Do not run concurrent helpers.
 
 ```powershell
-.\.venv313\Scripts\python.exe backend/math_workflow.py
+.\.venv313\Scripts\python.exe backend/website_workflow.py
 ```
 
 The numbered menu remembers the baseline and working database paths in ignored
@@ -296,3 +318,7 @@ The preview command never applies changes. Separate targeted publishers exist
 for text changes and new text-only entries. They recheck live records inside a
 write transaction; a snapshot report alone does not authorize overwriting a
 database that has changed since the snapshot was taken.
+
+The helper is now named `website_workflow.py`. The old `math_workflow.py` command
+still works. Existing saved settings and package folders keep their original
+names so no paths or workflow state need to be migrated.
