@@ -1,5 +1,29 @@
 # Website content synchronization
 
+## Google Photos and new-photo publication
+
+The local launcher configures the Google Photos integration for its chosen port
+(normally 5001). Register `http://127.0.0.1:5001/auth/google/callback` on the
+existing Google OAuth web client and preserve previous redirect URIs. Include
+the same URI in the existing private `~/.config/chi-portfolio/google-oauth.json`
+without changing its client ID or secret. Do not place
+that JSON in the repository. Google still requires explicit photo selection and
+consent; the program handles downloads and WebP conversion afterward.
+
+Start the local server with **6**. From another helper terminal choose **10** to
+open the Google Photos review page, or use the photography page's Google links.
+Review titles and locations, then add individual drafts or all reviewed drafts
+to the local gallery. This does not publish them to the live website.
+
+Choose **11** to prepare one new local gallery photo. Review it, then use **3**,
+**4**, and **5** as usual. The package contains both the image and its catalog
+metadata, with checksum verification and a live database backup. Existing image
+or metadata conflicts stop publication; matching repeats are skipped. Failed
+inserts can leave a verified unlisted image for a later retry, but never commit
+a catalog entry before its image is verified. After checking the live gallery,
+use **8** to refresh the baseline and bring gallery images home. Publishing
+existing-photo edits or deletions is not yet supported.
+
 ## Remembered local admin password (Windows)
 
 Option **6** now asks you to choose and confirm a password only on the first
@@ -51,11 +75,26 @@ a new verified live snapshot using the existing SSH downloader (which may ask
 for the PythonAnywhere account password twice). It compares every database table
 against the remembered baseline and working copy, not just math fields.
 
-It allows a refresh only if each local table is unchanged from the baseline or
-already exactly matches live. This first version is deliberately conservative:
-different IDs, timestamps or audit rows can require manual review even when the
-visible content looks identical. It stops on divergent local rows, schema changes,
-or differences in media-related tables. It does not merge unpublished edits.
+For ordinary tables, refresh requires that local content is unchanged from the
+baseline or matches live (profile save timestamps/JSON spacing are ignored).
+Photos are compared individually by filename and editable metadata, including
+visibility. Gallery IDs, rotation counters and rotation timestamps may differ.
+Unpublished or conflicting local photos still stop the refresh. Unrecognized
+schemas and changes to other media-related tables also stop for review.
+
+All gallery WebP files referenced by the live snapshot are checksum-verified
+against a read-only SSH manifest. Missing images are downloaded using SCP into
+the new sync folder, verified, then installed without overwriting existing files.
+A missing remote image, unsafe filename or different local image stops the
+refresh. Same-filename image replacements require manual review. Limits are
+25 MB per image and 1 GB for the gallery. Files absent from the live catalog are
+not deleted locally.
+
+Local Google Photos import drafts are preserved in the new working database;
+their gallery links are remapped by filename to the live IDs. Private draft
+images stay in their existing local folder. The baseline stays an exact live
+snapshot. Remote-only private drafts require review because their private image
+files are not part of the gallery download.
 
 On success it creates verified `base.db` and `working.db` in a new ignored
 `dist/home-sync/<unique-id>/` folder and remembers those paths. The original
@@ -64,8 +103,10 @@ Choose **6** to restart the local server on the refreshed working copy. The
 baseline must remain unchanged. A comparison report is saved on both successful
 and blocked comparisons. No live database writes or reloads are performed.
 
-This is database synchronization only. Website program files and media files
-are not downloaded or reconciled. Stop the local server before switching copies
+Website program files and other media (music, PDFs, math diagrams) are not
+downloaded. If a transfer or state save fails, the old database paths remain
+active; verified extra images may remain and can be reused on retry. The report's
+`refresh_complete` flag indicates whether the switch finished. Stop the local server before switching copies
 so it does not keep writing to the old database. Do not run concurrent helpers.
 
 ```powershell

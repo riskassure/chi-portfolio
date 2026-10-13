@@ -14,6 +14,13 @@ from urllib.request import Request, urlopen
 from config import PROJECT_ROOT
 
 REDIRECT_URI = "http://127.0.0.1:5000/auth/google/callback"
+
+
+def redirect_uri():
+    port = os.environ.get('PORTFOLIO_LOCAL_PORT', '5000')
+    if not port.isdigit() or not 1 <= int(port) <= 65535:
+        raise GooglePhotosError('Invalid local server port.')
+    return f'http://127.0.0.1:{int(port)}/auth/google/callback'
 SCOPES = "https://www.googleapis.com/auth/photospicker.mediaitems.readonly"
 
 
@@ -28,11 +35,11 @@ def credentials():
         raise GooglePhotosError("Keep Google credentials outside the website repository.")
     try:
         data = json.loads(path.read_text(encoding="utf-8-sig"))["web"]
-        if not data.get("client_id") or not data.get("client_secret") or REDIRECT_URI not in data.get("redirect_uris", []):
+        if not data.get("client_id") or not data.get("client_secret") or redirect_uri() not in data.get("redirect_uris", []):
             raise ValueError()
         return data
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
-        raise GooglePhotosError("Check the private google-oauth.json file and its authorized callback address.") from None
+        raise GooglePhotosError("Check the private google-oauth.json file. Register this exact callback in Google Cloud and download updated credentials: " + redirect_uri()) from None
 
 
 def token_path():
@@ -58,7 +65,7 @@ class GooglePhotosAuth:
             self.pending[state] = (now + 600, browser_id, client_id, verifier)
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
         return "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
-            "client_id": client_id, "response_type": "code", "redirect_uri": REDIRECT_URI,
+            "client_id": client_id, "response_type": "code", "redirect_uri": redirect_uri(),
             "scope": SCOPES, "state": state, "access_type": "offline", "prompt": "consent", "code_challenge_method": "S256",
             "code_challenge": challenge,
         })
@@ -72,7 +79,7 @@ class GooglePhotosAuth:
                 raise GooglePhotosError("Google Photos authorization was not completed. Please connect again.")
             _, _, client_id, verifier = pending
             data = self._request({"grant_type": "authorization_code", "code": code,
-                                  "redirect_uri": REDIRECT_URI, "client_id": client_id,
+                                  "redirect_uri": redirect_uri(), "client_id": client_id,
                                   "code_verifier": verifier})
             self._save(data, client_id)
 

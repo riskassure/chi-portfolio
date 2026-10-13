@@ -8,6 +8,7 @@ import sqlite3
 import uuid
 
 from download_live_database import verify
+import photo_home
 
 # File-backed content needs a separate download/reconciliation workflow.
 FILE_TABLES = {'music_catalog', 'stg_spotify_import', 'photography_catalog',
@@ -63,7 +64,7 @@ def assess(base, local, live):
                 blocked=sorted(blocked), live_changed=sorted(changed), media_review=assets)
 
 
-def refresh(state, snapshot, destination, save_state):
+def refresh(state, snapshot, destination, save_state, frontend=None):
     """Create new copies and switch saved paths only after a conservative comparison."""
     snapshot = Path(snapshot).resolve()
     metadata = json.loads(snapshot.with_name('snapshot.json').read_text(encoding='utf-8'))
@@ -83,11 +84,31 @@ def refresh(state, snapshot, destination, save_state):
         # Prevent a local edit between comparison and switching the saved paths.
         # No SQL writes are issued, and closing rolls this transaction back.
         local.execute('BEGIN IMMEDIATE')
-        result = assess(inventory(baseline), inventory(local), inventory(live))
+        inventories = [inventory(db) for db in (baseline, local, live)]
+        photo_plan = None
+        if frontend is not None:
+            photo_plan = photo_home.reconcile(baseline, local, live)
+            # The gallery has its own row comparison; local import drafts are
+            # carried into the new working copy, never into the live baseline.
+            inventories = [(tuple(row for row in schema if not
+                            (row[0] == 'table' and row[1] == 'google_photo_drafts')),
+                            {name: rows for name, rows in tables.items()
+                             if name not in {'photography_catalog', 'google_photo_drafts'}})
+                           for schema, tables in inventories]
+        result = assess(*inventories)
+        if photo_plan is not None:
+            result['photo_conflicts'] = photo_plan['blocked']
+            result['local_drafts_preserved'] = len(photo_plan['drafts'])
+            if photo_plan['blocked']:
+                result.update(safe=False, reason='Unpublished or divergent photos/drafts need review.')
         result.update(source=str(snapshot), previous_base=str(base), previous_working=str(working))
-        (folder/'comparison.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
+        report = folder/'comparison.json'
+        report.write_text(json.dumps(dict(result, refresh_complete=False), indent=2), encoding='utf-8')
         if not result['safe']:
             return dict(result, report=str(folder/'comparison.json'))
+        if photo_plan is not None:
+            print('Verifying gallery images; downloading missing photos. Existing images will not be overwritten.', flush=True)
+            manifest, staged = photo_home.stage_media(state['username'], photo_plan['paths'], frontend, folder)
         data = snapshot.read_bytes()
         if hashlib.sha256(data).hexdigest() != metadata['sha256']:
             raise ValueError('Snapshot changed during comparison.')
@@ -95,6 +116,13 @@ def refresh(state, snapshot, destination, save_state):
             with (folder/name).open('xb') as stream:
                 stream.write(data)
             verify(folder/name, metadata['sha256'])
+        if photo_plan is not None:
+            with closing(sqlite3.connect(folder/'working.db')) as new_working:
+                photo_home.preserve_drafts(new_working, photo_plan['drafts'])
+                if new_working.execute('PRAGMA integrity_check').fetchone()[0] != 'ok' or new_working.execute('PRAGMA foreign_key_check').fetchone():
+                    raise ValueError('New working database failed verification.')
+            photo_home.install_media(frontend, manifest, staged)
+            result.update(photos_verified=len(manifest), photos_downloaded=len(staged))
         (folder/'previous-workflow.json').write_text(json.dumps(state, indent=2), encoding='utf-8')
         updated = dict(state, base=str((folder/'base.db').resolve()),
                        working=str((folder/'working.db').resolve()),
@@ -102,4 +130,5 @@ def refresh(state, snapshot, destination, save_state):
         save_state(updated)
         state.clear()
         state.update(updated)
+        report.write_text(json.dumps(dict(result, refresh_complete=True), indent=2), encoding='utf-8')
     return dict(result, report=str(folder/'comparison.json'), working=state['working'])

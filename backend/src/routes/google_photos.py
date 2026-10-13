@@ -3,15 +3,23 @@ import os
 import secrets
 import re
 import sqlite3
+from pathlib import Path
 from urllib.parse import quote, urlparse
 
-from flask import Blueprint, current_app, jsonify, redirect, render_template_string, render_template, request, session, send_file
+from flask import Blueprint, current_app, jsonify, redirect, render_template_string, render_template, request, session, send_file, send_from_directory, abort
 from services.photography import google_photos_import as importer
-from services.photography.google_photos_auth import GooglePhotosAuth, GooglePhotosError, credentials
+from services.photography.google_photos_auth import GooglePhotosAuth, GooglePhotosError, credentials, redirect_uri
 
 google_photos_bp = Blueprint("google_photos", __name__)
 auth = GooglePhotosAuth()
 BASE = "/api/photography/google"
+
+
+@google_photos_bp.get(BASE + '/assets/<filename>')
+def assets(filename):
+    if filename not in ('google_photos.js', 'google_photos.css'):
+        abort(404)
+    return send_from_directory(Path(__file__).resolve().parents[1]/'static'/'photography', filename)
 
 
 @google_photos_bp.errorhandler(OSError)
@@ -23,8 +31,8 @@ def storage_failed(error):
 @google_photos_bp.before_request
 def local_admin_only():
     if (os.environ.get("FLASK_ENV") == "production" or
-            request.remote_addr != "127.0.0.1" or request.host != "127.0.0.1:5000"):
-        return "Google Photos setup is available only on this laptop at 127.0.0.1:5000.", 403
+            request.remote_addr != "127.0.0.1" or request.host != urlparse(redirect_uri()).netloc):
+        return "Google Photos setup is available only on the configured loopback server.", 403
     if request.method == "OPTIONS":
         return "", 204
     if not session.get("is_admin") and request.endpoint != "google_photos.login":

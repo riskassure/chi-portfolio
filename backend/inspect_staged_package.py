@@ -18,6 +18,7 @@ from publish_math_entry import validate as validate_entry, check_target
 from preview_math_sync import read_snapshot
 from apply_math_text_patch import patch_intended
 import profile_sync
+import photo_sync
 
 
 def fetch_verified(settings, remote, local):
@@ -50,7 +51,14 @@ def preview(data, snapshot=None, *, live=False):
         payload = json.loads(archive.read(payloads[0]))
     if not isinstance(payload, dict):
         raise ValueError('Invalid math payload.')
-    if payload.get('kind') == 'profile':
+    if payload.get('kind') == 'photo-add':
+        image = photo_sync.unpack(data, payload)
+        report += ['Proposed operation: add one gallery photo', json.dumps(payload['photo'],ensure_ascii=False,indent=2),
+                   'Image SHA-256: ' + payload['sha256']]
+        if snapshot:
+            frontend = Path(snapshot).resolve().parent.parent/'frontend' if live else Path(__file__).resolve().parents[1]/'frontend'
+            status = photo_sync.status(snapshot,payload,image,frontend)
+    elif payload.get('kind') == 'profile':
         profile_sync.validate_payload(payload)
         report += ['Proposed operation: update profile page ' + payload['page']]
         for key, value in sorted(payload['replacement'].items()):

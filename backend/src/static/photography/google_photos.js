@@ -6,6 +6,8 @@ const retry = document.getElementById('retry');
 const cancel = document.getElementById('cancel');
 const pickerLink = document.getElementById('picker-link');
 let generation = 0;
+const addAll = document.getElementById('add-all');
+let draftActions = [];
 
 async function api(path, data) {
     const response = await fetch(base + path, data === undefined ? {} : {
@@ -19,6 +21,8 @@ async function api(path, data) {
 async function loadDrafts() {
     const { items } = await api('/drafts');
     const container = document.getElementById('drafts');
+    draftActions = [];
+    addAll.disabled = !items.length;
     container.replaceChildren();
     if (!items.length) container.textContent = 'No photos waiting for review.';
     for (const item of items) {
@@ -40,21 +44,31 @@ async function loadDrafts() {
             card.append(label);
         }
         const publish = document.createElement('button');
-        publish.textContent = 'Publish to gallery';
+        publish.textContent = 'Add to local gallery';
         const status = document.createElement('p');
         status.setAttribute('role', 'status');
-        publish.onclick = async () => {
+        const addDraft = async () => {
+            if (publish.disabled) return;
             publish.disabled = true;
             try {
                 await api(`/drafts/${item.digest}/publish`, { title: fields.title.value, location: fields.location.value });
-                status.textContent = 'Published. Refresh your gallery to see it.';
-                publish.textContent = 'Published';
+                status.textContent = 'Added locally. Ready to review in the website helper.';
+                publish.textContent = 'Added locally';
             } catch (error) { status.textContent = error.message; publish.disabled = false; }
         };
+        publish.onclick = addDraft;
+        draftActions.push(addDraft);
         card.append(publish, status);
         container.append(card);
     }
 }
+
+addAll.onclick = async () => {
+    addAll.disabled = true;
+    choose.disabled = true;
+    try { for (const action of draftActions) await action(); }
+    finally { addAll.disabled = false; choose.disabled = false; }
+};
 
 function duration(value, fallback) {
     const seconds = Number.parseFloat(value);

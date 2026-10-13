@@ -20,6 +20,8 @@ from apply_math_text_patch import patch_intended
 from download_live_database import download
 from bring_changes_home import refresh
 import profile_sync
+import photo_sync
+import webbrowser
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / 'dist' / 'math-workflow.json'
@@ -96,8 +98,13 @@ def current_job(state):
         raise ValueError('Prepare a selected entry first.')
     if digest(state['base']) != state['base_sha256'] or digest(job['package']) != job['sha256']:
         raise ValueError('Baseline or package changed. Prepare a new review package.')
-    current = (profile_sync.page_state(state['working'], job['canonical'])['fields']
-               if job.get('kind') == 'profile' else read_snapshot(state['working']).get(job['canonical']))
+    if job.get('kind') == 'photo-add':
+        current = photo_sync.catalog(state['working']).get(job['canonical'])
+        if digest(ROOT/'frontend'/job['canonical']) != job['image_sha256']:
+            raise ValueError('Local photo changed. Prepare it again.')
+    else:
+        current = (profile_sync.page_state(state['working'], job['canonical'])['fields']
+                   if job.get('kind') == 'profile' else read_snapshot(state['working']).get(job['canonical']))
     if job.get('kind') == 'profile' and profile_sync.template_info(ROOT/'frontend', job['canonical'])[0] != job['template_sha256']:
         raise ValueError('Local profile template changed. Prepare again.')
     if current != job['proposed']:
@@ -118,6 +125,21 @@ def prepare_profile(state, page):
     (folder/'review.txt').write_text(report, encoding='utf-8')
     state['job'] = dict(kind='profile', canonical=page, package=str(package), sha256=digest(package),
                         proposed=payload['replacement'], template_sha256=payload['template_sha256'], remote=None, checked=False)
+    save(state)
+    return report
+
+
+def prepare_photo(state, file_path):
+    if digest(state['base']) != state['base_sha256']:
+        raise ValueError('Baseline changed. Select the unchanged baseline.')
+    folder = ROOT/'dist'/'math-workflow'/uuid.uuid4().hex
+    folder.mkdir(parents=True)
+    package = folder/'package.zip'
+    payload = photo_sync.prepare(state['base'],state['working'],file_path,ROOT/'frontend',package)
+    report = preview(read_package(package))
+    (folder/'review.txt').write_text(report,encoding='utf-8')
+    state['job'] = dict(kind='photo-add',canonical=file_path,package=str(package),sha256=digest(package),
+                        proposed=payload['photo'],image_sha256=payload['sha256'],remote=None,checked=False)
     save(state)
     return report
 
@@ -178,7 +200,7 @@ def main():
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -216,17 +238,35 @@ def main():
                 if input('Type STOPPED when the local server is stopped (anything else cancels): ').strip() != 'STOPPED':
                     continue
                 snapshot = download(Path.home()/'Downloads'/'chi-portfolio'/'database', state['username'])
-                result = refresh(state, snapshot, ROOT/'dist'/'home-sync', save)
+                result = refresh(state, snapshot, ROOT/'dist'/'home-sync', save, frontend=ROOT/'frontend')
                 print(result['reason'])
                 print('Comparison report:', result['report'])
                 if result['safe']:
                     print('New working copy:', result['working'])
-                    print('Choose 6 to restart the local server using this copy. No website files or media were downloaded.')
+                    print(f"Gallery: {result['photos_verified']} images verified, {result['photos_downloaded']} downloaded; {result['local_drafts_preserved']} local import drafts preserved.")
+                    print('Choose 6 to restart the local server using this copy. Website program files and other media were not downloaded.')
                 else:
                     print('Saved paths and existing databases are unchanged. Review the report before proceeding.')
             elif choice == '9':
                 print(prepare_profile(state, input('Page to prepare (bio or resume): ').strip()))
                 print('Review the changes above, then choose 3 to stage, 4 to check live, and 5 to publish.')
+            elif choice == '10':
+                print('Keep the local server running (option 6 in another terminal). Opening the photo review page.')
+                webbrowser.open('http://127.0.0.1:5001/api/photography/google/manage')
+            elif choice == '11':
+                baseline = photo_sync.catalog(state['base'])
+                local = photo_sync.catalog(state['working'])
+                candidates = sorted(set(local)-set(baseline))
+                for i,path in enumerate(candidates,1):
+                    print(f'{i}. {local[path]["title"]} ({path})')
+                if not candidates:
+                    print('No new local gallery photos. Import and add a photo locally first.')
+                else:
+                    selected = int(input('Photo number: '))
+                    if not 1 <= selected <= len(candidates):
+                        raise ValueError('Invalid photo number.')
+                    print(prepare_photo(state,candidates[selected-1]))
+                    print('Review your local photo, then use 3 (stage), 4 (check live), 5 (publish).')
             else:
                 print('Choose one of the listed numbers.')
         except (ValueError, RuntimeError, OSError, sqlite3.Error, subprocess.CalledProcessError) as error:

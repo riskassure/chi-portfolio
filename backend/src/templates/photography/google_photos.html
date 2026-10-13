@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf" content="{{ csrf }}">
   <title>Google Photos | Chi Portfolio</title>
-  <link rel="stylesheet" href="/static/photography/google_photos.css">
-  <script defer src="/static/photography/google_photos.js"></script>
+  <link rel="stylesheet" href="{{ url_for('google_photos.assets', filename='google_photos.css') }}">
+  <script defer src="{{ url_for('google_photos.assets', filename='google_photos.js') }}"></script>
 </head>
 <body><main>
   <h1>Add photos to your gallery</h1>
@@ -19,8 +19,9 @@
   <p><a id="picker-link" hidden target="_blank" rel="noopener">Open Google Photos selection</a></p>
   <button id="retry" hidden>Retry import</button>
   <button id="cancel" hidden>Cancel selection</button>
-  <h2>Ready to publish</h2>
-  <p>Publishing adds a photo to the public gallery and its rotation. Titles and locations are optional.</p>
+  <h2>Ready for your local gallery</h2>
+  <p>Review titles and locations, then add photos locally. Use the website helper afterward to publish selected photos to your live website.</p>
+  <button id="add-all" disabled>Add all reviewed drafts to local gallery</button>
   <div id="drafts" class="drafts"></div>
 </main></body>
 </html>

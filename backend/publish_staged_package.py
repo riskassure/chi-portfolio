@@ -43,7 +43,7 @@ def publish_staged(username, remote, local, output):
     receipt = dict(status='PENDING', remote=remote, sha256=request['sha256'])
     with output.open('x', encoding='utf-8') as stream:
         json.dump(receipt, stream, indent=2)
-    print('Publishing selected math update. SSH may ask for your PythonAnywhere account password.', flush=True)
+    print('Publishing selected website update. SSH may ask for your PythonAnywhere account password.', flush=True)
     executable = f'/home/{username}/.virtualenvs/chi-portfolio/bin/python'
     command = shlex.quote(executable) + ' -I -B -c ' + shlex.quote(BOOTSTRAP)
     try:

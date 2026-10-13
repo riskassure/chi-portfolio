@@ -26,6 +26,7 @@ def main():
     except (ValueError, OSError) as error:
         raise SystemExit(str(error))
     os.environ['FLASK_ENV'] = 'development'
+    os.environ['PORTFOLIO_LOCAL_PORT'] = str(args.port)
     os.environ['ADMIN_PASSWORD'] = password
     os.environ['FLASK_SECRET_KEY'] = secrets.token_urlsafe(48)
     sys.path.insert(0, str(Path(__file__).resolve().parent / 'src'))
