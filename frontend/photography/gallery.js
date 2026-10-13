@@ -123,6 +123,8 @@ function renderGalleryCards(photoList) {
             const locationMarkup = isAdmin 
                 ? `
                     <div class="admin-edit-panel" style="margin-top: 14px; background: #f8fafc; padding: 12px; border-radius: 4px; border: 1px solid #e2e8f0; width: 100%; box-sizing: border-box;">
+                        <label for="title-${photo.image_id}" style="display:block; font-size: 0.8rem; font-weight:bold; margin-bottom:4px; color:#34495e;">Title:</label>
+                        <input type="text" id="title-${photo.image_id}" maxlength="200" value="${photoTitleClean}" style="width:100%; padding:5px; margin-bottom:8px; border:1px solid #ccc; border-radius:3px; box-sizing:border-box;">
                         <label style="display:block; font-size: 0.8rem; font-weight:bold; margin-bottom:4px; color:#34495e;">Location Context:</label>
                         <input type="text" id="loc-${photo.image_id}" value="${escapePhotoText(photo.location_name || '')}" placeholder="e.g. Yosemite Valley, CA" style="width:100%; padding:5px; margin-bottom:8px; border:1px solid #ccc; border-radius:3px; box-sizing: border-box;">
                         
@@ -222,6 +224,7 @@ function initializeMuseumExhibitionLoop() {
 
 // 4. Post updated values directly back to Flask
 async function savePhotoEdits(imageId) {
+    const title = document.getElementById(`title-${imageId}`).value;
     const locationName = document.getElementById(`loc-${imageId}`).value;
     const latitude = document.getElementById(`lat-${imageId}`).value;
     const longitude = document.getElementById(`lng-${imageId}`).value;
@@ -236,6 +239,7 @@ async function savePhotoEdits(imageId) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 image_id: imageId,
+                title: title,
                 location_name: locationName,
                 latitude: latitude,
                 longitude: longitude
@@ -245,11 +249,14 @@ async function savePhotoEdits(imageId) {
 
         const result = await response.json();
         if (result.success) {
+            const card = statusSpan.closest('.photo-card');
+            card.querySelector('.photo-title').textContent = title;
+            card.querySelector('img').alt = title;
             statusSpan.innerText = "💾 Saved!";
             statusSpan.style.color = "green";
             setTimeout(() => { statusSpan.innerText = ""; }, 3000);
         } else {
-            statusSpan.innerText = "❌ Failed";
+            statusSpan.innerText = result.message || "Could not save photo details.";
             statusSpan.style.color = "red";
         }
     } catch (err) {

@@ -21,6 +21,7 @@ from download_live_database import download
 from bring_changes_home import refresh
 import profile_sync
 import photo_sync
+import photo_metadata_sync
 import webbrowser
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,7 +99,12 @@ def current_job(state):
         raise ValueError('Prepare a selected entry first.')
     if digest(state['base']) != state['base_sha256'] or digest(job['package']) != job['sha256']:
         raise ValueError('Baseline or package changed. Prepare a new review package.')
-    if job.get('kind') == 'photo-add':
+    if job.get('kind') == 'photo-edit':
+        photo = photo_sync.catalog(state['working']).get(job['canonical'])
+        current = photo_metadata_sync.metadata(photo) if photo else None
+        if photo_metadata_sync.image_hash(ROOT/'frontend', job['canonical']) != job['image_sha256']:
+            raise ValueError('Local photo changed. Prepare it again.')
+    elif job.get('kind') == 'photo-add':
         current = photo_sync.catalog(state['working']).get(job['canonical'])
         if digest(ROOT/'frontend'/job['canonical']) != job['image_sha256']:
             raise ValueError('Local photo changed. Prepare it again.')
@@ -140,6 +146,21 @@ def prepare_photo(state, file_path):
     (folder/'review.txt').write_text(report,encoding='utf-8')
     state['job'] = dict(kind='photo-add',canonical=file_path,package=str(package),sha256=digest(package),
                         proposed=payload['photo'],image_sha256=payload['sha256'],remote=None,checked=False)
+    save(state)
+    return report
+
+
+def prepare_photo_edit(state, file_path):
+    if digest(state['base']) != state['base_sha256']:
+        raise ValueError('Baseline changed. Select the unchanged baseline.')
+    folder = ROOT/'dist'/'math-workflow'/uuid.uuid4().hex
+    folder.mkdir(parents=True)
+    package = folder/'package.zip'
+    payload = photo_metadata_sync.prepare(state['base'], state['working'], file_path, ROOT/'frontend', package)
+    report = preview(read_package(package))
+    (folder/'review.txt').write_text(report, encoding='utf-8')
+    state['job'] = dict(kind='photo-edit', canonical=file_path, package=str(package), sha256=digest(package),
+                        proposed=payload['replacement'], image_sha256=payload['sha256'], remote=None, checked=False)
     save(state)
     return report
 
@@ -200,7 +221,7 @@ def main():
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -253,6 +274,21 @@ def main():
             elif choice == '10':
                 print('Keep the local server running (option 6 in another terminal). Opening the photo review page.')
                 webbrowser.open('http://127.0.0.1:5001/api/photography/google/manage')
+            elif choice == '12':
+                baseline = photo_sync.catalog(state['base'])
+                local = photo_sync.catalog(state['working'])
+                candidates = sorted(path for path in baseline.keys() & local.keys()
+                                    if photo_metadata_sync.metadata(baseline[path]) != photo_metadata_sync.metadata(local[path]))
+                for i, path in enumerate(candidates, 1):
+                    print(f'{i}. {local[path]["title"]} ({path})')
+                if not candidates:
+                    print('No changes to existing photo details. Edit and save a title, location or coordinates locally first.')
+                else:
+                    selected = int(input('Photo number: '))
+                    if not 1 <= selected <= len(candidates):
+                        raise ValueError('Invalid photo number.')
+                    print(prepare_photo_edit(state, candidates[selected-1]))
+                    print('Review the changes, then use 3 (stage), 4 (check live), 5 (publish).')
             elif choice == '11':
                 baseline = photo_sync.catalog(state['base'])
                 local = photo_sync.catalog(state['working'])

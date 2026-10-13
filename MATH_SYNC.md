@@ -21,8 +21,28 @@ metadata, with checksum verification and a live database backup. Existing image
 or metadata conflicts stop publication; matching repeats are skipped. Failed
 inserts can leave a verified unlisted image for a later retry, but never commit
 a catalog entry before its image is verified. After checking the live gallery,
-use **8** to refresh the baseline and bring gallery images home. Publishing
-existing-photo edits or deletions is not yet supported.
+use **8** to refresh the baseline and bring gallery images home. Photo deletion
+and image replacement are not yet supported.
+
+### Updating existing photo details
+
+Start the local server with **6**, sign in as admin, and open the photography
+page. Edit the title, location or coordinates and click **Save Details**. Stop
+the server, restart the helper if necessary, and choose **12. Prepare changes
+to existing photo details**. Select the photo and review the before/after fields,
+then use **3**, **4**, and **5** to stage, check and publish it.
+
+This metadata-only package includes the expected baseline values, replacement
+values and local image checksum. Live checks require that image and the expected
+details still match. Publication repeats the checks under a database write lock,
+creates a verified backup and changes only title, location and coordinates.
+Image bytes, filenames, gallery IDs, visibility and rotation history are not
+changed. Matching repeats are skipped; newer conflicting edits stop publication.
+After checking the live gallery, use **8** to refresh the baseline.
+
+The title input is part of the local editor update. Publishing metadata does not
+deploy this editor's HTML/JavaScript or backend route to the live site; the live
+gallery can display the updated title with its existing code.
 
 ## Remembered local admin password (Windows)
 

@@ -1,4 +1,5 @@
 import sqlite3
+import math
 import sys
 from datetime import datetime
 from flask import Blueprint, jsonify, request
@@ -134,33 +135,49 @@ def update_photography_catalog():
     @admin_required
     def process_update():
         data = request.get_json() or {}
+        if not isinstance(data, dict):
+            return jsonify(success=False, message='Invalid photo details.'), 400
         image_id = data.get("image_id")
         location_name = data.get("location_name")
+        title = data.get('title')
+        if 'title' in data and (not isinstance(title, str) or not title.strip() or len(title) > 200):
+            return jsonify(success=False, message='A title of 1 to 200 characters is required.'), 400
+        if not isinstance(location_name, str) or len(location_name) > 200:
+            return jsonify(success=False, message='Location must be at most 200 characters.'), 400
         
         try:
             latitude = float(data.get("latitude", 0.0)) if data.get("latitude") else 0.0
             longitude = float(data.get("longitude", 0.0)) if data.get("longitude") else 0.0
-        except ValueError:
+        except (ValueError, TypeError):
             return jsonify({"success": False, "message": "Invalid coordinate formatting."}), 400
+
+        if not math.isfinite(latitude) or not math.isfinite(longitude) or abs(latitude) > 90 or abs(longitude) > 180:
+            return jsonify(success=False, message='Latitude must be between -90 and 90, longitude between -180 and 180.'), 400
 
         if not image_id:
             return jsonify({"success": False, "message": "Missing image_id identifier."}), 400
 
+        conn = None
         try:
             conn = sqlite3.connect(str(DB_PATH))
             cursor = conn.cursor()
             
             cursor.execute("""
                 UPDATE photography_catalog 
-                SET location_name = ?, latitude = ?, longitude = ?
+                SET location_name = ?, latitude = ?, longitude = ?, title = COALESCE(?, title)
                 WHERE image_id = ?;
-            """, (location_name, latitude, longitude, image_id))
+            """, (location_name, latitude, longitude, title, image_id))
+
+            if cursor.rowcount != 1:
+                conn.rollback()
+                return jsonify(success=False, message='Photo not found.'), 404
             
             conn.commit()
             return jsonify({"success": True, "message": "Photography metadata successfully updated."})
         except sqlite3.Error as e:
             return jsonify({"success": False, "error": f"Database modification failed: {str(e)}"}), 500
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
 
     return process_update()

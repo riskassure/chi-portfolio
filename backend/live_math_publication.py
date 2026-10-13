@@ -9,6 +9,7 @@ from publish_math_entry import apply
 from apply_math_text_patch import apply_patch, patch_intended
 import profile_sync
 import photo_sync
+import photo_metadata_sync
 
 
 def publish(data, database, backups, source):
@@ -17,6 +18,8 @@ def publish(data, database, backups, source):
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         name = next(n for n in archive.namelist() if n.endswith('.json'))
         payload = json.loads(archive.read(name))
+    if payload.get('kind') == 'photo-edit':
+        return photo_metadata_sync.apply(database, payload, backups, source.parent.parent/'frontend')
     if payload.get('kind') == 'photo-add':
         return photo_sync.apply(database,payload,photo_sync.unpack(data,payload),backups,source.parent.parent/'frontend')
     if payload.get('kind') == 'profile':

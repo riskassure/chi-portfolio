@@ -19,6 +19,7 @@ from preview_math_sync import read_snapshot
 from apply_math_text_patch import patch_intended
 import profile_sync
 import photo_sync
+import photo_metadata_sync
 
 
 def fetch_verified(settings, remote, local):
@@ -51,7 +52,18 @@ def preview(data, snapshot=None, *, live=False):
         payload = json.loads(archive.read(payloads[0]))
     if not isinstance(payload, dict):
         raise ValueError('Invalid math payload.')
-    if payload.get('kind') == 'photo-add':
+    if payload.get('kind') == 'photo-edit':
+        photo_metadata_sync.unpack(data, payload)
+        report += ['Proposed operation: update existing photo details', 'Photo: '+payload['file_path']]
+        for key in photo_metadata_sync.FIELDS:
+            if payload['expected'][key] != payload['replacement'][key]:
+                report += ['Field: '+key, 'Before: '+json.dumps(payload['expected'][key], ensure_ascii=False),
+                           'After: '+json.dumps(payload['replacement'][key], ensure_ascii=False)]
+        report += ['Image SHA-256 (image unchanged): '+payload['sha256']]
+        if snapshot:
+            frontend = Path(snapshot).resolve().parent.parent/'frontend' if live else Path(__file__).resolve().parents[1]/'frontend'
+            status = photo_metadata_sync.status(snapshot, payload, frontend)
+    elif payload.get('kind') == 'photo-add':
         image = photo_sync.unpack(data, payload)
         report += ['Proposed operation: add one gallery photo', json.dumps(payload['photo'],ensure_ascii=False,indent=2),
                    'Image SHA-256: ' + payload['sha256']]

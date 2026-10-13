@@ -75,8 +75,12 @@ backs up the live database, creates the image without overwriting files, then
 inserts and verifies the catalog row. Repeat publication is skipped when image
 and metadata match. A failed database write may leave a verified image without
 a catalog row; retry after live preflight can reuse it. A dropped connection
-requires checking live before retrying. Publication supports new photos only;
-publishing existing-photo edits and deletions is not yet supported.
+requires checking live before retrying. Option 12 also publishes changes to an
+existing photo's title, location and coordinates. Edit and save locally first,
+then review the before/after values and use 3, 4 and 5. The metadata publisher
+checks expected values and image checksum again under a database write lock,
+backs up first, and preserves image bytes and rotation state. Deleting photos
+or replacing images is not yet supported.
 
 After checking the public gallery, stop the local server and use option 8.
 It compares photo metadata by filename, checks every live gallery image's
