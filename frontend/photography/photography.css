@@ -17,7 +17,7 @@
     display: grid;
     /* 📸 ONE PICTURE PER ROW: Forces a strict single-column stream layout */
     grid-template-columns: 1fr;
-    gap: 40px;
+    gap: 48px;
     padding: 10px;               /* Reduced padding to maximize horizontal screen real estate */
     box-sizing: border-box;
     max-width: 1100px;           /* Sets a perfect wide-aspect reading column limit */

@@ -12,7 +12,7 @@ from stage_pythonanywhere_package import read_package
 
 # Only these local, reviewed modules are sent. Scripts inside the ZIP are never run.
 MODULES = ('pythonanywhere_api', 'stage_pythonanywhere_package', 'preview_math_sync',
-           'publish_math_entry', 'apply_math_text_patch', 'profile_sync', 'photo_sync', 'photo_metadata_sync', 'photo_removal_sync', 'inspect_staged_package')
+           'publish_math_entry', 'apply_math_text_patch', 'profile_sync', 'photo_sync', 'photo_metadata_sync', 'photo_removal_sync', 'frontend_sync', 'inspect_staged_package')
 BOOTSTRAP = '''
 import sys, json, types, hashlib
 from pathlib import Path
@@ -57,7 +57,7 @@ def preflight(username, remote, local, output):
     request = build_request(username, remote, local)
     if not shutil.which('ssh'):
         raise ValueError('Windows OpenSSH Client is required.')
-    print('Checking the live database read-only. SSH may ask for your PythonAnywhere account password.', flush=True)
+    print('Checking the live target read-only. SSH may ask for your PythonAnywhere account password.', flush=True)
     # -I avoids imports from the host working directory; -B prevents bytecode files.
     command = 'python3.13 -I -B -c ' + shlex.quote(BOOTSTRAP)
     result = subprocess.run(['ssh', username + '@ssh.pythonanywhere.com', command],

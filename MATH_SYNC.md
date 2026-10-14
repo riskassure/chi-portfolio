@@ -1,5 +1,52 @@
 # Website content synchronization
 
+## Publishing frontend files (option 14)
+
+Edit and test HTML, CSS or JavaScript locally first. Choose **14. Prepare frontend
+files** and enter up to 20 paths relative to `frontend`, separated by commas,
+for example `photography/photography.css`. Blank input cancels. Only UTF-8
+`.html`, `.css` and `.js` files are allowed (2 MB per file, 10 MB of review text).
+Python, database files, private settings, media, links and deletions are excluded.
+
+The helper reads those exact files from PythonAnywhere over SSH and packages
+the live expected content together with your local replacement. Review **all**
+differences: this is a freshly captured live version, not a historical common
+baseline, and it does not infer which side's edits are newer. Unchanged selected
+files are omitted. New files require the live path to be absent.
+
+Use **3** to stage, **4** to check live and **5** to publish after reviewing. A
+local edit after preparation invalidates the package. A newer conflicting live
+edit stops publication. Matching repeated publication is skipped. No packaged
+JavaScript is run by the publisher; these files will run normally in visitors'
+browsers after publication.
+
+Publication holds a dedicated lock, verifies backups of all affected existing
+files, stages replacements beside their destinations, then replaces each file
+individually. The backup folder under `/home/cwoo/backups/before-frontend-update-*`
+contains exact `.before` bytes and `manifest.json` with paths, checksums and file
+modes. Existing modes are preserved; new public files use mode 0644. A batch is
+not a site-wide atomic switch: visitors may briefly see mixed file versions.
+Do not edit the selected live files concurrently through another tool.
+
+On an ordinary failure, the publisher attempts to restore files it changed and
+verifies them. It refuses to overwrite a concurrent edit during restoration.
+An interrupted process or failed recovery may leave `.frontend-publish.lock`
+in the backups folder. Check its `backup.txt`, the backup manifest, the live
+files and the pending local receipt before recovering; do not simply remove
+the lock or rerun. After resolving the live state, the lock can be cleared for
+a new reviewed attempt. Backups are retained for recovery.
+
+After success, hard-refresh affected public pages with **Ctrl+F5** and check their
+behavior. The upload verifies file bytes, not browser behavior. These frontend
+files are served directly, so this step does not reload PythonAnywhere or touch
+the database; option 8 is not needed for a file-only update. Option 8 still does
+not download website source code.
+
+This increment does not deploy Python code or coordinate database migrations.
+Only publish frontend changes compatible with the backend already live. In
+particular, the newer gallery title editor also needs the updated Python route;
+do not deploy that editor alone as a way to enable title editing on the live site.
+
 ## Google Photos and new-photo publication
 
 The local launcher configures the Google Photos integration for its chosen port

@@ -23,6 +23,7 @@ import profile_sync
 import photo_sync
 import photo_metadata_sync
 import photo_removal_sync
+import frontend_sync
 import webbrowser
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -100,6 +101,11 @@ def current_job(state):
         raise ValueError('Prepare a selected entry first.')
     if digest(state['base']) != state['base_sha256'] or digest(job['package']) != job['sha256']:
         raise ValueError('Baseline or package changed. Prepare a new review package.')
+    if job.get('kind') == 'frontend-files':
+        for path, expected_hash in job['proposed'].items():
+            if frontend_sync.checksum(frontend_sync.read_text(ROOT/'frontend', path)) != expected_hash:
+                raise ValueError('Local frontend file changed since review: '+path)
+        return job
     if job.get('kind') in ('photo-edit', 'photo-remove'):
         photo = photo_sync.catalog(state['working']).get(job['canonical'])
         current = photo_metadata_sync.metadata(photo) if photo else None
@@ -181,6 +187,27 @@ def prepare_photo_removal(state, file_path):
     return report
 
 
+def prepare_frontend(state, paths):
+    # Validate local selections before connecting, without changing user files.
+    for path in paths:
+        if frontend_sync.read_text(ROOT/'frontend', path) is None:
+            raise ValueError('Selected local file is missing: '+path)
+    print('Reading selected live frontend files for comparison. No live changes.', flush=True)
+    live = frontend_sync.capture_live(state['username'], paths)
+    folder = ROOT/'dist'/'math-workflow'/uuid.uuid4().hex
+    folder.mkdir(parents=True)
+    package = folder/'package.zip'
+    payload = frontend_sync.prepare(ROOT/'frontend', paths, live, package)
+    report = preview(read_package(package))
+    (folder/'review.txt').write_text(report, encoding='utf-8')
+    state['job'] = dict(kind='frontend-files', canonical='Frontend files: '+', '.join(item['path'] for item in payload['files']),
+                        package=str(package), sha256=digest(package),
+                        proposed={item['path']: frontend_sync.checksum(item['replacement']) for item in payload['files']},
+                        remote=None, checked=False)
+    save(state)
+    return report
+
+
 def upload(state):
     job = current_job(state)
     if job['remote']:
@@ -229,7 +256,10 @@ def publish_reviewed(state):
     result = publish_staged(state['username'], job['remote'], Path(job['package']), receipt)
     job['result'] = result['status']
     save(state)
-    print('Verify the live page, then download a fresh baseline. Existing local databases were not replaced.')
+    if job.get('kind') == 'frontend-files':
+        print('Frontend files verified. Hard-refresh the affected live pages (Ctrl+F5). No reload or database refresh is needed for this file-only update.')
+    else:
+        print('Verify the live page, then download a fresh baseline. Existing local databases were not replaced.')
 
 
 def main():
@@ -239,7 +269,7 @@ def main():
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -292,6 +322,14 @@ def main():
             elif choice == '10':
                 print('Keep the local server running (option 6 in another terminal). Opening the photo review page.')
                 webbrowser.open('http://127.0.0.1:5001/api/photography/google/manage')
+            elif choice == '14':
+                print('Enter paths relative to frontend, separated by commas (example: photography/photography.css).')
+                selected = input('Files (blank cancels): ').strip()
+                if not selected:
+                    continue
+                paths = [path.strip() for path in selected.split(',')]
+                print(prepare_frontend(state, paths))
+                print('Review ALL differences against live, then use 3 (stage), 4 (check live), 5 (publish).')
             elif choice == '13':
                 baseline = photo_sync.catalog(state['base'])
                 local = photo_sync.catalog(state['working'])

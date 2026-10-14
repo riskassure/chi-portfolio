@@ -11,6 +11,7 @@ import profile_sync
 import photo_sync
 import photo_metadata_sync
 import photo_removal_sync
+import frontend_sync
 
 
 def publish(data, database, backups, source):
@@ -19,6 +20,8 @@ def publish(data, database, backups, source):
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         name = next(n for n in archive.namelist() if n.endswith('.json'))
         payload = json.loads(archive.read(name))
+    if payload.get('kind') == 'frontend-files':
+        return frontend_sync.apply(payload, source.parent.parent/'frontend', backups)
     if payload.get('kind') == 'photo-remove':
         return photo_removal_sync.apply(database, payload, backups, source.parent.parent/'frontend')
     if payload.get('kind') == 'photo-edit':
