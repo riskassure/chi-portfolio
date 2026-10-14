@@ -24,6 +24,7 @@ import photo_sync
 import photo_metadata_sync
 import photo_removal_sync
 import frontend_sync
+import site_deployment
 import webbrowser
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -101,9 +102,10 @@ def current_job(state):
         raise ValueError('Prepare a selected entry first.')
     if digest(state['base']) != state['base_sha256'] or digest(job['package']) != job['sha256']:
         raise ValueError('Baseline or package changed. Prepare a new review package.')
-    if job.get('kind') == 'frontend-files':
+    if job.get('kind') in ('frontend-files', 'website-code'):
+        code = job['kind'] == 'website-code'
         for path, expected_hash in job['proposed'].items():
-            if frontend_sync.checksum(frontend_sync.read_text(ROOT/'frontend', path)) != expected_hash:
+            if frontend_sync.checksum(frontend_sync.read_text(ROOT if code else ROOT/'frontend', path, code)) != expected_hash:
                 raise ValueError('Local frontend file changed since review: '+path)
         return job
     if job.get('kind') in ('photo-edit', 'photo-remove'):
@@ -187,25 +189,65 @@ def prepare_photo_removal(state, file_path):
     return report
 
 
-def prepare_frontend(state, paths):
+def prepare_frontend(state, paths, code=False):
     # Validate local selections before connecting, without changing user files.
     for path in paths:
-        if frontend_sync.read_text(ROOT/'frontend', path) is None:
+        if frontend_sync.read_text(ROOT if code else ROOT/'frontend', path, code) is None:
             raise ValueError('Selected local file is missing: '+path)
     print('Reading selected live frontend files for comparison. No live changes.', flush=True)
-    live = frontend_sync.capture_live(state['username'], paths)
+    domain = None
+    if code:
+        settings = validate(json.loads(SETTINGS.read_text(encoding='utf-8')))
+        if settings['username'] != state['username']:
+            raise ValueError('API account differs from selected account.')
+        domains = site_deployment.domains(settings)
+        if not domains:
+            raise ValueError('No website found in the selected account.')
+        print('Account websites:', ', '.join(domains))
+        domain = domains[0] if len(domains) == 1 else input('Website domain to reload: ').strip()
+        if domain not in domains:
+            raise ValueError('Choose a website from the account list.')
+    live = frontend_sync.capture_live(state['username'], paths, code=code)
     folder = ROOT/'dist'/'math-workflow'/uuid.uuid4().hex
     folder.mkdir(parents=True)
     package = folder/'package.zip'
-    payload = frontend_sync.prepare(ROOT/'frontend', paths, live, package)
+    payload = frontend_sync.prepare(ROOT if code else ROOT/'frontend', paths, live, package, code=code)
     report = preview(read_package(package))
     (folder/'review.txt').write_text(report, encoding='utf-8')
-    state['job'] = dict(kind='frontend-files', canonical='Frontend files: '+', '.join(item['path'] for item in payload['files']),
+    state['job'] = dict(kind=payload['kind'], domain=domain, canonical=('Website code: ' if code else 'Frontend files: ')+', '.join(item['path'] for item in payload['files']),
                         package=str(package), sha256=digest(package),
                         proposed={item['path']: frontend_sync.checksum(item['replacement']) for item in payload['files']},
                         remote=None, checked=False)
     save(state)
     return report
+
+
+def finish_code_deployment(state):
+    job = current_job(state)
+    if job.get('kind') != 'website-code' or job.get('result') not in ('APPLIED', 'ALREADY_PRESENT'):
+        raise ValueError('Publish a reviewed website code package first.')
+    # A retry must verify the uploaded code again, not just reload arbitrary
+    # files that may have changed since the original upload.
+    check_live(state)
+    if not job['preflight_status'].startswith('ALREADY PRESENT'):
+        raise ValueError('Live files do not match the published package; reload stopped.')
+    settings = validate(json.loads(SETTINGS.read_text(encoding='utf-8')))
+    if settings['username'] != state['username']:
+        raise ValueError('Reload account differs from publication account.')
+    deployment_receipt = Path(job['package']).parent/('deployment-'+uuid.uuid4().hex+'.json')
+    def record(status):
+        job['deployment_status'] = status
+        job['deployment_receipt'] = str(deployment_receipt)
+        deployment_receipt.write_text(json.dumps(dict(status=status, domain=job['domain'],
+            package_sha256=job['sha256'], publication_receipt=job.get('publication_receipt')), indent=2), encoding='utf-8')
+        save(state)
+    record('RELOAD_PENDING')
+    site_deployment.reload_site(settings, job['domain'])
+    record('RELOAD_ACKNOWLEDGED')
+    site_deployment.verify_site(job['domain'])
+    record('HOMEPAGE_VERIFIED')
+    print('Deployment receipt:', deployment_receipt)
+    print('Reload acknowledged and public homepage returned HTTP 200. Check the changed feature in your browser; this is not a feature test.')
 
 
 def upload(state):
@@ -245,6 +287,8 @@ def publish_reviewed(state):
     print('Selected entry:', job['canonical'])
     if job.get('kind') == 'photo-remove':
         print('REMOVE this photo from the live gallery. The image file will remain accessible at its direct URL.')
+    if job.get('kind') == 'website-code':
+        print('This uploads Python and matching files, then reloads https://'+job['domain']+'. No migrations or dependency installation are included.')
     print('This applies the reviewed package to the live website, with a backup and repeated conflict checks.')
     if input('Type PUBLISH to proceed (anything else cancels): ').strip() != 'PUBLISH':
         print('Cancelled.')
@@ -255,8 +299,12 @@ def publish_reviewed(state):
     receipt = Path(job['package']).parent / ('receipt-' + uuid.uuid4().hex + '.json')
     result = publish_staged(state['username'], job['remote'], Path(job['package']), receipt)
     job['result'] = result['status']
+    job['publication_receipt'] = str(receipt)
     save(state)
-    if job.get('kind') == 'frontend-files':
+    if job.get('kind') == 'website-code':
+        print('Code files uploaded. Reload and homepage verification follow; if interrupted, use option 16 after checking the saved status.')
+        finish_code_deployment(state)
+    elif job.get('kind') == 'frontend-files':
         print('Frontend files verified. Hard-refresh the affected live pages (Ctrl+F5). No reload or database refresh is needed for this file-only update.')
     else:
         print('Verify the live page, then download a fresh baseline. Existing local databases were not replaced.')
@@ -269,7 +317,7 @@ def main():
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -322,6 +370,15 @@ def main():
             elif choice == '10':
                 print('Keep the local server running (option 6 in another terminal). Opening the photo review page.')
                 webbrowser.open('http://127.0.0.1:5001/api/photography/google/manage')
+            elif choice == '16':
+                finish_code_deployment(state)
+            elif choice == '15':
+                print('Enter repository-relative paths, separated by commas. Include backend/src Python and any matching frontend files.')
+                selected = input('Code files (blank cancels): ').strip()
+                if not selected:
+                    continue
+                print(prepare_frontend(state, [path.strip() for path in selected.split(',')], code=True))
+                print('Review all changes and test locally, then use 3 (stage), 4 (check live), 5 (publish and reload).')
             elif choice == '14':
                 print('Enter paths relative to frontend, separated by commas (example: photography/photography.css).')
                 selected = input('Files (blank cancels): ').strip()

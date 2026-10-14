@@ -1,5 +1,51 @@
 # Website content synchronization
 
+## Python and matching frontend deployments (options 15 and 16)
+
+Option **15** prepares a reviewed code update. Enter repository-relative paths,
+separated by commas, for example:
+
+```text
+backend/src/routes/admin_photography.py, frontend/photography/gallery.js
+```
+
+The supported scope is Python under `backend/src` plus matching frontend HTML,
+CSS and JavaScript. A code package must contain a changed Python file; use option
+14 for frontend-only updates. Database migrations, dependency installation,
+private settings, WSGI configuration, file deletion and other backend tools are
+outside this step. Test the selected changes locally with the installed
+dependencies before publication.
+
+Preparation reads live expected files and lists the account's websites. With
+one website it selects that domain; otherwise choose one from the list. Review
+all differences, then use **3**, **4**, and **5**. Python source is compiled for
+syntax validation locally and on the server without executing it during review
+or preflight. This is not an import/dependency/runtime test. Matching frontend
+and Python changes share the existing batch backups, conflict checks and
+file-replacement rollback. Batches are not a site-wide atomic deployment.
+
+Before the `PUBLISH` confirmation, the helper displays the domain it will reload.
+After uploading, it verifies that the live files match the package, sends an API
+reload request for that account webapp, and checks the public HTTPS homepage.
+The private API token is used only with the PythonAnywhere API and is never sent
+to the public website. No database refresh is needed for code-only deployment.
+
+The upload receipt and deployment receipt are separate. Deployment states are
+`RELOAD_PENDING`, `RELOAD_ACKNOWLEDGED` and `HOMEPAGE_VERIFIED`. HTTP 200 on the
+homepage does not prove that every worker or changed feature is healthy: hard
+refresh the browser, sign in and test the actual changed feature afterward.
+For the photo editor, verify that a title edit saves and survives a page refresh.
+
+If reload or verification fails, the uploaded files and backups remain. Inspect
+the live site and PythonAnywhere error log before choosing **16** to retry reload
+and homepage verification. Option 16 first rechecks the package's live file
+checksums and refuses newer conflicting files. It retains a separate receipt
+for each attempt. A failed runtime check does not automatically restore old code
+or trigger repeated reloads. Recovery from a runtime failure uses the recorded
+file backups, followed by another reload; do not restore an old whole database.
+
+Reload API reference: https://help.pythonanywhere.com/pages/API/
+
 ## Publishing frontend files (option 14)
 
 Edit and test HTML, CSS or JavaScript locally first. Choose **14. Prepare frontend
@@ -42,10 +88,10 @@ files are served directly, so this step does not reload PythonAnywhere or touch
 the database; option 8 is not needed for a file-only update. Option 8 still does
 not download website source code.
 
-This increment does not deploy Python code or coordinate database migrations.
+Option 14 does not deploy Python code or coordinate database migrations.
 Only publish frontend changes compatible with the backend already live. In
 particular, the newer gallery title editor also needs the updated Python route;
-do not deploy that editor alone as a way to enable title editing on the live site.
+use option 15 to review and deploy both files together.
 
 ## Google Photos and new-photo publication
 
@@ -115,9 +161,9 @@ Image bytes, filenames, gallery IDs, visibility and rotation history are not
 changed. Matching repeats are skipped; newer conflicting edits stop publication.
 After checking the live gallery, use **8** to refresh the baseline.
 
-The title input is part of the local editor update. Publishing metadata does not
-deploy this editor's HTML/JavaScript or backend route to the live site; the live
-gallery can display the updated title with its existing code.
+The title input is part of the editor update. Publishing metadata does not
+deploy its JavaScript or backend route; use option 15 for the paired code files.
+The live gallery can display updated titles with its existing code.
 
 ## Remembered local admin password (Windows)
 

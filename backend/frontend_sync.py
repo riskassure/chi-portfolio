@@ -18,13 +18,18 @@ TOTAL_LIMIT = 10 * 1024 * 1024
 MAX_FILES = 20
 
 
-def validate_path(name):
+def validate_path(name, code=False):
+    if code:
+        if isinstance(name, str) and (re.fullmatch(r'backend/src/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.py', name)
+                                      or re.fullmatch(r'frontend/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.(?:html|css|js)', name)):
+            return
+        raise ValueError('Code updates allow only backend/src Python files and frontend HTML/CSS/JS.')
     if not isinstance(name, str) or not re.fullmatch(r'(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.(?:html|css|js)', name):
         raise ValueError('Use a relative frontend HTML, CSS or JS path, without links or hidden directories.')
 
 
-def target_path(frontend, name):
-    validate_path(name)
+def target_path(frontend, name, code=False):
+    validate_path(name, code)
     root = Path(frontend).resolve()
     target = root/name
     if target.is_symlink() or target.resolve() != target or not target.resolve().is_relative_to(root):
@@ -32,8 +37,8 @@ def target_path(frontend, name):
     return target
 
 
-def read_text(frontend, name):
-    path = target_path(frontend, name)
+def read_text(frontend, name, code=False):
+    path = target_path(frontend, name, code)
     if not path.exists():
         return None
     with path.open('rb') as stream:
@@ -51,7 +56,7 @@ def checksum(text):
 
 
 def validate(payload):
-    if not isinstance(payload, dict) or set(payload) != {'kind', 'files'} or payload['kind'] != 'frontend-files':
+    if not isinstance(payload, dict) or set(payload) != {'kind', 'files'} or payload['kind'] not in ('frontend-files', 'website-code'):
         raise ValueError('Invalid frontend package.')
     files = payload['files']
     if not isinstance(files, list) or not 1 <= len(files) <= MAX_FILES:
@@ -60,7 +65,7 @@ def validate(payload):
     for item in files:
         if not isinstance(item, dict) or set(item) != {'path', 'expected', 'replacement'}:
             raise ValueError('Invalid frontend file entry.')
-        validate_path(item['path'])
+        validate_path(item['path'], payload['kind'] == 'website-code')
         if item['path'].casefold() in seen:
             raise ValueError('Duplicate frontend path.')
         seen.add(item['path'].casefold())
@@ -76,6 +81,13 @@ def validate(payload):
             total += size
         if item['expected'] == item['replacement']:
             raise ValueError('Package contains an unchanged file.')
+        if item['path'].endswith('.py'):
+            try:
+                compile(item['replacement'].encode('utf-8'), item['path'], 'exec', dont_inherit=True)
+            except (SyntaxError, ValueError) as error:
+                raise ValueError('Python syntax check failed for '+item['path']+': '+str(error)) from None
+    if payload['kind'] == 'website-code' and not any(item['path'].endswith('.py') for item in files):
+        raise ValueError('Use option 14 for frontend-only changes; a code package must include Python.')
     if total > TOTAL_LIMIT:
         raise ValueError('Frontend review exceeds 10 MB.')
 
@@ -83,8 +95,8 @@ def validate(payload):
 def unpack(data, payload):
     validate(payload)
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
-        if archive.namelist() != ['frontend-files.json']:
-            raise ValueError('Frontend packages contain only frontend-files.json.')
+        if archive.namelist() != [payload['kind']+'.json']:
+            raise ValueError('Unexpected code/file package contents.')
 
 
 def review(payload):
@@ -93,9 +105,13 @@ def review(payload):
              'Review every difference: the expected version was read from live during preparation.',
              'No database changes, Python changes or website reload are included.',
              'Multiple files are replaced individually; a brief mixed-version interval is possible.']
+    code = payload['kind'] == 'website-code'
+    if code:
+        lines[0] = 'Proposed operation: publish Python and matching frontend code'
+        lines[2] = 'Python syntax is checked without execution. Publication requires a website reload and verification. No database migration or dependency installation.'
     for item in payload['files']:
         name = item['path']
-        lines += ['File: frontend/'+name, 'Expected SHA-256: '+str(checksum(item['expected'])),
+        lines += ['File: '+('' if code else 'frontend/')+name, 'Expected SHA-256: '+str(checksum(item['expected'])),
                   'Proposed SHA-256: '+checksum(item['replacement'])]
         lines += list(difflib.unified_diff((item['expected'] or '').splitlines(), item['replacement'].splitlines(),
                                          fromfile='live/'+name, tofile='local/'+name, lineterm=''))
@@ -110,7 +126,7 @@ def status(payload, frontend):
     validate(payload)
     matches = []
     for item in payload['files']:
-        current = read_text(frontend, item['path'])
+        current = read_text(frontend, item['path'], payload['kind'] == 'website-code')
         if current not in (item['expected'], item['replacement']):
             return 'CONFLICT - live file changed: '+item['path']
         matches.append(current == item['replacement'])
@@ -118,17 +134,17 @@ def status(payload, frontend):
             'EXPECTED TEXT MATCHES - frontend files eligible for publication')
 
 
-def capture_live(username, paths):
+def capture_live(username, paths, code=False):
     if not re.fullmatch(r'[A-Za-z0-9_]+', username):
         raise ValueError('Invalid account username.')
     if not 1 <= len(paths) <= MAX_FILES or len({path.casefold() for path in paths}) != len(paths):
         raise ValueError('Select 1 to 20 distinct frontend files.')
     for path in paths:
-        validate_path(path)
+        validate_path(path, code)
     # Send only this trusted local reader, never the HTML/JS being reviewed.
-    script = "import json,sys; config=json.load(sys.stdin); scope={}; exec(compile(config['reader'],'<frontend-reader>','exec'),scope); result={p:scope['read_text'](config['frontend'],p) for p in config['paths']}; print('FRONTEND_SNAPSHOT='+json.dumps(result))"
+    script = "import json,sys; config=json.load(sys.stdin); scope={}; exec(compile(config['reader'],'<frontend-reader>','exec'),scope); result={p:scope['read_text'](config['frontend'],p,config['code']) for p in config['paths']}; print('FRONTEND_SNAPSHOT='+json.dumps(result))"
     request = dict(reader=Path(__file__).read_text(encoding='utf-8'), paths=paths,
-                   frontend=f'/home/{username}/chi-portfolio/frontend')
+                   code=code, frontend=f'/home/{username}/chi-portfolio'+('' if code else '/frontend'))
     result = subprocess.run(['ssh', username+'@ssh.pythonanywhere.com', 'python3.13 -I -B -c '+shlex.quote(script)],
                             input=json.dumps(request), text=True, encoding='utf-8', stdout=subprocess.PIPE, check=True)
     lines = [line.split('=', 1)[1] for line in result.stdout.splitlines() if line.startswith('FRONTEND_SNAPSHOT=')]
@@ -140,22 +156,22 @@ def capture_live(username, paths):
     return snapshot
 
 
-def prepare(frontend, paths, live, output):
+def prepare(frontend, paths, live, output, code=False):
     if set(paths) != set(live):
         raise ValueError('Live snapshot does not match selected files.')
     files = []
     for path in paths:
-        replacement = read_text(frontend, path)
+        replacement = read_text(frontend, path, code)
         if replacement is None:
             raise ValueError('Selected local file is missing: '+path)
         if replacement != live[path]:
             files.append(dict(path=path, expected=live[path], replacement=replacement))
     if not files:
         raise ValueError('Selected files already match live. No package needed.')
-    payload = dict(kind='frontend-files', files=files)
+    payload = dict(kind='website-code' if code else 'frontend-files', files=files)
     validate(payload)
     with zipfile.ZipFile(output, 'x', compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr('frontend-files.json', json.dumps(payload, ensure_ascii=False, indent=2))
+        archive.writestr(payload['kind']+'.json', json.dumps(payload, ensure_ascii=False, indent=2))
     return payload
 
 
@@ -177,6 +193,8 @@ def temporary_file(target, text, mode):
 
 def apply(payload, frontend, backups):
     validate(payload)
+    code = payload['kind'] == 'website-code'
+    canonical = 'Website code (reload required)' if code else 'Frontend files'
     backups = Path(backups)
     backups.mkdir(parents=True, exist_ok=True)
     lock = backups/'.frontend-publish.lock'
@@ -190,17 +208,17 @@ def apply(payload, frontend, backups):
     try:
         outcome = status(payload, frontend)
         if outcome.startswith('ALREADY PRESENT'):
-            return dict(status='ALREADY_PRESENT', canonical='Frontend files', backup=None)
+            return dict(status='ALREADY_PRESENT', canonical=canonical, backup=None)
         if not outcome.startswith('EXPECTED TEXT MATCHES'):
             raise ValueError(outcome)
-        backup = backups/('before-frontend-update-'+uuid.uuid4().hex)
+        backup = backups/(('before-code-update-' if code else 'before-frontend-update-')+uuid.uuid4().hex)
         backup.mkdir()
         (lock/'backup.txt').write_text(str(backup), encoding='utf-8')
-        journal = dict(status='PREPARING', files=[])
+        journal = dict(status='PREPARING', kind=payload['kind'], files=[])
         for index, item in enumerate(payload['files']):
             path = item['path']
-            target = target_path(frontend, path)
-            current = read_text(frontend, path)
+            target = target_path(frontend, path, code)
+            current = read_text(frontend, path, code)
             if current == item['replacement']:
                 continue
             if current != item['expected']:
@@ -219,35 +237,35 @@ def apply(payload, frontend, backups):
         (backup/'manifest.json').write_text(json.dumps(journal, indent=2), encoding='utf-8')
         # All backups and temporary files exist before the first replacement.
         for item, current, mode, temporary in staged:
-            target = target_path(frontend, item['path'])
-            if read_text(frontend, item['path']) != current:
+            target = target_path(frontend, item['path'], code)
+            if read_text(frontend, item['path'], code) != current:
                 raise ValueError('Live file changed before replacement: '+item['path'])
             if current is None:
                 os.link(temporary, target)  # Refuse a concurrently created file.
             else:
                 os.replace(temporary, target)
             installed.append((item, current, mode))
-            if read_text(frontend, item['path']) != item['replacement']:
+            if read_text(frontend, item['path'], code) != item['replacement']:
                 raise ValueError('Published file verification failed.')
         if not status(payload, frontend).startswith('ALREADY PRESENT'):
             raise ValueError('Frontend batch verification failed.')
         journal['status'] = 'APPLIED'
         (backup/'manifest.json').write_text(json.dumps(journal, indent=2), encoding='utf-8')
-        return dict(status='APPLIED', canonical='Frontend files', backup=str(backup))
+        return dict(status='APPLIED', canonical=canonical, backup=str(backup))
     except BaseException as error:
         failures = []
         for item, current, mode in reversed(installed):
             restore = None
             try:
-                target = target_path(frontend, item['path'])
-                if read_text(frontend, item['path']) != item['replacement']:
+                target = target_path(frontend, item['path'], code)
+                if read_text(frontend, item['path'], code) != item['replacement']:
                     raise ValueError('Concurrent edit; automatic restoration refused.')
                 if current is None:
                     target.unlink()
                 else:
                     restore = temporary_file(target, current, mode)
                     os.replace(restore, target)
-                if read_text(frontend, item['path']) != current:
+                if read_text(frontend, item['path'], code) != current:
                     raise ValueError('Restoration verification failed.')
             except BaseException:
                 failures.append(item['path'])

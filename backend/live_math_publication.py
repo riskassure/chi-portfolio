@@ -20,6 +20,8 @@ def publish(data, database, backups, source):
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         name = next(n for n in archive.namelist() if n.endswith('.json'))
         payload = json.loads(archive.read(name))
+    if payload.get('kind') == 'website-code':
+        return frontend_sync.apply(payload, source.parent.parent, backups)
     if payload.get('kind') == 'frontend-files':
         return frontend_sync.apply(payload, source.parent.parent/'frontend', backups)
     if payload.get('kind') == 'photo-remove':

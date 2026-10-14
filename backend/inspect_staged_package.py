@@ -54,11 +54,13 @@ def preview(data, snapshot=None, *, live=False):
         payload = json.loads(archive.read(payloads[0]))
     if not isinstance(payload, dict):
         raise ValueError('Invalid math payload.')
-    if payload.get('kind') == 'frontend-files':
+    if payload.get('kind') in ('frontend-files', 'website-code'):
         frontend_sync.unpack(data, payload)
         report += [frontend_sync.review(payload)]
         if snapshot:
             frontend = Path(snapshot).resolve().parent.parent/'frontend' if live else Path(__file__).resolve().parents[1]/'frontend'
+            if payload['kind'] == 'website-code':
+                frontend = frontend.parent
             status = frontend_sync.status(payload, frontend)
     elif payload.get('kind') == 'photo-remove':
         photo_removal_sync.unpack(data, payload)
@@ -134,14 +136,14 @@ def preview(data, snapshot=None, *, live=False):
                     except ValueError as error:
                         status = 'BLOCKED — ' + str(error)
     if snapshot:
-        report += [('Frontend directory: '+str(frontend) if payload.get('kind') == 'frontend-files' else
+        report += [('File root: '+str(frontend) if payload.get('kind') in ('frontend-files', 'website-code') else
                     ('Live database: ' if live else 'Comparison snapshot: ') + str(Path(snapshot).resolve())), status,
-                   ('Read-only file check; files may change after this check.' if payload.get('kind') == 'frontend-files' else
+                   ('Read-only file check; files may change after this check.' if payload.get('kind') in ('frontend-files', 'website-code') else
                     'Checked in a consistent read-only transaction; live content may change after this check.'
                     if live else 'This checks the supplied snapshot, not the current live database.')]
     else:
         report += [('Live eligibility NOT CHECKED: run a separate live preflight after staging.'
-                    if payload.get('kind') == 'frontend-files' else
+                    if payload.get('kind') in ('frontend-files', 'website-code') else
                     'Live eligibility NOT CHECKED: no database snapshot supplied.')]
     report += ['Nothing extracted, executed, applied or reloaded. Publication requires separate live checks.']
     return '\n'.join(report)
