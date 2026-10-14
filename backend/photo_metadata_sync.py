@@ -19,6 +19,20 @@ def metadata(photo):
     return {key: photo[key] for key in FIELDS}
 
 
+def validate_details(row):
+    if not isinstance(row, dict) or set(row) != set(FIELDS):
+        raise ValueError('Only title, location and coordinates can be edited.')
+    for key in FIELDS:
+        value = row[key]
+        if value is None and key != 'title':
+            continue
+        if key in ('title', 'location_name'):
+            if not isinstance(value, str) or len(value) > 200 or (key == 'title' and not value.strip()):
+                raise ValueError('Invalid photo title or location.')
+        elif type(value) not in (int, float) or not math.isfinite(value) or abs(value) > (90 if key == 'latitude' else 180):
+            raise ValueError('Invalid photo coordinates.')
+
+
 def validate(payload):
     if not isinstance(payload, dict) or set(payload) != {'kind', 'file_path', 'expected', 'replacement', 'sha256'} or payload['kind'] != 'photo-edit':
         raise ValueError('Invalid photo metadata package.')
@@ -27,20 +41,8 @@ def validate(payload):
     if not isinstance(payload['sha256'], str) or not re.fullmatch('[a-f0-9]{64}', payload['sha256']):
         raise ValueError('Invalid image checksum.')
     for name in ('expected', 'replacement'):
-        row = payload[name]
-        if not isinstance(row, dict) or set(row) != set(FIELDS):
-            raise ValueError('Only title, location and coordinates can be edited.')
-        for key in FIELDS:
-            value = row[key]
-            # Older gallery rows may have unset location/coordinates. Preserve
-            # these exactly rather than changing unrelated fields implicitly.
-            if value is None and key != 'title':
-                continue
-            if key in ('title', 'location_name'):
-                if not isinstance(value, str) or len(value) > 200 or (key == 'title' and not value.strip()):
-                    raise ValueError('Invalid photo title or location.')
-            elif type(value) not in (int, float) or not math.isfinite(value) or abs(value) > (90 if key == 'latitude' else 180):
-                raise ValueError('Invalid photo coordinates.')
+        # Older rows may have unset location/coordinates; preserve them exactly.
+        validate_details(payload[name])
     if payload['expected'] == payload['replacement']:
         raise ValueError('No photo metadata changes to publish.')
 

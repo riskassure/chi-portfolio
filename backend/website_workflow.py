@@ -22,6 +22,7 @@ from bring_changes_home import refresh
 import profile_sync
 import photo_sync
 import photo_metadata_sync
+import photo_removal_sync
 import webbrowser
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,7 +100,7 @@ def current_job(state):
         raise ValueError('Prepare a selected entry first.')
     if digest(state['base']) != state['base_sha256'] or digest(job['package']) != job['sha256']:
         raise ValueError('Baseline or package changed. Prepare a new review package.')
-    if job.get('kind') == 'photo-edit':
+    if job.get('kind') in ('photo-edit', 'photo-remove'):
         photo = photo_sync.catalog(state['working']).get(job['canonical'])
         current = photo_metadata_sync.metadata(photo) if photo else None
         if photo_metadata_sync.image_hash(ROOT/'frontend', job['canonical']) != job['image_sha256']:
@@ -165,6 +166,21 @@ def prepare_photo_edit(state, file_path):
     return report
 
 
+def prepare_photo_removal(state, file_path):
+    if digest(state['base']) != state['base_sha256']:
+        raise ValueError('Baseline changed. Select the unchanged baseline.')
+    folder = ROOT/'dist'/'math-workflow'/uuid.uuid4().hex
+    folder.mkdir(parents=True)
+    package = folder/'package.zip'
+    payload = photo_removal_sync.prepare(state['base'], state['working'], file_path, ROOT/'frontend', package)
+    report = preview(read_package(package))
+    (folder/'review.txt').write_text(report, encoding='utf-8')
+    state['job'] = dict(kind='photo-remove', canonical=file_path, package=str(package), sha256=digest(package),
+                        proposed=payload['expected'], image_sha256=payload['sha256'], remote=None, checked=False)
+    save(state)
+    return report
+
+
 def upload(state):
     job = current_job(state)
     if job['remote']:
@@ -200,6 +216,8 @@ def publish_reviewed(state):
     if not job['remote'] or not job['checked']:
         raise ValueError('Run a successful live check for this package first.')
     print('Selected entry:', job['canonical'])
+    if job.get('kind') == 'photo-remove':
+        print('REMOVE this photo from the live gallery. The image file will remain accessible at its direct URL.')
     print('This applies the reviewed package to the live website, with a backup and repeated conflict checks.')
     if input('Type PUBLISH to proceed (anything else cancels): ').strip() != 'PUBLISH':
         print('Cancelled.')
@@ -221,7 +239,7 @@ def main():
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -274,6 +292,22 @@ def main():
             elif choice == '10':
                 print('Keep the local server running (option 6 in another terminal). Opening the photo review page.')
                 webbrowser.open('http://127.0.0.1:5001/api/photography/google/manage')
+            elif choice == '13':
+                baseline = photo_sync.catalog(state['base'])
+                local = photo_sync.catalog(state['working'])
+                candidates = sorted(baseline.keys() & local.keys())
+                for i, path in enumerate(candidates, 1):
+                    print(f'{i}. {local[path]["title"]} ({path})')
+                if not candidates:
+                    print('No existing baseline photos available for removal.')
+                else:
+                    selected = int(input('Photo number to prepare for removal (0 cancels): '))
+                    if selected == 0:
+                        continue
+                    if not 1 <= selected <= len(candidates):
+                        raise ValueError('Invalid photo number.')
+                    print(prepare_photo_removal(state, candidates[selected-1]))
+                    print('Nothing removed yet. Review, then use 3 (stage), 4 (check live), 5 (publish).')
             elif choice == '12':
                 baseline = photo_sync.catalog(state['base'])
                 local = photo_sync.catalog(state['working'])

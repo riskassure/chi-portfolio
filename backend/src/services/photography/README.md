@@ -79,8 +79,16 @@ requires checking live before retrying. Option 12 also publishes changes to an
 existing photo's title, location and coordinates. Edit and save locally first,
 then review the before/after values and use 3, 4 and 5. The metadata publisher
 checks expected values and image checksum again under a database write lock,
-backs up first, and preserves image bytes and rotation state. Deleting photos
-or replacing images is not yet supported.
+backs up first, and preserves image bytes and rotation state.
+
+Option 13 prepares removal of an existing gallery entry without changing the
+local database. Review it, stage with 3, check with 4, and publish with 5. The
+publisher rechecks metadata and image checksum, backs up the database, detaches
+linked import drafts and removes the catalog row transactionally. The image
+remains on disk and accessible at its direct URL. Option 8 then refreshes the
+local gallery and preserves drafts for intentional re-addition. Unpublished
+local edits block removal preparation or refresh. Permanent image deletion and
+image replacement are not supported.
 
 After checking the public gallery, stop the local server and use option 8.
 It compares photo metadata by filename, checks every live gallery image's

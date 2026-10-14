@@ -20,6 +20,7 @@ from apply_math_text_patch import patch_intended
 import profile_sync
 import photo_sync
 import photo_metadata_sync
+import photo_removal_sync
 
 
 def fetch_verified(settings, remote, local):
@@ -52,7 +53,17 @@ def preview(data, snapshot=None, *, live=False):
         payload = json.loads(archive.read(payloads[0]))
     if not isinstance(payload, dict):
         raise ValueError('Invalid math payload.')
-    if payload.get('kind') == 'photo-edit':
+    if payload.get('kind') == 'photo-remove':
+        photo_removal_sync.unpack(data, payload)
+        report += ['Proposed operation: REMOVE one gallery entry', 'Photo: '+payload['file_path'],
+                   json.dumps(payload['expected'], ensure_ascii=False, indent=2),
+                   'Image SHA-256: '+payload['sha256'],
+                   'The image file is retained and remains accessible at its direct URL.',
+                   'The entry stays in your local gallery until option 8 refreshes it after publication.']
+        if snapshot:
+            frontend = Path(snapshot).resolve().parent.parent/'frontend' if live else Path(__file__).resolve().parents[1]/'frontend'
+            status = photo_removal_sync.status(snapshot, payload, frontend)
+    elif payload.get('kind') == 'photo-edit':
         photo_metadata_sync.unpack(data, payload)
         report += ['Proposed operation: update existing photo details', 'Photo: '+payload['file_path']]
         for key in photo_metadata_sync.FIELDS:

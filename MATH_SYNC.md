@@ -21,8 +21,36 @@ metadata, with checksum verification and a live database backup. Existing image
 or metadata conflicts stop publication; matching repeats are skipped. Failed
 inserts can leave a verified unlisted image for a later retry, but never commit
 a catalog entry before its image is verified. After checking the live gallery,
-use **8** to refresh the baseline and bring gallery images home. Photo deletion
-and image replacement are not yet supported.
+use **8** to refresh the baseline and bring gallery images home. Gallery removal
+is supported by option 13; permanent image deletion and image replacement are
+not yet supported.
+
+### Removing a photo from the gallery
+
+Choose **13. Prepare removal from the gallery (keep image)** and select an
+existing photo. Enter 0 at the photo-number prompt to cancel. Preparation only
+creates a review package; it does not remove anything locally or online.
+Unpublished local edits to that photo must be resolved first.
+
+Review the filename, title and location, then use **3** (stage), **4** (check
+live), and **5** (publish). The publisher repeats the metadata and image-checksum
+checks, backs up the live database, and removes only the selected catalog row.
+Linked Google Photos drafts are retained with their gallery links cleared.
+Rotation changes do not block removal; newer content changes do. Repeating an
+already completed removal is a no-op if the retained image still matches.
+
+The image file remains on disk and accessible at its direct URL. This removes
+the photo from gallery listings, not from hosting. After checking the live
+gallery, stop the local server and use **8** to refresh the local gallery and
+baseline. Local private drafts for unchanged removed entries become available
+for intentional re-addition; their image files are preserved. Unpublished local
+edits to a removed entry still stop synchronization for review.
+
+To abandon a prepared removal, do not publish it; preparing another package
+replaces the selected job. Recovery after publication uses the retained image
+and database backup. A retained Google Photos draft can also be added locally
+again and published as a new photo after refreshing the baseline. Do not restore
+an entire old live database over subsequent website changes.
 
 ### Updating existing photo details
 

@@ -62,6 +62,11 @@ def reconcile(baseline, local, live):
             blocked.append(path)
     local_drafts = drafts(local, w)
     remote_drafts = drafts(live, r)
+    # A live removal of an unchanged local entry detaches its private import
+    # draft. Keep the draft available locally for intentional re-addition.
+    removed = {path for path in b.keys() & w.keys() if path not in r and b[path][1] == w[path][1]}
+    local_drafts = {digest: (title, location, None if path in removed else path)
+                    for digest, (title, location, path) in local_drafts.items()}
     # Draft image bytes live in a private local folder, not the public gallery.
     # Do not pretend we can import remote-only drafts without those private files.
     for digest, row in remote_drafts.items():
