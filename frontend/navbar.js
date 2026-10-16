@@ -37,6 +37,7 @@ function loadUniversalNavbar() {
                 <li><a href="${prefix}music/index.html">Music</a></li>
                 <li><a href="${prefix}math/index.html">Mathematics</a></li>
                 <li><a href="${prefix}photography/index.html">Photography</a></li>
+                <li><a href="${prefix}geography/index.html">Travel Map</a></li>
                 
                 <li id="admin-nav-item" class="admin-only-link"><a href="${prefix}admin_dashboard.html">Admin Control</a></li>
             </ul>

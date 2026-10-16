@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Places I've Been | Chi-Chih Woo</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="https://js.arcgis.com/5.1/esri/themes/light/main.css">
+    <link rel="stylesheet" href="travel.css">
+    <script src="../runtime-config.js"></script>
+    <script type="module" src="https://js.arcgis.com/5.1/"></script>
+</head>
+<body>
+<main class="travel-page">
+    <header class="travel-heading">
+        <p class="eyebrow">A life of exploring</p>
+        <h1>Places I've been</h1>
+        <p>National parks, familiar cities, and moments along the way.</p>
+        <div id="travel-counts" class="travel-counts"></div>
+    </header>
+    <div class="travel-layout">
+        <aside class="travel-sidebar" aria-label="Explore places">
+            <h2>Explore the map</h2>
+            <div class="map-views" aria-label="Map views">
+                <button type="button" data-view="world">World</button>
+                <button type="button" data-view="usa">United States</button>
+                <button type="button" data-view="canada">Canada</button>
+                <button type="button" data-view="hawaii">Hawaii</button>
+            </div>
+            <fieldset><legend>Show on the map</legend>
+                <label><input type="checkbox" id="show-states" checked> <span class="swatch states"></span> States &amp; Canadian regions with an overnight stay</label>
+                <label><input type="checkbox" id="show-countries" checked> <span class="swatch countries"></span> Countries visited</label>
+                <label><input type="checkbox" id="show-parks" checked> <span class="swatch parks"></span> National parks</label>
+                <label><input type="checkbox" id="show-photos" checked> <span class="swatch photos"></span> Photo locations</label>
+                <label><input type="checkbox" id="show-cities" checked> <span class="swatch cities"></span> Cities &amp; other places</label>
+            </fieldset>
+            <p><a href="cities.html">Review U.S. cities</a></p>
+            <section id="map-editor" hidden>
+                <h2>Edit my places</h2>
+                <p class="muted">Saved locally. Publish your reviewed map changes with the website helper.</p>
+                <details id="region-editor">
+                    <summary>Edit states, provinces &amp; countries</summary>
+                    <p class="muted">Check states and Canadian provinces or territories where you stayed at least one night. Check countries you have visited.</p>
+                    <form id="region-form"><div id="region-groups"></div>
+                        <button type="submit" class="editor-action">Save regions locally</button>
+                        <p id="region-status" role="status"></p>
+                    </form>
+                </details>
+                <h3>Add a place or locate a photo</h3>
+                <form id="place-form">
+                    <input type="hidden" id="edit-place-id">
+                    <label for="edit-photo">Place type</label>
+                    <select id="edit-photo"><option value="">New visited place</option></select>
+                    <img id="edit-photo-preview" hidden alt="Photo being placed">
+                    <label for="edit-place-name">Place name</label>
+                    <input id="edit-place-name" maxlength="200" required>
+                    <div class="coordinate-inputs">
+                        <label>Latitude<input type="number" id="edit-latitude" min="-90" max="90" step="any" required></label>
+                        <label>Longitude<input type="number" id="edit-longitude" min="-180" max="180" step="any" required></label>
+                    </div>
+                    <button type="button" id="pick-map-point">Choose point on map</button>
+                    <button type="submit">Save locally</button>
+                    <button type="button" id="cancel-map-edit">Clear form</button>
+                    <p id="edit-status" role="status"></p>
+                </form>
+                <details><summary id="unplaced-count">Photos needing a location</summary><ul id="unplaced-photos"></ul></details>
+            </section>
+            <label for="place-search">Find a place</label>
+            <input type="search" id="place-search" placeholder="Search this collection…">
+            <p id="place-count" class="muted" aria-live="polite"></p>
+            <ul id="place-list" class="place-list"></ul>
+            <p class="muted">A growing collection. City visits will be added as I work through my travel history.</p>
+        </aside>
+        <section class="map-panel" aria-label="Travel map">
+            <p id="map-status" role="status">Loading the map…</p>
+            <div id="travel-map" aria-label="Interactive world travel map"></div>
+            <section id="place-detail" hidden aria-label="Selected place"></section>
+        </section>
+    </div>
+    <p class="map-note">Park markers show general park locations, not trailheads or exact photo spots. Boundaries are simplified for display.</p>
+    <p class="map-note">Boundaries: <a href="https://www.naturalearthdata.com/about/terms-of-use/">Natural Earth</a>. Park locations: <a href="https://www.nps.gov/subjects/gisandmapping/index.htm">National Park Service</a>. Photography: Chi-Chih Woo.</p>
+</main>
+<script src="../navbar.js"></script>
+<script src="reference-data.js"></script>
+<script src="country-reference.js"></script>
+<script src="travel-data.js"></script>
+<script type="module" src="travel.js"></script>
+</body>
+</html>

@@ -11,6 +11,33 @@ let photoPageSize = 3;         // Curation Grid Density limit variable
 let refreshIntervalMinutes = 5; // Museum cycle execution pace anchor
 let navbarSizeObserver = null;
 let rotationTimerId = null;    // Tracks the background window interval loop
+let mapPhotoLocations = new Map();
+
+function updatePhotoMapLink(card, photo) {
+    let location = card.querySelector('.photo-location');
+    if (!location) {
+        location = document.createElement('p'); location.className = 'photo-location';
+        card.querySelector('.photo-metadata').append(location);
+    }
+    const mapped = mapPhotoLocations.get(photo.file_path);
+    const hasCoordinates = Number.isFinite(photo.latitude) && Number.isFinite(photo.longitude)
+        && Math.abs(photo.latitude) <= 90 && Math.abs(photo.longitude) <= 180
+        && (photo.latitude !== 0 || photo.longitude !== 0);
+    const located = hasCoordinates || (mapped?.located && mapped.location_name === photo.location_name);
+    if (located || isAdmin) {
+        const link = document.createElement('a');
+        link.href = `../geography/index.html?photo=${encodeURIComponent(photo.file_path)}${located ? '' : '&edit=photo'}`;
+        link.textContent = located ? `${(mapped?.location_name === photo.location_name && mapped?.map_location_name) || photo.location_name || 'Photo location'} — View on map` : 'Place this photo on the map';
+        location.replaceChildren(link);
+    } else location.textContent = photo.location_name || 'Unknown Location';
+}
+
+async function refreshPhotoMapLocations() {
+    try {
+        const response = await fetch(`${window.PORTFOLIO_API_BASE}/travel/photos`);
+        if (response.ok) mapPhotoLocations = new Map((await response.json()).photos.map(p => [p.file_path, p]));
+    } catch (_) { /* Plain location text remains usable if map data is unavailable. */ }
+}
 
 // 🛠️ HOOK: Called automatically by navbar.js ONLY if authenticated!
 function unlockLocalPageControls() {
@@ -150,6 +177,7 @@ function renderGalleryCards(photoList) {
 
             const imgCard = document.createElement('div');
             imgCard.className = 'photo-card';
+            imgCard.dataset.filePath = photo.file_path;
             
             imgCard.innerHTML = `
                 <div class="photo-frame-wrapper">
@@ -161,6 +189,7 @@ function renderGalleryCards(photoList) {
                 </div>
             `;
             galleryContainer.appendChild(imgCard);
+            updatePhotoMapLink(imgCard, photo);
         } catch (innerErr) {
             console.error("Skipped malformed card compilation iteration:", innerErr);
         }
@@ -170,11 +199,15 @@ function renderGalleryCards(photoList) {
 // 1. Fetch and render cards on page load (Strict Read Mode)
 async function loadActivePhotos() {
     try {
-        const response = await fetch(API_URL, { method: "GET" });
+        await refreshPhotoMapLocations();
+        const selectedPhoto = new URLSearchParams(window.location.search).get('photo');
+        const response = await fetch(selectedPhoto ? `${window.PORTFOLIO_API_BASE}/travel/photos` : API_URL, { method: "GET" });
         if (!response.ok) throw new Error(`Status code: ${response.status}`);
 
         const jsonResponse = await response.json();
-        renderGalleryCards(jsonResponse.data);
+        renderGalleryCards(selectedPhoto ? jsonResponse.photos.filter(photo => photo.file_path === selectedPhoto).map(photo => ({...photo,
+            latitude: Object.hasOwn(photo, 'catalog_latitude') ? photo.catalog_latitude : photo.latitude,
+            longitude: Object.hasOwn(photo, 'catalog_longitude') ? photo.catalog_longitude : photo.longitude})) : jsonResponse.data);
     } catch (error) {
         console.error("Pipeline breakdown:", error);
         galleryContainer.innerHTML = `<p style="color:#e74c3c; text-align:center; grid-column:1/-1;">⚠️ Failed to load landscape catalog records.</p>`;
@@ -214,6 +247,7 @@ function initializeMuseumExhibitionLoop() {
     if (rotationTimerId) {
         clearInterval(rotationTimerId); 
     }
+    if (new URLSearchParams(window.location.search).has('photo')) return;
 
     const intervalMilliseconds = refreshIntervalMinutes * 60 * 1000;
     rotationTimerId = setInterval(() => {
@@ -252,6 +286,9 @@ async function savePhotoEdits(imageId) {
             const card = statusSpan.closest('.photo-card');
             card.querySelector('.photo-title').textContent = title;
             card.querySelector('img').alt = title;
+            await refreshPhotoMapLocations();
+            updatePhotoMapLink(card, {file_path: card.dataset.filePath, location_name: locationName,
+                latitude: latitude === '' ? null : Number(latitude), longitude: longitude === '' ? null : Number(longitude)});
             statusSpan.innerText = "💾 Saved!";
             statusSpan.style.color = "green";
             setTimeout(() => { statusSpan.innerText = ""; }, 3000);

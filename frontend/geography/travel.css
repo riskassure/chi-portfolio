@@ -1,0 +1,33 @@
+.travel-page{max-width:1500px;margin:auto;padding:40px 28px;color:#253c46}
+.travel-page [hidden]{display:none!important}
+.travel-heading h1{font-size:clamp(2rem,4vw,3.3rem);margin:8px 0;font-family:Georgia,serif}
+.eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.75rem;color:#326d65;font-weight:700}
+.travel-counts{display:flex;gap:12px;flex-wrap:wrap;margin:25px 0}
+.travel-counts span{background:#e9f0ec;border-radius:6px;padding:12px 18px}
+.travel-layout{display:grid;grid-template-columns:290px minmax(0,1fr);border:1px solid #d7e0dc;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 8px 30px #203d3210}
+.travel-sidebar{padding:24px;background:#f7f9f6}.travel-sidebar h2{font-size:1.15rem;margin-top:0}
+.map-views{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:24px}
+.map-views button,.place-list button{cursor:pointer;font:inherit;color:#22594e;background:white;border:1px solid #c4d4ca;border-radius:5px;padding:8px}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #ba6c23;outline-offset:3px}
+fieldset{border:0;padding:0;margin:0 0 24px}legend{font-weight:600;margin-bottom:12px}fieldset label{display:flex;align-items:center;gap:7px;font-size:.85rem;margin:12px 0}
+.swatch{display:inline-block;width:12px;height:12px;flex-shrink:0}.states{background:#62a88a88;border:1px solid #397c61}.countries{border:1px solid #ba6c23}.parks{background:#24745e;border-radius:50%}.photos{background:#865ab1;border-radius:50%}
+#place-search{box-sizing:border-box;width:100%;padding:10px;margin-top:8px;border:1px solid #a8bdb2;border-radius:5px;font:inherit}
+.place-list{padding:0;list-style:none;max-height:280px;overflow:auto}.place-list li{margin:6px 0}.place-list button{width:100%;text-align:left;border:0;background:transparent}.place-list button:hover{background:#e1ede5}
+.muted,.map-note{font-size:.8rem;color:#52665f;line-height:1.6}
+.cities{background:#2d6ca2;border-radius:50%}
+#map-editor{border-top:1px solid #baccc0;margin:20px 0;padding-top:20px}
+#place-form label{display:block;margin:10px 0 4px;font-size:.85rem}
+#place-form input,#place-form select{width:100%;box-sizing:border-box;padding:7px;border:1px solid #9eb7aa;border-radius:4px}
+#place-form button,#unplaced-photos button,.editor-action{padding:8px;margin:8px 5px 0 0;cursor:pointer;border:1px solid #397c61;background:white;border-radius:4px;color:#22594e}
+.coordinate-inputs{display:flex;gap:8px}.coordinate-inputs label{min-width:0;flex:1}
+#edit-status{font-size:.85rem;line-height:1.5}
+#edit-photo-preview{width:100%;max-height:170px;object-fit:contain;margin-top:12px}
+.map-panel{min-width:0;position:relative}#travel-map{height:700px;min-height:450px}#map-status{padding:10px 18px;margin:0;background:#edf3ee;font-size:.85rem}
+#place-detail{padding:22px;border-top:1px solid #d7e0dc}#place-detail h2{margin-top:0;font-size:1.3rem}.place-photo{display:inline-block;margin:8px 12px 8px 0;max-width:180px;vertical-align:top}.place-photo img{width:100%;height:130px;object-fit:cover;border-radius:4px}.place-photo span{display:block}
+@media(max-width:800px){.travel-page{padding:25px 14px}.travel-layout{grid-template-columns:1fr}.travel-sidebar{padding:18px}.place-list{max-height:150px}#travel-map{height:65vh;min-height:400px}.travel-counts span{padding:10px;font-size:.85rem}}
+
+#region-editor{margin-bottom:22px}#region-editor summary{cursor:pointer;font-weight:600;line-height:1.5}
+#region-groups details{margin:12px 0} .region-options{max-height:220px;overflow:auto;margin-top:8px}
+.region-options label{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:.85rem}
+#region-groups input[type=search]{width:100%;box-sizing:border-box;margin-top:8px;padding:8px;border:1px solid #9eb7aa;border-radius:4px}
+#region-status{font-size:.85rem;line-height:1.5}

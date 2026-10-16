@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Review U.S. Cities | Chi-Chih Woo</title>
+    <link rel="icon" href="data:,"><link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="travel.css"><link rel="stylesheet" href="cities.css">
+    <script src="../runtime-config.js"></script>
+</head>
+<body>
+<main class="travel-page city-page">
+    <p><a href="index.html">← Back to the travel map</a></p>
+    <h1>My U.S. city checklist</h1>
+    <p>A starting list of 159 major cities, state capitals, and regional destinations, grouped by state. This is a travel checklist, not a population ranking.</p>
+    <p>Mark places you have <strong>not visited</strong> or are <strong>unsure about</strong>. Then use “Mark remaining cities visited” and review the totals before saving. Only cities saved as visited appear on the map.</p>
+    <p>Nashville, Boise, Anchorage, and Des Moines start as “Not visited,” based on your earlier list. You can change any selection.</p>
+    <div class="city-toolbar">
+        <label>Find city or state <input type="search" id="city-search" placeholder="Search the checklist"></label>
+        <button id="mark-remaining" disabled>Mark remaining cities visited</button>
+        <button id="save-cities" disabled>Save reviewed city list locally</button>
+        <button id="download-cities" disabled>Download checklist</button>
+        <p id="city-summary" aria-live="polite"></p>
+        <p id="city-status" role="status">Loading the checklist…</p>
+    </div>
+    <div id="city-checklist"></div>
+    <p class="map-note">General city reference points: <a href="https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-populated-places/">Natural Earth</a>; Fort Worth: <a href="https://tigerweb.geo.census.gov/tigerwebmain/Files/acs26/tigerweb_acs26_incplace_tx.html">U.S. Census Bureau</a>. City visits do not change overnight-state shading.</p>
+</main>
+<script src="../navbar.js"></script><script type="module" src="cities.js"></script>
+</body>
+</html>
