@@ -6,9 +6,31 @@ from flask import Blueprint, jsonify, request
 
 # Tell Python to look up one folder level to find config.py
 sys.path.append(str(sys.path[0] + '/..'))
+from services import gallery_settings
+from routes.travel import editable
 from config import DB_PATH          
 
 photography_bp = Blueprint('photography_bp', __name__)
+
+@photography_bp.route('/api/photography/settings', methods=['GET', 'POST'])
+def photography_settings():
+    try:
+        if request.method == 'POST':
+            if not editable() or request.headers.get('Origin') != request.host_url.rstrip('/'):
+                return jsonify(error='Sign in on the local website to save gallery settings.'), 403
+            body = request.get_json(silent=True)
+            if not isinstance(body, dict):
+                return jsonify(error='Expected gallery settings.'), 400
+            gallery_settings.save(body.get('settings'), body.get('revision'))
+        settings, revision = gallery_settings.read()
+        return jsonify(settings=settings, revision=revision, editable=editable())
+    except gallery_settings.Conflict as error:
+        return jsonify(error=str(error)), 409
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    except OSError:
+        return jsonify(error='Could not read or save gallery settings.'), 503
+
 
 @photography_bp.route('/api/photography/current', methods=['GET', 'OPTIONS'])
 def get_current_photos():
@@ -30,9 +52,9 @@ def get_current_photos():
                 COALESCE(longitude, 0.0) AS longitude, 
                 is_currently_displayed 
             FROM photography_catalog 
-            WHERE is_currently_displayed = 1
-            ORDER BY image_id ASC;
-        """)
+            ORDER BY COALESCE(is_currently_displayed, 0) DESC, image_id ASC
+            LIMIT ?;
+        """, (gallery_settings.read()[0]['photo_count'],))
         
         photos = [dict(row) for row in cursor.fetchall()]
         return jsonify({"status": "success", "count": len(photos), "data": photos}), 200
@@ -47,15 +69,9 @@ def rotate_catalog_pool():
     if request.method == "OPTIONS":
         return jsonify({"status": "CORS preflight ok"}), 200
         
-    data = request.get_json() or {}
-    
-    # 🛡️ TYPE CAST SAFEGUARD: Explicitly force the limit parameter to be an integer 
-    # to completely prevent SQLite string type mismatch crashes.
-    try:
-        limit = int(data.get('limit', 3))
-    except (ValueError, TypeError):
-        limit = 3
-    
+    # Rotation uses the saved preference, never a stale browser default.
+    limit = gallery_settings.read()[0]['photo_count']
+
     try:
         conn = sqlite3.connect(str(DB_PATH))
         conn.row_factory = sqlite3.Row 

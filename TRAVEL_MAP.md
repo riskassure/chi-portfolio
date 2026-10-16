@@ -119,3 +119,30 @@ The boundary builder also produces country-reference.js (world outlines, rounded
 to four decimal places) and region-reference.js (editor labels and identifiers).
 These are required alongside reference-data.js, and each remains under the
 publication helper's 2 MiB per-file limit.
+
+## Esri key upload helper
+
+Choose option 17 to upload the key already saved in your local
+`~/.config/chi-portfolio/esri-api-key.txt` to the same home-relative path on
+PythonAnywhere. SSH may ask for the hosting account password. The key travels
+through SSH standard input, never in command arguments or deployment packages.
+The helper validates it, writes a temporary owner-only file, atomically replaces
+the destination, and verifies the saved bytes without displaying them. It does
+not publish website code or reload the app. A successful upload prepares the
+first map deployment; then use option 15 and the normal stage/check/publish flow.
+
+## Gallery display count
+
+The photography page saves its 3/6/9/12-photo preference locally in
+`frontend/photography/gallery-settings.js`. The initial saved count is 12,
+matching the local gallery. Only a signed-in local editor can save the setting;
+stale revisions are rejected. Visitors read the preferred number of photos,
+prioritizing the database's current rotation and filling from the remaining
+catalog without database writes. Rotation also uses the saved count, ignoring
+stale browser limits. Local and live rotations may still select different photos.
+
+For the first release of this feature, use helper option 15 with:
+`backend/src/services/gallery_settings.py, backend/src/routes/admin_photography.py, frontend/photography/gallery-settings.js, frontend/photography/gallery.js`.
+Review, stage, check live, and publish/reload as usual. After that first release,
+option 18 prepares only the saved display settings for the normal 3/4/5 workflow.
+Changing the local count alone does not change production.

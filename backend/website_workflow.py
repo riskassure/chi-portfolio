@@ -26,6 +26,7 @@ import photo_removal_sync
 import frontend_sync
 import site_deployment
 import webbrowser
+import upload_esri_key
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / 'dist' / 'math-workflow.json'
@@ -317,7 +318,7 @@ def main():
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n17. Upload Esri map key\n18. Prepare saved gallery display settings\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -370,6 +371,13 @@ def main():
             elif choice == '10':
                 print('Keep the local server running (option 6 in another terminal). Opening the photo review page.')
                 webbrowser.open('http://127.0.0.1:5001/api/photography/google/manage')
+            elif choice == '18':
+                print(prepare_frontend(state, ['photography/gallery-settings.js']))
+                print('Review the saved photo count, then use 3 (stage), 4 (check live), 5 (publish).')
+            elif choice == '17':
+                print('Uploading your saved Esri key. SSH may ask for your PythonAnywhere password.')
+                print(upload_esri_key.upload(state['username']))
+                print('Key setup complete. Publish the map code with option 15 when ready.')
             elif choice == '16':
                 finish_code_deployment(state)
             elif choice == '15':

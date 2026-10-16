@@ -63,3 +63,6 @@ backend/data/math/pmlinkname_target_diagnostics.csv
 # Block generated unresolved-macro diagnostic reports
 backend/data/math/diagnostics/unresolved_macro_definition_contexts_run_*.csv
 backend/data/math/diagnostics/unresolved_macro_inventory_run_*.csv
+
+frontend/photography/gallery-settings.lock
+frontend/photography/.gallery-*.tmp

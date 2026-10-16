@@ -7,11 +7,23 @@ const galleryContainer = document.getElementById("photography-gallery");
 
 // Global mutable view states for runtime configuration
 let isAdmin = false;
-let photoPageSize = 3;         // Curation Grid Density limit variable
+let photoPageSize = null;         // Curation Grid Density limit variable
 let refreshIntervalMinutes = 5; // Museum cycle execution pace anchor
 let navbarSizeObserver = null;
 let rotationTimerId = null;    // Tracks the background window interval loop
 let mapPhotoLocations = new Map();
+let galleryPreference;
+async function loadGalleryPreference() {
+    const response = await fetch(`${window.PORTFOLIO_API_BASE}/photography/settings`);
+    if (!response.ok) throw new Error('Could not load gallery preferences.');
+    galleryPreference = await response.json();
+    photoPageSize = galleryPreference.settings.photo_count;
+    const select = document.getElementById('photo-size-select');
+    if (select) {select.value = String(photoPageSize); select.disabled = !galleryPreference.editable;}
+}
+const preferenceReady = loadGalleryPreference().catch(() => {
+    galleryPreference = null;
+});
 
 function updatePhotoMapLink(card, photo) {
     let location = card.querySelector('.photo-location');
@@ -67,7 +79,7 @@ function unlockLocalPageControls() {
     if (document.getElementById('admin-gallery-controls')) {
         const sizeSelect = document.getElementById('photo-size-select');
         if (sizeSelect) {
-            sizeSelect.value = photoPageSize.toString();
+            sizeSelect.value = String(photoPageSize ?? '');
         }
         return;
     }
@@ -101,13 +113,30 @@ function unlockLocalPageControls() {
     // Sync dropdown layout view state to global state memory baseline
     const sizeSelect = document.getElementById('photo-size-select');
     if (sizeSelect) {
-        sizeSelect.value = photoPageSize.toString();
+        sizeSelect.value = String(photoPageSize ?? '');
     }
 
+    sizeSelect.disabled = !galleryPreference?.editable;
+    const preferenceStatus = document.createElement('span');
+    preferenceStatus.id = 'gallery-preference-status'; preferenceStatus.setAttribute('role', 'status');
+    preferenceStatus.style.color = 'white'; controlDeck.append(preferenceStatus);
+
     // Wire listeners up to synchronize memory metrics on user changes
-    sizeSelect.addEventListener('change', (e) => {
-        photoPageSize = parseInt(e.target.value, 10);
-        triggerSmoothExhibitionRefresh(true); // Mutate on manual selection change
+    sizeSelect.addEventListener('change', async (e) => {
+        const count = Number(e.target.value);
+        sizeSelect.disabled = true;
+        try {
+            const response = await fetch(`${window.PORTFOLIO_API_BASE}/photography/settings`, {
+                method: 'POST', credentials: 'include', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({settings: {photo_count: count}, revision: galleryPreference.revision})});
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Could not save photo count.');
+            galleryPreference = result; photoPageSize = result.settings.photo_count;
+            preferenceStatus.textContent = 'Saved locally. Publish with helper option 18.';
+            await triggerSmoothExhibitionRefresh(false);
+        } catch (error) {
+            sizeSelect.value = String(photoPageSize); preferenceStatus.textContent = error.message;
+        } finally {sizeSelect.disabled = !galleryPreference?.editable;}
     });
 
     document.getElementById('photo-refresh-input').addEventListener('input', (e) => {
@@ -133,8 +162,8 @@ function renderGalleryCards(photoList) {
     // 🎯 VISUAL DROPDOWN LOCK: Explicitly force the control dropdown 
     // to match the actual number of photo cards rendered on the screen.
     const sizeSelect = document.getElementById('photo-size-select');
-    if (sizeSelect && photoList && photoList.length > 0) {
-        sizeSelect.value = photoList.length.toString();
+    if (sizeSelect && photoPageSize !== null) {
+        sizeSelect.value = String(photoPageSize);
     }
 
     if (!photoList || photoList.length === 0) {
@@ -199,6 +228,7 @@ function renderGalleryCards(photoList) {
 // 1. Fetch and render cards on page load (Strict Read Mode)
 async function loadActivePhotos() {
     try {
+        await preferenceReady;
         await refreshPhotoMapLocations();
         const selectedPhoto = new URLSearchParams(window.location.search).get('photo');
         const response = await fetch(selectedPhoto ? `${window.PORTFOLIO_API_BASE}/travel/photos` : API_URL, { method: "GET" });
@@ -223,7 +253,7 @@ async function triggerSmoothExhibitionRefresh(mutateDatabase = false) {
         await new Promise(resolve => setTimeout(resolve, 600));
     }
 
-    if (mutateDatabase && isAdmin) {
+    if (mutateDatabase && isAdmin && photoPageSize !== null) {
         try {
             const response = await fetch(ROTATE_URL, {
                 method: "POST",
