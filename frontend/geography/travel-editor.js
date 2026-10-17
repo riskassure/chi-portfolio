@@ -9,21 +9,61 @@ export function createEditor(state, photos) {
     const preview = document.getElementById('edit-photo-preview');
     const status = document.getElementById('edit-status');
     let picking = false;
+    let searchVersion = 0;
+    let searchController;
+    const lookup = document.getElementById('lookup-place');
+    const results = document.getElementById('lookup-results');
+    const lookupStatus = document.getElementById('lookup-status');
+    function clearSearch() {
+        searchVersion++; searchController?.abort();
+        results.replaceChildren(); lookupStatus.textContent = ''; lookup.disabled = false;
+    }
     const editor = {get picking() {return picking;}, choose(point) {
         lat.value = point.latitude.toFixed(6); lon.value = point.longitude.toFixed(6);
         picking = false; status.textContent = 'Point selected. Review it, then save locally.';
         panel.scrollIntoView({block: 'nearest', behavior: 'smooth'});
     }, edit(place) {
-        form.reset(); id.value = place.id; name.value = place.name;
+        clearSearch(); form.reset(); id.value = place.id; name.value = place.name;
         preview.hidden = true; picking = false;
         lat.value = place.latitude; lon.value = place.longitude; name.readOnly = false;
         panel.scrollIntoView({block: 'center', behavior: 'smooth'});
     }, async remove(place) {
-        if (!confirm(`Remove â€œ${place.name}â€ from your local places?`)) return;
+        if (!confirm(`Remove "${place.name}" from your local places?`)) return;
         await save({action: 'delete', id: place.id});
     }};
     if (!state?.editable) return null;
     panel.hidden = false;
+    name.addEventListener('input', clearSearch);
+    lookup.addEventListener('click', async () => {
+        clearSearch();
+        const query = name.value.trim();
+        if (query.length < 2) {lookupStatus.textContent = 'Enter a place and, if known, its country or region.'; return;}
+        const version = searchVersion;
+        searchController = new AbortController(); lookup.disabled = true;
+        lookupStatus.textContent = 'Searching for matching places...';
+        try {
+            const response = await fetch(`${window.PORTFOLIO_API_BASE}/travel/search`, {
+                method: 'POST', credentials: 'include', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query}), signal: searchController.signal});
+            const data = await response.json();
+            if (version !== searchVersion) return;
+            if (!response.ok) throw new Error(data.error || 'Place search is unavailable. You can still choose a point on the map.');
+            lookupStatus.textContent = data.results.length ? 'Choose a match to fill the coordinates, then save locally.' : 'No matches. Try adding a country or nearby town, or choose a point on the map.';
+            for (const place of data.results) {
+                const li = document.createElement('li'); const button = document.createElement('button');
+                button.type = 'button'; button.textContent = place.name;
+                button.addEventListener('click', () => {
+                    name.value = place.name.slice(0, 200);
+                    editor.choose(place);
+                    document.dispatchEvent(new CustomEvent('travel-preview-point', {detail: place}));
+                    clearSearch(); lookupStatus.textContent = 'Location selected. Save locally to add it.';
+                });
+                li.append(button); results.append(li);
+            }
+        } catch (error) {
+            if (version === searchVersion && error.name !== 'AbortError') lookupStatus.textContent = error.message;
+        } finally {if (version === searchVersion) lookup.disabled = false;}
+    });
     const regionForm = document.getElementById('region-form');
     const regionStatus = document.getElementById('region-status');
     const regionInputs = {};
@@ -62,12 +102,12 @@ export function createEditor(state, photos) {
     });
     for (const photo of photos) {
         const option = document.createElement('option'); option.value = photo.file_path;
-        option.textContent = `${photo.title || 'Photo'} â€” ${photo.map_location_name || photo.location_name || 'Unknown location'}${photo.located ? '' : ' (unplaced)'}`;
+        option.textContent = `${photo.title || 'Photo'} - ${photo.map_location_name || photo.location_name || 'Unknown location'}${photo.located ? '' : ' (unplaced)'}`;
         photoSelect.append(option);
     }
     function pickPhoto(path) {
         const photo = photos.find(p => p.file_path === path);
-        form.reset(); id.value = ''; picking = false; photoSelect.value = path;
+        clearSearch(); form.reset(); id.value = ''; picking = false; photoSelect.value = path;
         name.value = photo ? (photo.map_location_name || (photo.location_name === 'Unknown Location' ? '' : photo.location_name) || '') : '';
         name.placeholder = 'Enter the place name';
         name.readOnly = false;
@@ -83,7 +123,7 @@ export function createEditor(state, photos) {
     });
     document.getElementById('cancel-map-edit').addEventListener('click', () => pickPhoto(''));
     async function save(body) {
-        status.textContent = 'Savingâ€¦';
+        status.textContent = 'Saving...';
         try {
             const response = await fetch(`${window.PORTFOLIO_API_BASE}/travel/places`, {method: 'POST', credentials: 'include',
                 headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...body, revision: state.revision})});

@@ -55,6 +55,10 @@
                     <img id="edit-photo-preview" hidden alt="Photo being placed">
                     <label for="edit-place-name">Place name</label>
                     <input id="edit-place-name" maxlength="200" required>
+                    <button type="button" id="lookup-place">Search by name</button>
+                    <p id="lookup-status" role="status" class="muted"></p>
+                    <ul id="lookup-results" class="lookup-results" aria-label="Matching locations"></ul>
+                    <p id="lookup-credit" class="muted">Search: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. Press Search to look up a public place name.</p>
                     <div class="coordinate-inputs">
                         <label>Latitude<input type="number" id="edit-latitude" min="-90" max="90" step="any" required></label>
                         <label>Longitude<input type="number" id="edit-longitude" min="-180" max="180" step="any" required></label>
@@ -79,7 +83,7 @@
         </section>
     </div>
     <p class="map-note">Park markers show general park locations, not trailheads or exact photo spots. Boundaries are simplified for display.</p>
-    <p class="map-note">Boundaries: <a href="https://www.naturalearthdata.com/about/terms-of-use/">Natural Earth</a>. Park locations: <a href="https://www.nps.gov/subjects/gisandmapping/index.htm">National Park Service</a>. Photography: Chi-Chih Woo.</p>
+    <p class="map-note">Place search: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors (ODbL)</a>. Boundaries: <a href="https://www.naturalearthdata.com/about/terms-of-use/">Natural Earth</a>. Park locations: <a href="https://www.nps.gov/subjects/gisandmapping/index.htm">National Park Service</a>. Photography: Chi-Chih Woo.</p>
 </main>
 <script src="../navbar.js"></script>
 <script src="reference-data.js"></script>

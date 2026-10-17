@@ -154,6 +154,13 @@ try {
     await view.goTo(worldView, {animate: false});
     await reactiveUtils.whenOnce(() => !view.updating);
     status.textContent = photoWarning + 'Select a marker or choose a place from the list.';
+    document.addEventListener('travel-preview-point', event => {
+        const point = event.detail;
+        draftLayer.removeAll();
+        draftLayer.add(new Graphic({geometry: {type: 'point', latitude: point.latitude, longitude: point.longitude},
+            symbol: {type: 'simple-marker', style: 'diamond', size: 18, color: '#d87518', outline: {color: 'white', width: 2}}}));
+        view.goTo({center: [point.longitude, point.latitude], zoom: 11}).catch(() => {});
+    });
     view.on('click', async event => {
         if (editor?.picking && event.mapPoint) {
             draftLayer.removeAll();

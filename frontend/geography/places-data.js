@@ -1,5 +1,111 @@
 window.TRAVEL_PLACES = {
-  "places": [],
+  "places": [
+    {
+      "id": "place-408747842d934eb3bd87e502cf4ad48e",
+      "name": "City of London, Greater London, England, United Kingdom",
+      "latitude": 51.515618,
+      "longitude": -0.091998,
+      "kind": "place"
+    },
+    {
+      "id": "place-a99862101b2a434982e67b1eeaf7673e",
+      "name": "Paris, Ile-de-France, Metropolitan France, France",
+      "latitude": 48.85889,
+      "longitude": 2.320041,
+      "kind": "place"
+    },
+    {
+      "id": "place-212ce94347be44e79cc29a5d416e6d81",
+      "name": "Lucerne, Switzerland",
+      "latitude": 47.052144,
+      "longitude": 8.305812,
+      "kind": "place"
+    },
+    {
+      "id": "place-54710bdc6e0c4ad8a418d4a0208ab507",
+      "name": "Milan, Rodano, Milan, Lombardy, Italy",
+      "latitude": 45.464194,
+      "longitude": 9.189635,
+      "kind": "place"
+    },
+    {
+      "id": "place-106fe8863f2148c8aca86cab94829157",
+      "name": "Venice, Venezia, Veneto, 30121-30176, Italy",
+      "latitude": 45.437191,
+      "longitude": 12.33459,
+      "kind": "place"
+    },
+    {
+      "id": "place-587e1bca61c748bca49104fa3a550896",
+      "name": "Rome, Roma Capitale, Lazio, Italy",
+      "latitude": 41.89332,
+      "longitude": 12.482932,
+      "kind": "place"
+    },
+    {
+      "id": "place-918de1f3c1bc409a982e760890083aaf",
+      "name": "Leaning Tower of Pisa, Piazza del Duomo, Santa Maria, Porta a Lucca, Pisa, Tuscany, 56126, Italy",
+      "latitude": 43.723016,
+      "longitude": 10.396632,
+      "kind": "place"
+    },
+    {
+      "id": "place-aeaf859e41224bdc9d72c1daa8cfbd8a",
+      "name": "Santa Maria del Fiore, Piazza del Duomo, Quartiere 1, Florence, Tuscany, 50112, Italy",
+      "latitude": 43.773102,
+      "longitude": 11.256574,
+      "kind": "place"
+    },
+    {
+      "id": "place-329ae35347974b96a0d6b6eac21ec0bc",
+      "name": "Shanghai, China",
+      "latitude": 31.231271,
+      "longitude": 121.470015,
+      "kind": "place"
+    },
+    {
+      "id": "place-a72f005ffc6e4869b05beff06049b0db",
+      "name": "Taipei, Taiwan",
+      "latitude": 25.03752,
+      "longitude": 121.56368,
+      "kind": "place"
+    },
+    {
+      "id": "place-7782697c41c74005aa7ffd0e9bb84508",
+      "name": "Hong Kong, China",
+      "latitude": 22.349236,
+      "longitude": 114.185778,
+      "kind": "place"
+    },
+    {
+      "id": "place-4956a69cfc424c198708bea95893430a",
+      "name": "Huangshan National Scenic Area, Huangshan, Anhui, China",
+      "latitude": 30.128612,
+      "longitude": 118.156522,
+      "kind": "place"
+    },
+    {
+      "id": "place-d9dc59cedea940e4a774d214c01042da",
+      "name": "Ho Chi Minh City, Vietnam",
+      "latitude": 10.773726,
+      "longitude": 106.716601,
+      "kind": "place"
+    },
+    {
+      "id": "place-264b06fc7be54c15bc553596351d497d",
+      "name": "Toronto, Ontario, Canada",
+      "latitude": 43.653482,
+      "longitude": -79.383935,
+      "kind": "place"
+    },
+    {
+      "id": "place-b74b5bcf4b0d4ce2bd81d47805919ad1",
+      "name": "Montreal, Urban agglomeration of Montreal, Montreal (administrative region), Quebec, Canada",
+      "latitude": 45.503182,
+      "longitude": -73.569806,
+      "kind": "place"
+    }
+  ],
   "photoLocations": {
     "images/photography/img_2122.webp": {
       "latitude": 19.862729,

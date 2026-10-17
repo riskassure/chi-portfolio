@@ -146,3 +146,24 @@ For the first release of this feature, use helper option 15 with:
 Review, stage, check live, and publish/reload as usual. After that first release,
 option 18 prepares only the saved display settings for the normal 3/4/5 workflow.
 Changing the local count alone does not change production.
+
+## Place-name lookup
+
+The local map editor offers Search by name for new places and photo locations.
+Press Search, select one of up to five matching names, review the orange preview
+pin, then Save locally. Selection fills the coordinates; map clicking can refine
+them. The service never automatically marks a search result as visited.
+
+Lookup uses OpenStreetMap Nominatim; the displayed map remains Esri. Per
+https://operations.osmfoundation.org/policies/nominatim/ this is an occasional,
+user-triggered editor feature, not autocomplete or bulk geocoding. Only the local
+signed-in admin can call it, with a matching Origin. Requests identify this site,
+are serialized with a 1.1-second minimum gap, and are cached persistently in
+ignored dist/place-search-cache.db. Run only one local editor server. Search
+public place names, not confidential addresses. Results carry OpenStreetMap/ODbL
+attribution on the editor and map. The upstream can be changed without source
+changes using PORTFOLIO_PLACE_SEARCH_URL (HTTPS Nominatim-compatible endpoint).
+
+Lookup failures leave manual pin placement available. No Esri privilege change
+or additional key is needed. Only names/coordinates explicitly saved by the
+editor enter places-data.js and its existing review/publication workflow.

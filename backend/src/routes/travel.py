@@ -8,6 +8,7 @@ import sqlite3
 from flask import Blueprint, jsonify, request, session
 from config import DB_PATH
 from services import travel_store
+from services import place_search
 import uuid
 
 travel_bp = Blueprint('travel', __name__)
@@ -85,6 +86,22 @@ def editable():
     return (os.environ.get('FLASK_ENV') != 'production' and session.get('is_admin') is True
             and request.remote_addr in {'127.0.0.1', '::1'}
             and request.host in {f'127.0.0.1:{port}', f'localhost:{port}'})
+
+
+@travel_bp.post('/api/travel/search')
+def search_places():
+    if not editable() or request.headers.get('Origin') != request.host_url.rstrip('/'):
+        return jsonify(error='Sign in on the local website to look up places.'), 403
+    body = request.get_json(silent=True)
+    try:
+        results = place_search.search(body.get('query') if isinstance(body, dict) else None)
+        return jsonify(results=results)
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    except RuntimeError as error:
+        return jsonify(error=str(error)), 503
+    except (OSError, sqlite3.Error):
+        return jsonify(error='Place search is unavailable. You can still choose a point on the map.'), 503
 
 
 @travel_bp.get('/api/travel/places')

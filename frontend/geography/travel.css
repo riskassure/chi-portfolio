@@ -31,3 +31,5 @@ fieldset{border:0;padding:0;margin:0 0 24px}legend{font-weight:600;margin-bottom
 .region-options label{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:.85rem}
 #region-groups input[type=search]{width:100%;box-sizing:border-box;margin-top:8px;padding:8px;border:1px solid #9eb7aa;border-radius:4px}
 #region-status{font-size:.85rem;line-height:1.5}
+
+.lookup-results{list-style:none;padding:0;max-height:260px;overflow:auto}.lookup-results button{width:100%;text-align:left;overflow-wrap:anywhere}
