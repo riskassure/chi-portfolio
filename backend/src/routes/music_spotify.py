@@ -5,6 +5,7 @@ import secrets
 
 from flask import Blueprint, current_app, jsonify, redirect, render_template_string, request, session
 from services.music.spotify_auth import SpotifyAuth, SpotifyError
+from config import DB_PATH
 
 spotify_bp = Blueprint("spotify", __name__, url_prefix="/api/music/spotify")
 auth = SpotifyAuth()
@@ -13,8 +14,8 @@ auth = SpotifyAuth()
 @spotify_bp.before_request
 def local_admin_only():
     if (os.environ.get("FLASK_ENV") == "production" or
-            request.remote_addr != "127.0.0.1" or request.host != "127.0.0.1:5000"):
-        return jsonify(error="Spotify setup is available only at http://127.0.0.1:5000 on this laptop."), 403
+            request.remote_addr != "127.0.0.1" or request.host != "127.0.0.1:5001"):
+        return jsonify(error="Spotify setup is available only at http://127.0.0.1:5001 on this laptop."), 403
     if request.method == "OPTIONS":
         return "", 204
     if not session.get("is_admin") and request.endpoint != "spotify.login":
@@ -64,7 +65,12 @@ def private_response(response):
 
 @spotify_bp.errorhandler(SpotifyError)
 def connection_error(error):
-    return str(error), 400
+    return render_template_string("""<!doctype html><html lang="en"><meta charset="utf-8">
+        <title>Reconnect Spotify</title><h1>Connect Spotify again</h1>
+        <p>{{ error }}</p><p>Start a fresh connection in this browser and finish within ten minutes.
+        Keep the local server running while you approve access.</p>
+        <p><a href="/api/music/spotify/connect">Restart Spotify connection</a></p></html>""",
+        error=str(error)), 400
 
 
 @spotify_bp.route("/connect", methods=["GET", "POST"])
@@ -73,7 +79,7 @@ def connect():
         session.setdefault("spotify_form_token", secrets.token_urlsafe(32))
         return render_template_string("""<!doctype html><html lang="en"><meta charset="utf-8">
             <title>Connect Spotify</title><h1>Connect Spotify</h1>
-            <p>{{ status }}</p><p>Enter the Client ID from your Spotify app settings. No Client Secret is needed.</p>
+            <p>{{ status }}</p><p>Reads your Spotify top tracks over approximately the last six months. No downloaded history file is needed.</p><p>Enter the Client ID from your Spotify app settings. No Client Secret is needed.</p>
             <p role="alert">{{ error }}</p>
             <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
             <label>Client ID <input name="client_id" value="{{ client_id }}" required pattern="[a-fA-F0-9]{32}" size="36"></label>
@@ -89,52 +95,42 @@ def connect():
     client_id = request.form.get("client_id", "").strip()
     if not re.fullmatch(r"[a-fA-F0-9]{32}", client_id):
         return show_form("Enter the 32-character Client ID from your Spotify app settings.", 400)
-    browser_id = secrets.token_urlsafe(32)
-    session["spotify_browser_id"] = browser_id
+    browser_id = session.setdefault("spotify_browser_id", secrets.token_urlsafe(32))
     return redirect(auth.begin(client_id, browser_id))
 
 
 @spotify_bp.get("/callback")
 def callback():
-    auth.complete(request.args.get("state", ""), session.pop("spotify_browser_id", ""),
+    auth.complete(request.args.get("state", ""), session.get("spotify_browser_id", ""),
                   request.args.get("code", ""), denied="error" in request.args)
     return redirect("/api/music/spotify/connected")
 
 
 @spotify_bp.get("/connected")
 def connected():
-    return jsonify(connected=auth.connected(), message="Connection saved locally. Open /api/music/spotify/status for refresh status.")
+    return jsonify(connected=auth.connected(), message="Connection saved. Return to the music page and click Update now to load your top tracks.")
 
 
 @spotify_bp.get("/status")
 def sync_status():
-    from contextlib import closing
-    import json
-    import sqlite3
-    from services.music.spotify_auth import token_path
-    path = token_path().parent / "spotify-history.db"
-    report = None
-    if path.exists():
-        with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as db:
-            if db.execute("SELECT 1 FROM sqlite_master WHERE name='sync_state'").fetchone():
-                row = db.execute("SELECT value FROM sync_state WHERE key='job_status'").fetchone()
-                report = json.loads(row[0]) if row else None
+    from services.music.spotify_top import status
     session.setdefault("spotify_update_csrf", secrets.token_urlsafe(32))
-    return jsonify(connected=auth.connected(), last_job=report, update_csrf=session["spotify_update_csrf"],
-                   counting_rule="Only export records with at least 30 seconds count. Recent API events await duration verification.")
+    return jsonify(connected=auth.connected(), last_job=status(DB_PATH), update_csrf=session["spotify_update_csrf"],
+                   ranking_source="Spotify top tracks", time_range="Last six months", refresh_interval_hours=24)
+
 
 
 @spotify_bp.post("/refresh")
 def refresh_catalog():
     import sqlite3
-    from services.music.spotify_jobs import run_local_job
+    from services.music.spotify_top import run
     data = request.get_json(silent=True)
     expected = session.get("spotify_update_csrf", "")
     supplied = data.get("csrf") if isinstance(data, dict) else None
     if not expected or not isinstance(supplied, str) or not secrets.compare_digest(expected.encode(), supplied.encode()):
         return jsonify(status="error", message="Reload the music page and try again."), 400
     try:
-        report = run_local_job(force=True)
+        report = run(DB_PATH, force=True)
     except (OSError, ValueError, sqlite3.Error):
         return jsonify(status="error", message="The local update could not start. Check the backend and try again."), 500
     return jsonify(report), {"ok": 200, "busy": 409, "waiting": 429, "error": 502}[report["status"]]

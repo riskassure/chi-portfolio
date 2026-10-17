@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!button || !message) return;
     button.addEventListener("click", async () => {
         button.disabled = true;
-        message.textContent = "Updating playlists and rankings. This may take a few minutes...";
+        message.textContent = "Refreshing your Spotify top tracks...";
         const base = `${window.PORTFOLIO_API_BASE}/music/spotify`;
         try {
             const status = await fetch(`${base}/status`, {credentials: "include", cache: "no-store"});
@@ -21,11 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const retry = result.retry_at ? ` Retry after ${new Date(result.retry_at).toLocaleString()}.` : "";
                 throw new Error((result.message || "Update failed. The previous catalog is retained.") + retry);
             }
-            const archives = result.archive_import;
-            message.textContent = "Update complete. " + (archives?.imported
-                ? `Imported ${archives.imported} Spotify history ZIP(s). Verified counts refreshed.`
-                : "No new history ZIP imported. Save your next Spotify export in Downloads for automatic import.");
-            if (archives?.issues?.length) message.textContent += " " + archives.issues.join(" ");
+            message.textContent = result.message || 'Your Spotify ranking is up to date.';
             loadMusicData();
         } catch (error) {
             message.textContent = error.message || "Could not reach the backend. Please try again.";

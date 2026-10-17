@@ -12,8 +12,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-REDIRECT_URI = "http://127.0.0.1:5000/api/music/spotify/callback"
-SCOPES = "playlist-read-private playlist-read-collaborative user-read-recently-played"
+REDIRECT_URI = "http://127.0.0.1:5001/api/music/spotify/callback"
+SCOPES = "user-top-read"
 
 
 class SpotifyError(Exception):
@@ -22,7 +22,7 @@ class SpotifyError(Exception):
 
 def token_path():
     base = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / ".local/share")))
-    path = (base / "chi-portfolio" / "spotify-tokens.json").resolve()
+    path = Path(os.environ.get("SPOTIFY_TOKEN_PATH", str(base / "chi-portfolio" / "spotify-tokens.json"))).resolve()
     repository = Path(__file__).resolve().parents[4]
     if path.is_relative_to(repository):
         raise SpotifyError("Spotify credentials must be stored outside the repository.")
@@ -105,6 +105,7 @@ class SpotifyAuth:
             with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
                                              delete=False) as output:
                 temporary = Path(output.name)
+                os.chmod(output.name, 0o600)
                 json.dump(record, output)
             temporary.replace(path)
         except OSError:
@@ -118,6 +119,8 @@ class SpotifyAuth:
         """Refresh on demand; a rejected refresh requires browser authorization again."""
         with self.lock:
             old = self._read()
+            if not set(SCOPES.split()).issubset(old.get("scope", "").split()):
+                raise SpotifyError("Connect Spotify again to allow reading your top tracks.")
             if not old.get("refresh_token"):
                 raise SpotifyError("Connect Spotify first.")
             if old.get("expires_at", 0) > time.time() + 60:

@@ -48,6 +48,7 @@ function unlockLocalPageControls() {
 
 // Fetch live backend metrics
 let musicRequestNumber = 0;
+let spotifyTopRanking = false;
 function loadMusicData() {
     const requestNumber = ++musicRequestNumber;
     const params = new URLSearchParams({page: currentPage, per_page: recordsPerPage,
@@ -61,12 +62,16 @@ function loadMusicData() {
             if (requestNumber !== musicRequestNumber) return;
             currentPage = payload.page;
             masterMusicData = payload.data; 
+            spotifyTopRanking = payload.ranking?.source === 'spotify_top';
             buildColumnCheckboxes();
             populatePlaylistFilter(payload.playlists || []);
             const status = document.getElementById("ranking-status");
             if (status) {
                 const ranking = payload.ranking;
-                status.textContent = ranking
+                status.textContent = ranking?.source === 'spotify_top'
+                    ? `My top ${ranking.target_count} tracks on Spotify over approximately the last six months. ` +
+                      `Spotify's ranking reflects listening preference, not exact play counts. Updated ${ranking.published_at.slice(0, 10)}.`
+                    : ranking
                     ? `Top ${ranking.target_count.toLocaleString()} playlist tracks, ordered by my verified plays of at least 30 seconds. ` +
                       `Window: ${ranking.window_start.slice(0, 10)} to ${ranking.window_end.slice(0, 10)} (UTC). ` +
                       `History through ${(ranking.history_latest || "unknown").slice(0, 10)}. ` +
@@ -136,7 +141,7 @@ function populatePlaylistFilter(data) {
 
 function getActiveViewportColumns() {
     const coreKeys = Object.keys(FIELD_REGISTRY).filter(k => FIELD_REGISTRY[k].isCore);
-    return [...coreKeys, ...activeOptionalColumns];
+    return [...coreKeys, ...activeOptionalColumns].filter(key => !spotifyTopRanking || !['plays', 'spotify_playlist', 'popularity'].includes(key));
 }
 
 function processAndRenderTable() {

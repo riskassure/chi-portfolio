@@ -1,3 +1,58 @@
+# Automatic Spotify top tracks (current workflow)
+
+The current music connection uses read-only `user-top-read` permission, not
+exported listening history. It reads up to 50 tracks in Spotify's `medium_term`
+ranking (approximately six months), preserving Spotify's returned order. This
+is an affinity ranking, not an exact count of plays or a complete listening log.
+The developer app owner must have Spotify Premium under current development-mode
+rules.
+
+1. In the Spotify developer dashboard, register the exact redirect URI:
+   `http://127.0.0.1:5001/api/music/spotify/callback`.
+2. Run the local website with helper option 6 and sign in as admin.
+3. Open `/api/music/spotify/connect`, enter the Client ID, and approve Spotify.
+   No Client Secret is needed. Credentials stay outside the repository.
+4. Return to the music page and choose Update now. A successful refresh replaces
+   only the derived ranking. Original catalog rows and editorial overrides stay.
+
+Refresh is due after 24 hours, retains the last successful catalog on errors or
+empty/malformed responses, and respects Spotify rate-limit backoff. Update now
+can bypass the daily timer but cannot bypass rate-limit backoff. The worker uses
+an exclusive SQLite lock to prevent simultaneous token refresh/publication jobs.
+No browser request by a visitor contacts Spotify or changes the ranking.
+
+The page shows Spotify ranking, source window and last update, omitting exact
+play counts and playlist membership for this source. Local and production use
+separate databases and need separate jobs. No schedule is installed automatically
+by running the web server or deploying this code.
+
+For local automation, run `backend/install_music_schedule.ps1` after connecting.
+It replaces the previous task of the same name and targets the current working
+copy recorded by the helper. Reinstall after switching working database copies.
+It checks every 15 minutes while logged in, refreshing only when 24 hours are due.
+
+For PythonAnywhere, first install the authorized token securely outside the
+repository (and do not run the local job using that same refresh token afterward).
+Set `SPOTIFY_TOKEN_PATH` to its absolute private path. Then configure a daily task:
+
+```
+cd /home/cwoo/chi-portfolio/backend/src && SPOTIFY_TOKEN_PATH=/home/cwoo/.config/chi-portfolio/spotify-tokens.json /home/cwoo/.virtualenvs/chi-portfolio/bin/python -m services.music.spotify_top --database /home/cwoo/chi-portfolio/backend/portfolio.db
+```
+
+The CLI requires an explicit existing database; it never creates a missing
+portfolio database. Production setup requires deployment, private token
+installation, an initial refresh verification, and daily task activation.
+Spotify may require reauthorization later; reconnect if refresh is
+rejected. Never commit, paste into chat, or place tokens in a deployment package.
+
+References: https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks
+and https://developer.spotify.com/documentation/web-api/tutorials/refreshing-tokens
+
+## Historical implementation (not the current connection flow)
+
+The notes below describe the older export-based ranking retained for reference.
+Its playlist/recent-history scopes are not requested by the new connection.
+
 # Spotify connection (local development)
 
 Authorization, token refresh, history import, playlist synchronization and ranked

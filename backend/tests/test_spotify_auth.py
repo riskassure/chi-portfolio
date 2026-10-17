@@ -25,7 +25,7 @@ class SpotifyTests(unittest.TestCase):
         app.config["ADMIN_PASSWORD"] = "test-admin-password"
         app.register_blueprint(spotify_bp)
         self.client = app.test_client()
-        self.base = "http://127.0.0.1:5000"
+        self.base = "http://127.0.0.1:5001"
         self.patcher = patch("routes.music_spotify.auth", self.auth)
         self.patcher.start()
         self.addCleanup(self.patcher.stop)
@@ -167,15 +167,40 @@ class SpotifyTests(unittest.TestCase):
         self.assertNotIn("access_token", status.text)
         self.assertNotIn("refresh_token", status.text)
 
+    def test_overlapping_connections_and_stale_callback_keep_browser_binding(self):
+        self.client.get('/api/music/spotify/connect', base_url=self.base)
+        with self.client.session_transaction(base_url=self.base) as session:
+            csrf = session['spotify_form_token']
+        states = []
+        for _ in range(2):
+            response = self.client.post('/api/music/spotify/connect', base_url=self.base,
+                                        data={'csrf': csrf, 'client_id': 'a' * 32})
+            states.append(parse_qs(urlparse(response.location).query)['state'][0])
+        with patch.object(self.auth, '_request', return_value=self.response()) as exchange:
+            stale = self.client.get('/api/music/spotify/callback', base_url=self.base,
+                                    query_string={'state': 'stale', 'code': 'code'})
+            self.assertEqual(stale.status_code, 400)
+            self.assertIn('Restart Spotify connection', stale.text)
+            exchange.assert_not_called()
+            for state in states:
+                response = self.client.get('/api/music/spotify/callback', base_url=self.base,
+                                           query_string={'state': state, 'code': 'code'})
+                self.assertEqual(response.status_code, 302)
+            self.assertEqual(exchange.call_count, 2)
+            replay = self.client.get('/api/music/spotify/callback', base_url=self.base,
+                                     query_string={'state': states[0], 'code': 'code'})
+            self.assertEqual(replay.status_code, 400)
+            self.assertEqual(exchange.call_count, 2)
+
     def test_manual_refresh_requires_admin_and_valid_csrf(self):
         path = '/api/music/spotify/refresh'
-        with patch('services.music.spotify_jobs.run_local_job', return_value={'status': 'ok'}) as run:
+        with patch('services.music.spotify_top.run', return_value={'status': 'ok'}) as run:
             self.assertEqual(self.client.post(path, base_url=self.base, json={}).status_code, 400)
             with self.client.session_transaction(base_url=self.base) as session:
                 session['spotify_update_csrf'] = 'valid'
             response = self.client.post(path, base_url=self.base, json={'csrf': 'valid'})
             self.assertEqual(response.status_code, 200)
-            run.assert_called_once_with(force=True)
+            run.assert_called_once_with(__import__("routes.music_spotify", fromlist=["DB_PATH"]).DB_PATH, force=True)
             with self.client.session_transaction(base_url=self.base) as session:
                 session.clear()
             self.assertEqual(self.client.post(path, base_url=self.base, json={'csrf': 'valid'}).status_code, 403)
@@ -185,14 +210,14 @@ class SpotifyTests(unittest.TestCase):
         with self.client.session_transaction(base_url=self.base) as session:
             session['spotify_update_csrf'] = 'valid'
         for status, code in [('busy', 409), ('waiting', 429), ('error', 502)]:
-            with patch('services.music.spotify_jobs.run_local_job', return_value={'status': status}):
+            with patch('services.music.spotify_top.run', return_value={'status': status}):
                 response = self.client.post('/api/music/spotify/refresh', base_url=self.base, json={'csrf': 'valid'})
                 self.assertEqual(response.status_code, code)
 
     def test_manual_refresh_preflight_needs_no_session_and_never_runs_job(self):
         with self.client.session_transaction(base_url=self.base) as session:
             session.clear()
-        with patch('services.music.spotify_jobs.run_local_job') as run:
+        with patch('services.music.spotify_top.run') as run:
             response = self.client.options('/api/music/spotify/refresh', base_url=self.base)
             self.assertEqual(response.status_code, 204)
             run.assert_not_called()
