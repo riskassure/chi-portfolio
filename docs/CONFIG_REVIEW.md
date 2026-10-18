@@ -57,4 +57,5 @@ folder as empty. Math operation-specific setup is unchanged.
 
 Tests cover quiet imports with directory writes forbidden, repeatable explicit
 setup in a fresh temporary tree, missing input folders, playlist output, and web
-startup without directory creation. No production deployment has been performed.
+startup without directory creation. All 205 regression tests passed. Deployed October 18, 2026; reload and public
+API/browser checks passed. See the admin runbook for the receipt and backup.

@@ -26,7 +26,8 @@ The [configuration review](CONFIG_REVIEW.md) identified implicit setup dependenc
 in the older playlist parser and photo converter. Removing config's import-time
 directory creation requires addressing those utilities and testing a fresh
 workspace first. This is now implemented locally with isolated setup/import tests;
-production deployment remains pending.
+all 205 regression tests passed. Deployed October 18, 2026 with successful
+reload and read-only public verification; details are in the admin runbook.
 
 1. Verify and review the admin runbook against actual workflows.
 2. Inventory production entry points, local tools, reusable services, tests,
