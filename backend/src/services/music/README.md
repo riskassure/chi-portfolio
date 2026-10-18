@@ -50,6 +50,15 @@ and https://developer.spotify.com/documentation/web-api/tutorials/refreshing-tok
 
 ## Historical implementation (not the current connection flow)
 
+Shared catalog tables and queries live in `music_catalog.py`. The older
+export-history publication algorithm lives in `history_publication.py`;
+`spotify_jobs.py` imports it directly. The existing `music_catalog.publish(...)`
+entry point is retained as a lazy compatibility wrapper. Current top-track
+refresh and catalog reading do not import the historical export modules.
+This separation does not change database schemas, ranking algorithms, or schedules.
+Deploy these three Python files together when publishing this refactor, including
+the new `history_publication.py`; it has not been deployed by editing local files.
+
 The notes below describe the older export-based ranking retained for reference.
 Its playlist/recent-history scopes are not requested by the new connection.
 

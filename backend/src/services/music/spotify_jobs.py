@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import sqlite3
 
-from services.music.music_catalog import publish
+from services.music.history_publication import publish
 from services.music.spotify_api import SpotifyApi, SpotifyApiError
 from services.music.spotify_auth import SpotifyError, token_path
 from services.music.spotify_sync import collect_recent, connect, sync_playlists

@@ -3,12 +3,14 @@
 Status: documentation baseline committed. A first-pass static inventory and
 dependency review is recorded in [the maintenance assessment](MAINTENANCE_ASSESSMENT.md).
 The documentation index and current-workflow pointers have been added. Code
-implementation and file-retention decisions remain pending.
+maintenance work is proceeding in focused batches.
 The [tracked backup review](BACKUP_REVIEW.md) and authorized private preservation
 are complete. This change untracks the verified backup while retaining its local
 copy and adds an ignore rule. Earlier Git history remains unchanged.
-No file removal, code refactoring, dependency change or deployment is part of this
-initial documentation change.
+The music catalog's historical publication algorithm has now been extracted into
+`history_publication.py`, preserving `music_catalog.publish` as a lazy compatibility
+entry point. The current refresh and query path is tested with historical modules
+unavailable. This local refactor changes no schema or schedule and is not deployed.
 
 ## Sequence
 
