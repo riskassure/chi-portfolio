@@ -1,6 +1,9 @@
 # Maintenance assessment plan
 
-Status: documentation baseline drafted; repository-wide assessment not yet done.
+Status: documentation baseline committed. A first-pass static inventory and
+dependency review is recorded in [the maintenance assessment](MAINTENANCE_ASSESSMENT.md).
+The documentation index and current-workflow pointers have been added. Code
+implementation and file-retention decisions remain pending.
 No file removal, code refactoring, dependency change or deployment is part of this
 initial documentation change.
 
@@ -20,6 +23,11 @@ initial documentation change.
 7. Agree on retention and archive/delete candidates separately from code cleanup.
 
 ## Candidates to investigate (not established defects)
+
+The owner confirms that mathematics already underwent extensive modularization
+and simplification. Keep further math restructuring low priority, review its
+history first, and require a concrete maintenance problem or measured bottleneck.
+Large files alone do not establish a need for another refactor.
 
 - Older Spotify export/history tools versus the current top-track workflow.
 - Repeated preparation, staging, validation and publication code.

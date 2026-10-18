@@ -1,5 +1,9 @@
 # Website content synchronization
 
+For the everyday workflow and environment overview, start with the
+[admin runbook](docs/ADMIN_RUNBOOK.md). This guide provides detailed helper
+procedures. Other guides are listed in the [documentation index](docs/README.md).
+
 ## Python and matching frontend deployments (options 15 and 16)
 
 Option **15** prepares a reviewed code update. Enter repository-relative paths,

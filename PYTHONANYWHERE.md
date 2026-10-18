@@ -1,6 +1,8 @@
 # First deployment: cwoo.pythonanywhere.com
 
-For subsequent releases, follow [UPDATING_WEBSITE.md](UPDATING_WEBSITE.md).
+For subsequent releases, start with the repository's
+[admin runbook](docs/ADMIN_RUNBOOK.md). The
+[manual update guide](UPDATING_WEBSITE.md) is an older alternative and recovery reference.
 Do not reuse this first-deployment package to update the live database.
 
 This package contains a private database snapshot. Upload it only inside your

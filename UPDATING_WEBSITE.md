@@ -1,5 +1,10 @@
 # Updating the live website
 
+> This is the older manual package-update and recovery reference. For routine
+> updates, use the reviewed helper workflow in the repository's
+> [admin runbook](docs/ADMIN_RUNBOOK.md). See the [documentation index](docs/README.md)
+> for current and historical guides. Do not combine the two deployment procedures.
+
 The live database at `/home/cwoo/chi-portfolio/backend/portfolio.db` is the
 authoritative content database. A Git push does not update PythonAnywhere.
 Never unpack the first-deployment ZIP over the live site.

@@ -202,6 +202,7 @@ for context, but do not use first-install instructions on an existing deployment
 
 Further references:
 
+- [Documentation index](README.md)
 - [Maintenance assessment plan](MAINTENANCE_PLAN.md)
 - [Math synchronization](../MATH_SYNC.md)
 - [Broader deployment and recovery details](../UPDATING_WEBSITE.md) (older manual package workflow)
