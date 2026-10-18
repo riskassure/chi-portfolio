@@ -10,14 +10,15 @@ copy and adds an ignore rule. Earlier Git history remains unchanged.
 The music catalog's historical publication algorithm has now been extracted into
 `history_publication.py`, preserving `music_catalog.publish` as a lazy compatibility
 entry point. The current refresh and query path is tested with historical modules
-unavailable. This local refactor changes no schema or schedule and is not deployed.
+unavailable. This refactor changes no schema or schedule and was deployed October 18, 2026.
 
 Map and gallery persistence now share `services/file_persistence.py` for exclusive
 lock ownership and flushed atomic file replacement. Feature validation,
 serialization, revision-check timing and conflict exceptions remain with their
 original services. Seventeen targeted persistence/map/gallery tests pass. This
-local change is not deployed; publish the new helper together with
-`travel_store.py` and `gallery_settings.py` when deploying it.
+change was deployed October 18, 2026, with the new helper, `travel_store.py`
+and `gallery_settings.py` together. Public music, photography and map APIs and
+browser pages passed verification; no live editor writes were performed.
 
 ## Sequence
 
@@ -56,7 +57,7 @@ name, or its presence in `dist`.
 
 ## Pending operational checks
 
-- Inspect a real automatic Spotify task run; current evidence covers an initial
-  manual production refresh and creation of an enabled daily task only.
+- Completed October 18: verified the October 17 automatic Spotify run via its
+  hosting task log (exit code 0, 50 tracks) and matching public ranking timestamp.
 - Identify backup retention needs and plan a restoration exercise on an isolated
   copy. Do not test recovery by restoring over the live site.

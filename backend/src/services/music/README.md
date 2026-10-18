@@ -57,7 +57,8 @@ entry point is retained as a lazy compatibility wrapper. Current top-track
 refresh and catalog reading do not import the historical export modules.
 This separation does not change database schemas, ranking algorithms, or schedules.
 Deploy these three Python files together when publishing this refactor, including
-the new `history_publication.py`; it has not been deployed by editing local files.
+the new `history_publication.py`. These three files were deployed together on
+October 18, 2026; the public music API and page passed verification.
 
 The notes below describe the older export-based ranking retained for reference.
 Its playlist/recent-history scopes are not requested by the new connection.

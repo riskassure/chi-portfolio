@@ -104,8 +104,8 @@ use the separate existing photo review/publication workflow.
 Maintenance note: `backend/src/services/file_persistence.py` provides the shared
 lock and atomic-write mechanics used by `travel_store.py` and `gallery_settings.py`.
 Deploy all three Python files together for that refactor. Saved data formats and
-admin publishing procedures are unchanged. This source note does not indicate
-that the refactor has been deployed.
+admin publishing procedures are unchanged. These three files were deployed together on October 18, 2026; public
+map and photography pages/APIs passed verification.
 
 This is a local preview until reviewed. The site helper's code publication
 supports the new Python route, app registration, and HTML/CSS/JS files together.

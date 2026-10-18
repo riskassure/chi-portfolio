@@ -118,7 +118,9 @@ Recorded deployment on 2026-10-17:
   (9:30 a.m. Pacific daylight time / 8:30 a.m. standard time).
 - Task expiry was reported as null at creation.
 - The old Windows task `Chi Portfolio Spotify Refresh` was disabled.
-- **The first automatic scheduled run has not yet been verified.**
+- Verified on October 18: the October 17 scheduled run started at 16:30:15 UTC,
+  published 50 tracks at 16:30:29 UTC, and completed at 16:30:30 UTC with exit
+  code 0. The public music API timestamp matched. The daily task remains enabled.
 
 No button or running laptop is needed. Visitors receive the saved ranking on page
 load/reload; an already open page does not necessarily update itself. Spotify's
@@ -215,5 +217,16 @@ Further references:
 - [First hosting installation](../PYTHONANYWHERE.md) (not a routine update procedure)
 
 This baseline does not certify backup restoration, every page/editor workflow, or
-the automatic Spotify task. These need explicit checks when scheduled, rather
+future automatic Spotify runs. These need explicit checks when scheduled, rather
 than being inferred from code inspection.
+
+## Maintenance deployment: October 18, 2026
+
+Published Spotify module separation (`dee75b4`) and shared file persistence
+(`ca8b81f`) together: six Python files, backed up before publication. Reload and
+homepage verification succeeded. Public music, photography and map APIs passed,
+and their pages loaded without JavaScript errors. Music still reports 50 tracks.
+No live editor writes, database migration or schedule changes were performed.
+
+- Receipt: `dist/math-workflow/d17d34222a09427cbbc981c7134632d8/receipt-b805e43f396a4451861c2e75ced4b831.json`.
+- Backup: `/home/cwoo/backups/before-code-update-7f801c82bbf544d084658e0df557fecf`.
