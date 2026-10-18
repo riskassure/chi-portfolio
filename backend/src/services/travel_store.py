@@ -2,9 +2,8 @@
 from contextlib import contextmanager
 import hashlib
 import json
-import os
 from pathlib import Path
-import tempfile
+from services.file_persistence import exclusive_edit, replace_text
 
 ROOT = Path(__file__).resolve().parents[3]
 PREFIX = 'window.TRAVEL_PLACES = '
@@ -49,28 +48,13 @@ class Conflict(Exception):
 @contextmanager
 def edit(revision):
     target = data_path()
-    lock = target.with_suffix('.lock')
-    try:
-        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError:
-        raise Conflict('Another map edit is in progress. Reload and try again.')
-    os.close(fd)
-    try:
+    with exclusive_edit(target, Conflict, 'Another map edit is in progress. Reload and try again.'):
         data, current = read()
         if revision != current:
             raise Conflict('The map data changed. Reload before saving your edit.')
         yield data
         content = PREFIX + json.dumps(data, ensure_ascii=True, indent=2, allow_nan=False) + ';\n'
-        # Reject external edits made during validation, too.
+        # Preserve the map's revision check after editor validation/serialization.
         if read()[1] != current:
             raise Conflict('The map data changed. Reload before saving your edit.')
-        fd, name = tempfile.mkstemp(dir=target.parent, prefix='.travel-', suffix='.tmp')
-        try:
-            with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as stream:
-                stream.write(content); stream.flush(); os.fsync(stream.fileno())
-            os.replace(name, target)
-        finally:
-            if os.path.exists(name):
-                os.unlink(name)
-    finally:
-        lock.unlink()
+        replace_text(target, content, prefix='.travel-')

@@ -67,7 +67,7 @@ class GallerySettingsTests(unittest.TestCase):
 
     def test_failed_write_keeps_settings(self):
         self.login(); before = self.settings.read_bytes()
-        with patch.object(gallery_settings.os, 'replace', side_effect=OSError()):
+        with patch('services.file_persistence.os.replace', side_effect=OSError()):
             self.assertEqual(self.post().status_code, 503)
         self.assertEqual(self.settings.read_bytes(), before)
         self.assertFalse(self.settings.with_suffix('.lock').exists())

@@ -1,9 +1,8 @@
 """Publishable gallery preferences, separate from each database's rotation state."""
 import hashlib
 import json
-import os
 from pathlib import Path
-import tempfile
+from services.file_persistence import exclusive_edit, replace_text
 
 PREFIX = 'window.GALLERY_SETTINGS = '
 
@@ -35,25 +34,11 @@ class Conflict(ValueError):
 def save(settings, revision):
     validate(settings)
     target = path()
-    lock = target.with_suffix('.lock')
-    try:
-        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError:
-        raise Conflict('Another gallery edit is in progress. Reload and try again.') from None
-    os.close(fd)
-    temporary = None
-    try:
+    def check_revision():
         if read()[1] != revision:
             raise Conflict('Gallery settings changed. Reload before saving.')
-        fd, temporary = tempfile.mkstemp(prefix='.gallery-', suffix='.tmp', dir=target.parent)
-        with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as stream:
-            stream.write(PREFIX + json.dumps(settings, indent=2) + ';\n')
-            stream.flush()
-            os.fsync(stream.fileno())
-        if read()[1] != revision:
-            raise Conflict('Gallery settings changed. Reload before saving.')
-        os.replace(temporary, target)
-    finally:
-        if temporary and os.path.exists(temporary):
-            os.unlink(temporary)
-        lock.unlink()
+
+    with exclusive_edit(target, Conflict, 'Another gallery edit is in progress. Reload and try again.'):
+        check_revision()
+        content = PREFIX + json.dumps(settings, indent=2) + ';\n'
+        replace_text(target, content, prefix='.gallery-', before_replace=check_revision)

@@ -12,6 +12,13 @@ The music catalog's historical publication algorithm has now been extracted into
 entry point. The current refresh and query path is tested with historical modules
 unavailable. This local refactor changes no schema or schedule and is not deployed.
 
+Map and gallery persistence now share `services/file_persistence.py` for exclusive
+lock ownership and flushed atomic file replacement. Feature validation,
+serialization, revision-check timing and conflict exceptions remain with their
+original services. Seventeen targeted persistence/map/gallery tests pass. This
+local change is not deployed; publish the new helper together with
+`travel_store.py` and `gallery_settings.py` when deploying it.
+
 ## Sequence
 
 1. Verify and review the admin runbook against actual workflows.

@@ -112,7 +112,7 @@ class TravelEditingTests(unittest.TestCase):
         for lat, lon in [(91, 0), (0, 181), (0, 0), (True, 2), ('1', 2), (None, 2)]:
             self.assertEqual(self.post({'action': 'place', 'name': 'Bad', 'latitude': lat, 'longitude': lon}).status_code, 400)
         self.assertEqual(self.post({'action': 'place', 'name': '', 'latitude': 1, 'longitude': 2}).status_code, 400)
-        with patch.object(travel_store.os, 'replace', side_effect=OSError('test disk failure')):
+        with patch('services.file_persistence.os.replace', side_effect=OSError('test disk failure')):
             self.assertEqual(self.post({'action': 'place', 'name': 'Cannot save', 'latitude': 1, 'longitude': 2}).status_code, 503)
         self.assertEqual(before, self.path.read_bytes())
         self.assertFalse(self.path.with_suffix('.lock').exists())
