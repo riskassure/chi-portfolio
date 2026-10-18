@@ -4,6 +4,7 @@
 # Block local runtime database engines
 backend/portfolio.db
 backend/*.db
+backend/backups/**/*.db
 
 # ==========================================================================
 # 🐍 PYTHON SYSTEM RUNTIMES & CACHE

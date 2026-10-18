@@ -193,6 +193,12 @@ No retention policy is agreed yet. Inventory and choose retention before deletin
 old databases, media, staging packages, reports or credentials. Some `dist` files
 are active workflow state, not disposable build output.
 
+The July 28 pre-macro-backfill snapshot is preserved under
+`%USERPROFILE%\.config\chi-portfolio\backups\historical\`, with checksum and
+provenance metadata. Its original local copy remains in `backend/backups/`,
+ignored rather than tracked in new commits. See the [backup review](BACKUP_REVIEW.md).
+This is an archive on the same computer, not an off-device backup.
+
 ## Documentation and maintenance workflow
 
 This is the operational starting point. Check code and current receipts when a
