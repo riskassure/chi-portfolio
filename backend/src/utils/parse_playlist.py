@@ -1,3 +1,4 @@
+"""Convert local playlist CSV exports to JSON; creates output folders on demand."""
 import csv
 import json
 import re
@@ -60,6 +61,7 @@ def run_pipeline(top_n_tracks=20):
         
     print(f"📂 Pipeline running Popularity Sort across {len(csv_files)} playlist(s).\n")
     
+    MUSIC_PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     master_tracks_list = []
     
     for file_path in csv_files:

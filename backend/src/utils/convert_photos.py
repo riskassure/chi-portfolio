@@ -1,3 +1,4 @@
+"""Convert local JPEGs to WebP; absent input folders are treated as empty."""
 import os
 import sys
 from PIL import Image
@@ -26,7 +27,7 @@ def batch_convert_to_webp(quality=80, max_width=1920):
     print("-" * 60)
 
     # Read filenames out of the config path object
-    for filename in os.listdir(str(PHOTO_RAW_DIR)):
+    for filename in (os.listdir(str(PHOTO_RAW_DIR)) if PHOTO_RAW_DIR.is_dir() else []):
         if filename.endswith(valid_extensions):
             source_path = PHOTO_RAW_DIR / filename
             

@@ -22,6 +22,12 @@ browser pages passed verification; no live editor writes were performed.
 
 ## Sequence
 
+The [configuration review](CONFIG_REVIEW.md) identified implicit setup dependencies
+in the older playlist parser and photo converter. Removing config's import-time
+directory creation requires addressing those utilities and testing a fresh
+workspace first. This is now implemented locally with isolated setup/import tests;
+production deployment remains pending.
+
 1. Verify and review the admin runbook against actual workflows.
 2. Inventory production entry points, local tools, reusable services, tests,
    configuration, generated data, historical scripts, and backups. Identify

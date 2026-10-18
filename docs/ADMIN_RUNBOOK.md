@@ -230,3 +230,12 @@ No live editor writes, database migration or schedule changes were performed.
 
 - Receipt: `dist/math-workflow/d17d34222a09427cbbc981c7134632d8/receipt-b805e43f396a4451861c2e75ced4b831.json`.
 - Backup: `/home/cwoo/backups/before-code-update-7f801c82bbf544d084658e0df557fecf`.
+
+## Explicit local directory setup (maintenance change, not yet deployed)
+
+Importing configuration no longer creates data folders. If preparing an empty
+local workspace for imports, run `python backend/src/config.py` from the repository
+root. This creates missing standard data/output directories only; it does not
+create a database or download content. Existing previews normally need no extra
+step. Playlist processing and photo conversion handle their own required folders.
+Do not run setup merely to conceal a missing database or configuration error.

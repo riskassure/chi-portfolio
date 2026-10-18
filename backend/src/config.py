@@ -1,4 +1,8 @@
-# backend/src/config.py
+"""Shared paths; importing this module does not create directories.
+
+Run ``python backend/src/config.py`` to explicitly prepare local data folders.
+This setup creates directories only, not databases or imported content.
+"""
 
 from pathlib import Path
 import os
@@ -58,7 +62,7 @@ def verify_system_directories():
     for d in dirs:
         if not d.exists():
             d.mkdir(parents=True, exist_ok=True)
-            print(f"📁 Created missing system directory: {d}")
+            print(f"Created missing system directory: {d}")
 
-# Automatically ensure directories exist when config is imported
-verify_system_directories()
+if __name__ == '__main__':
+    verify_system_directories()

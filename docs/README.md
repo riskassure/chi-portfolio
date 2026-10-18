@@ -21,6 +21,7 @@ Committing code does not publish it to the website.
 - [Maintenance plan](MAINTENANCE_PLAN.md): scope, sequence and pending checks.
 - [Assessment](MAINTENANCE_ASSESSMENT.md): findings and proposed priorities, not a deletion list.
 - [Tracked backup review](BACKUP_REVIEW.md): provenance, integrity checks and proposed preservation.
+- [Configuration review](CONFIG_REVIEW.md): directory-creation dependencies and proposed explicit setup.
 - [Agent instructions](../AGENTS.md): expectations for future coding sessions.
 
 The math section has already undergone substantial modularization and
