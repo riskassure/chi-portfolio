@@ -68,5 +68,7 @@ name, or its presence in `dist`.
   hosting task log (exit code 0, 50 tracks) and matching public ranking timestamp.
 - Completed October 18: bounded local/production inventory and isolated recovery
   of a historical database snapshot. Five application queries passed. See
-  [backup and recovery review](BACKUP_RECOVERY.md). Full-site recovery and an
+  [backup and recovery review](BACKUP_RECOVERY.md). A subsequent full-site archive was created on hosting, downloaded privately,
+  checksum-verified and restored in isolation: ten page/API checks, 18 photos and
+  76 diagram references passed. Hosting/credential restoration and an additional
   off-device copy remain unverified; retention policy is proposed, not enacted.

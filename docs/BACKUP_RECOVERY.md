@@ -107,3 +107,42 @@ For a real incident, preserve the current state first, stop relevant writes/jobs
 and plan restoration of the appropriate database/files. Do not replace an open
 SQLite database or restore a whole old site over current content. Consult the
 admin runbook and obtain a specific recovery plan for the incident.
+
+## Full-site archive and isolated restore completed October 18, 2026
+
+Created a new archive with the reviewed `backup_site.py` implementation, using
+an owner-only creation mask on PythonAnywhere. Existing backup files and live
+website content were not changed. Archive creation reads site files sequentially;
+it is not an atomic snapshot of concurrent file edits. The SQLite snapshot is
+consistent. Avoid editing/deploying while creating future recovery archives.
+
+- Server: `/home/cwoo/backups/full-site-20261018-6775c038.zip`.
+- Local: `%USERPROFILE%\.config\chi-portfolio\backups\full-site\full-site-20261018-6775c038.zip`.
+- Size: 20,186,623 bytes (approximately 19.3 MiB).
+- SHA-256: `2ba7c626194f7747597f28d1f64e81d602712f63a80c3dd39e707a57e254afd7`.
+- Local companion: `full-site-20261018-6775c038.verification.json`.
+
+The download matched the remote checksum. ZIP CRC checks passed. Archive paths
+were checked for traversal and symlinks before extraction into a unique temporary
+folder. Every extracted file's hash matched its archived bytes. Configuration,
+code, map data and media were loaded from that isolated restored tree, with the
+installed local Python environment providing dependencies.
+
+SQLite integrity and foreign-key checks passed. All 18 catalog photographs were
+present and served successfully; all 76 referenced diagram filenames existed in
+the restored diagram directory. Ten public page/API requests passed, including
+home, music, photos, map, math search/classifications, and travel data. The restored
+database hash remained unchanged. The temporary extraction was removed afterward;
+both archives and the verification record remain.
+
+Private hosting/API/Spotify credentials and the Esri key were excluded. This was
+not a test of DNS, TLS, PythonAnywhere WSGI installation, fresh dependency install,
+admin writes, external Spotify/Esri connections, browser rendering, or scheduled
+job reinstatement. No credentials were copied into the test tree. Re-create the
+hosting environment from the runbook and supply protected private settings
+separately during a real recovery. The archive is not encrypted.
+
+The previously identified code/media/database recovery gap now has a tested
+archive. An additional protected copy off this computer and hosting account,
+credential recovery, and a formal retention/automatic backup policy remain
+separate decisions. No deletion policy or backup schedule was installed.

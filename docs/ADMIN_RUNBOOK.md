@@ -174,8 +174,10 @@ credentials without understanding which environment uses them.
 
 See the [October 18 backup review](BACKUP_RECOVERY.md) for inventory and an isolated
 database recovery exercise: integrity and five application queries passed on a
-temporary copy of the pre-Spotify snapshot. This does not certify a complete site
-restore. Full-site/off-device recovery and retention remain follow-up work.
+temporary copy of the pre-Spotify snapshot. A subsequent full-site archive restore also passed: 18 photos, 76 diagram
+references and ten page/API checks. See that review for archive locations and
+checksums. Hosting/credential recovery, an additional off-device copy and retention
+policy remain follow-up decisions.
 
 Publication receipts and reviews live under `dist/math-workflow/`. Server backups
 are under `/home/cwoo/backups/`; receipt output identifies the relevant backup.
