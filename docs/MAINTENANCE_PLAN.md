@@ -66,5 +66,7 @@ name, or its presence in `dist`.
 
 - Completed October 18: verified the October 17 automatic Spotify run via its
   hosting task log (exit code 0, 50 tracks) and matching public ranking timestamp.
-- Identify backup retention needs and plan a restoration exercise on an isolated
-  copy. Do not test recovery by restoring over the live site.
+- Completed October 18: bounded local/production inventory and isolated recovery
+  of a historical database snapshot. Five application queries passed. See
+  [backup and recovery review](BACKUP_RECOVERY.md). Full-site recovery and an
+  off-device copy remain unverified; retention policy is proposed, not enacted.

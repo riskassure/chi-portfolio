@@ -172,6 +172,11 @@ credentials without understanding which environment uses them.
 
 ## Backups, failures and recovery
 
+See the [October 18 backup review](BACKUP_RECOVERY.md) for inventory and an isolated
+database recovery exercise: integrity and five application queries passed on a
+temporary copy of the pre-Spotify snapshot. This does not certify a complete site
+restore. Full-site/off-device recovery and retention remain follow-up work.
+
 Publication receipts and reviews live under `dist/math-workflow/`. Server backups
 are under `/home/cwoo/backups/`; receipt output identifies the relevant backup.
 The initial Spotify refresh backup was
