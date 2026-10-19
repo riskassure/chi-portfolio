@@ -72,7 +72,9 @@ function renderList() {
         button.type = 'button'; button.textContent = place.name;
         button.addEventListener('click', () => selectPlace(place)); li.append(button); list.append(li);
     }
-    document.getElementById('place-count').textContent = `${results.length} places`;
+    document.getElementById('place-count').textContent = results.length
+        ? `${results.length} places`
+        : 'No matching places in Chi’s travel collection.';
 }
 
 async function json(url) {
