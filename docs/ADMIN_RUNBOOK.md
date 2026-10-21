@@ -97,10 +97,10 @@ option 8. Never replace the entire live database with a laptop copy.
 
 ## Add a mathematics entry
 
-Follow [Adding a math entry](../frontend/math/ADDING_ENTRIES.md) for field guidance,
+Follow [Adding a math entry](features/math/ADDING_ENTRIES.md) for field guidance,
 previewing, local saving and publication. Start with helper option **6**, sign in
 locally, then open `http://127.0.0.1:5001/math/create.html`. Follow the existing
-[authoring standards](../frontend/math/AUTHORING_STANDARDS.md) for mathematical prose
+[authoring standards](features/math/AUTHORING_STANDARDS.md) for mathematical prose
 and notation. Search for duplicates before creating an entry.
 
 For a new text/equation entry, prepare with **2** and publish via **3/4/5** after
@@ -131,7 +131,7 @@ Publish saved map edits with **14**, selecting `geography/places-data.js`, then
 3/4/5. City checklist and region edits use that same file. Photo catalog edits use
 12 instead. Changing catalog coordinates/location can invalidate an older photo
 map binding; verify its map link afterward. Publish gallery count using 18.
-See [travel details](../TRAVEL_MAP.md) for reference-data generation and restrictions;
+See [travel details](features/travel/TRAVEL_MAP.md) for reference-data generation and restrictions;
 its original photo counts and first-deployment narrative are historical.
 
 ## Spotify automatic refresh
@@ -173,7 +173,7 @@ local authorization if continued local refreshing is needed.
 
 There is currently no Spotify credential-upload option in the helper. Renewal
 requires a deliberate private transfer and production verification; option 17 is
-Esri-only. See [Spotify implementation and setup](../backend/src/services/music/README.md).
+Esri-only. See [Spotify implementation and setup](features/music/SPOTIFY.md).
 
 ## Credentials and renewals
 
@@ -197,7 +197,7 @@ credentials without understanding which environment uses them.
 
 ## Backups, failures and recovery
 
-See the [October 18 backup review](BACKUP_RECOVERY.md) for inventory and an isolated
+See the [October 18 backup review](administration/backups/BACKUP_RECOVERY.md) for inventory and an isolated
 database recovery exercise: integrity and five application queries passed on a
 temporary copy of the pre-Spotify snapshot. A subsequent full-site archive restore also passed: 18 photos, 76 diagram
 references and ten page/API checks. See that review for archive locations and
@@ -230,7 +230,7 @@ are active workflow state, not disposable build output.
 The July 28 pre-macro-backfill snapshot is preserved under
 `%USERPROFILE%\.config\chi-portfolio\backups\historical\`, with checksum and
 provenance metadata. Its original local copy remains in `backend/backups/`,
-ignored rather than tracked in new commits. See the [backup review](BACKUP_REVIEW.md).
+ignored rather than tracked in new commits. See the [backup review](administration/backups/HISTORICAL_BACKUP_REVIEW.md).
 This is an archive on the same computer, not an off-device backup.
 
 ## Documentation and maintenance workflow
@@ -243,10 +243,10 @@ for context, but do not use first-install instructions on an existing deployment
 Further references:
 
 - [Documentation index](README.md)
-- [Maintenance assessment plan](MAINTENANCE_PLAN.md)
-- [Math synchronization](../MATH_SYNC.md)
-- [Broader deployment and recovery details](../UPDATING_WEBSITE.md) (older manual package workflow)
-- [First hosting installation](../PYTHONANYWHERE.md) (not a routine update procedure)
+- [Maintenance assessment plan](maintenance/MAINTENANCE_PLAN.md)
+- [Math synchronization](administration/deployment/CONTENT_SYNC.md)
+- [Broader deployment and recovery details](administration/deployment/MANUAL_UPDATES.md) (older manual package workflow)
+- [First hosting installation](administration/deployment/PYTHONANYWHERE.md) (not a routine update procedure)
 
 This baseline does not certify backup restoration, every page/editor workflow, or
 future automatic Spotify runs. These need explicit checks when scheduled, rather

@@ -24,8 +24,10 @@ def build(destination, code_only=False):
                  if p.is_file() and p.suffix.lower() in {'.svg','.png','.jpg','.jpeg','.gif','.webp'})
     for name in ['backend/requirements.txt','backend/serve.py','backend/backup_database.py',
                  'backend/pythonanywhere_wsgi.py','backend/setup_pythonanywhere.py',
-                 'backend/backup_site.py', 'PYTHONANYWHERE.md', 'UPDATING_WEBSITE.md']:
+                 'backend/backup_site.py']:
         files.add(ROOT/name)
+    files.update((ROOT/'docs').rglob('*.md'))
+    files.add(ROOT/'AGENTS.md')
     with tempfile.TemporaryDirectory() as temp:
         snapshot=Path(temp)/'portfolio.db'
         if not code_only:

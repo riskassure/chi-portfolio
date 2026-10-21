@@ -1,6 +1,11 @@
 # Repository maintenance assessment
 
 Date: 2026-10-17. Baseline commit: `5d3a828`.
+Follow-up October 21: guides were consolidated under `docs/`, links updated, and
+the package builder changed to include the docs tree. Location observations below
+describe the original assessment; the tracked-backup and configuration work has
+also since been completed as recorded in the maintenance plan.
+
 Scope: first-pass static inventory and dependency review. No code execution,
 production inspection, database-content inspection, performance measurement,
 refactoring or deletion was performed for this assessment. This is not a full
@@ -31,15 +36,15 @@ working databases, environments, downloaded data and `dist` artifacts.
 
 ### 1. Make documentation entry points consistent (low risk; first batch)
 
-[UPDATING_WEBSITE.md](../UPDATING_WEBSITE.md) describes an older whole code-package
-workflow, while [the current helper](../backend/website_workflow.py) supports
-specific reviewed packages. [TRAVEL_MAP.md](../TRAVEL_MAP.md) includes historical
+[UPDATING_WEBSITE.md](../../administration/deployment/MANUAL_UPDATES.md) describes an older whole code-package
+workflow, while [the current helper](../../../backend/website_workflow.py) supports
+specific reviewed packages. [TRAVEL_MAP.md](../../features/travel/TRAVEL_MAP.md) includes historical
 photo counts and a local-preview deployment narrative. The runbook now provides
 context, but people can still enter through an older guide and miss it.
 
 Action: add a documentation index and short current-workflow pointers to older
 operational guides. Label historical setup sections. Do not move every document
-at once: [build_deployment_package.py](../backend/build_deployment_package.py)
+at once: [build_deployment_package.py](../../../backend/build_deployment_package.py)
 explicitly includes root-level `PYTHONANYWHERE.md` and `UPDATING_WEBSITE.md`.
 Moving them requires updating that builder as well as links and references.
 
@@ -50,7 +55,7 @@ running deployment commands. Rollback: revert only the documentation changes.
 
 Git still tracks
 `backend/backups/portfolio_before_local_macro_backfill_20260728_205948_390296.db`.
-[.gitignore](../.gitignore) excludes `backend/*.db`, but this nested backup is
+[.gitignore](../../../.gitignore) excludes `backend/*.db`, but this nested backup is
 already tracked. Its contents were not inspected, so this report makes no claim
 about what personal or sensitive information it contains.
 
@@ -65,8 +70,8 @@ Rollback: recover from the verified private copy. Do not delete the only copy.
 
 ### 3. Separate current and historical music responsibilities (medium risk)
 
-[spotify_top.py](../backend/src/services/music/spotify_top.py) imports `tables`
-from [music_catalog.py](../backend/src/services/music/music_catalog.py), which
+[spotify_top.py](../../../backend/src/services/music/spotify_top.py) imports `tables`
+from [music_catalog.py](../../../backend/src/services/music/music_catalog.py), which
 imports `rank_history` and `six_months_before` from the old history module.
 Thus the current flow still has an import dependency on historical code even
 though it does not use the old ranking algorithm. Old jobs also have direct tests.
@@ -82,8 +87,8 @@ this separation should require no schema change or data migration.
 
 ### 4. Consolidate file-save mechanics narrowly (medium risk)
 
-[travel_store.py](../backend/src/services/travel_store.py) and
-[gallery_settings.py](../backend/src/services/gallery_settings.py) both implement
+[travel_store.py](../../../backend/src/services/travel_store.py) and
+[gallery_settings.py](../../../backend/src/services/gallery_settings.py) both implement
 exclusive lock files, revision checks, temporary writes and atomic replacement.
 This is a concrete candidate for shared mechanics, while validation and data
 formats should stay with their feature modules.
@@ -96,7 +101,7 @@ implementations; saved file formats must remain unchanged.
 
 ### 5. Make configuration imports free of directory creation (medium risk)
 
-[config.py](../backend/src/config.py) calls `verify_system_directories()` when
+[config.py](../../../backend/src/config.py) calls `verify_system_directories()` when
 imported. Merely importing paths creates data directories. This makes read-only
 tools and tests harder to reason about and couples configuration to setup.
 
@@ -122,8 +127,8 @@ Measured tracked-source sizes:
 | `frontend/math/math_editor.js` | 1,605 | Event wiring, loading/saving, preview and diagram-related editor behavior |
 | `backend/src/routes/admin_math.py` | 972 | Public lookups/search, admin audit queries, preview, creation and updates |
 
-[concept_render_service.py](../backend/src/services/math/concept_render_service.py),
-[smart_save_service.py](../backend/src/services/math/smart_save_service.py), the
+[concept_render_service.py](../../../backend/src/services/math/concept_render_service.py),
+[smart_save_service.py](../../../backend/src/services/math/smart_save_service.py), the
 diagram pipeline and diagnostics import renderer helpers. The editor is loaded
 by both `frontend/math/create.html` and `frontend/math/edit.html`. Existing route
 code already delegates some operations to services; extend those boundaries.
@@ -140,9 +145,9 @@ one extraction at a time without schema changes.
 
 ### 7. Preserve publishing safeguards when reducing repetition (medium/high risk)
 
-[website_workflow.py](../backend/website_workflow.py) repeats package/job setup
+[website_workflow.py](../../../backend/website_workflow.py) repeats package/job setup
 across content types, but their validation and publication rules differ.
-[preflight_live_package.py](../backend/preflight_live_package.py) sends an explicit
+[preflight_live_package.py](../../../backend/preflight_live_package.py) sends an explicit
 ordered module list to the remote interpreter; the publisher extends it.
 Extracting a shared dependency without updating that list can break remote checks
 although normal local imports succeed.

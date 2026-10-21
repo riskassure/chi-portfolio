@@ -1,5 +1,8 @@
 # Knot diagram sources
 
+Source context: `backend/data/math/legacy_diagram_sources`. Bare filenames and
+relative implementation paths below refer to that source directory.
+
 The four historical knot examples used by the PlanetMath `knot theory`
 entry are retained from the references selected during restoration:
 

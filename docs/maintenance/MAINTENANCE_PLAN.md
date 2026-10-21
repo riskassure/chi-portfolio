@@ -1,10 +1,10 @@
 # Maintenance assessment plan
 
 Status: documentation baseline committed. A first-pass static inventory and
-dependency review is recorded in [the maintenance assessment](MAINTENANCE_ASSESSMENT.md).
+dependency review is recorded in [the maintenance assessment](assessments/REPOSITORY_ASSESSMENT.md).
 The documentation index and current-workflow pointers have been added. Code
 maintenance work is proceeding in focused batches.
-The [tracked backup review](BACKUP_REVIEW.md) and authorized private preservation
+The [tracked backup review](../administration/backups/HISTORICAL_BACKUP_REVIEW.md) and authorized private preservation
 are complete. This change untracks the verified backup while retaining its local
 copy and adds an ignore rule. Earlier Git history remains unchanged.
 The music catalog's historical publication algorithm has now been extracted into
@@ -22,7 +22,7 @@ browser pages passed verification; no live editor writes were performed.
 
 ## Sequence
 
-The [configuration review](CONFIG_REVIEW.md) identified implicit setup dependencies
+The [configuration review](assessments/CONFIG_REVIEW.md) identified implicit setup dependencies
 in the older playlist parser and photo converter. Removing config's import-time
 directory creation requires addressing those utilities and testing a fresh
 workspace first. This is now implemented locally with isolated setup/import tests;
@@ -68,7 +68,16 @@ name, or its presence in `dist`.
   hosting task log (exit code 0, 50 tracks) and matching public ranking timestamp.
 - Completed October 18: bounded local/production inventory and isolated recovery
   of a historical database snapshot. Five application queries passed. See
-  [backup and recovery review](BACKUP_RECOVERY.md). A subsequent full-site archive was created on hosting, downloaded privately,
+  [backup and recovery review](../administration/backups/BACKUP_RECOVERY.md). A subsequent full-site archive was created on hosting, downloaded privately,
   checksum-verified and restored in isolation: ten page/API checks, 18 photos and
   76 diagram references passed. Hosting/credential restoration and an additional
   off-device copy remain unverified; retention policy is proposed, not enacted.
+
+## Documentation consolidation: October 21, 2026
+
+Detailed guides now reside under administration, features and maintenance folders
+within `docs/`. The root AGENTS.md and short code-adjacent README pointers remain.
+Relative document links and the deployment archive builder were updated together.
+Math authoring and local/production creation workflows are under `docs/features/math/`.
+This organization is local until committed; no production deployment is required
+for reading the repository documentation.

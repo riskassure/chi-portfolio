@@ -31,7 +31,7 @@ problems; see the synchronization and commit guidance below.
    or a revision instead.
 
 Keep the server terminal open. Use a second helper terminal when ready to publish.
-See the [admin runbook](../../docs/ADMIN_RUNBOOK.md) for starting and refreshing
+See the [admin runbook](../../ADMIN_RUNBOOK.md) for starting and refreshing
 local copies. A local save writes the selected working database, not production.
 The math creation route can also accept authenticated production edits; this guide
 intentionally uses the local workflow to allow review before publication. Always
@@ -113,7 +113,7 @@ to bypass that limit. A diagram working locally does not establish publishabilit
 
 Git commit/push does not publish database entries. Do not add working databases to
 Git. Keep the helper's review, receipt and backup references. Detailed technical
-publication procedures are in [MATH_SYNC.md](../../MATH_SYNC.md).
+publication procedures are in [MATH_SYNC.md](../../administration/deployment/CONTENT_SYNC.md).
 
 ## B. Production first: create live, then synchronize locally
 
@@ -193,9 +193,9 @@ not database entries, live credentials or helper-selected local copies.
 ## What the other math documents cover
 
 - [AUTHORING_STANDARDS.md](AUTHORING_STANDARDS.md): writing, notation, structure and review conventions.
-- [README.md](README.md): frontend architecture and rendering dependencies.
-- [ALGEBRA_DEFINITION_AUDIT.md](ALGEBRA_DEFINITION_AUDIT.md) and
-  [CATEGORY_DEFINITION_AUDIT.md](CATEGORY_DEFINITION_AUDIT.md): topic-specific audit notes,
+- [README.md](FRONTEND.md): frontend architecture and rendering dependencies.
+- [ALGEBRA_DEFINITION_AUDIT.md](../../maintenance/history/ALGEBRA_DEFINITION_AUDIT.md) and
+  [CATEGORY_DEFINITION_AUDIT.md](../../maintenance/history/CATEGORY_DEFINITION_AUDIT.md): topic-specific audit notes,
   not the general entry-creation workflow.
 
 No production writes or sample entries were used to verify this documentation.

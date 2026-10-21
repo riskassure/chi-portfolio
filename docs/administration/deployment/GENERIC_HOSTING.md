@@ -2,8 +2,8 @@
 
 > Historical/alternative hosting reference: this guide describes Waitress hosting,
 > not the current PythonAnywhere deployment. For routine administration, start with
-> the repository's [admin runbook](docs/ADMIN_RUNBOOK.md) or
-> [documentation index](docs/README.md). The preparation status below is historical.
+> the repository's [admin runbook](../../ADMIN_RUNBOOK.md) or
+> [documentation index](../../README.md). The preparation status below is historical.
 
 The supported first deployment serves `frontend/` and `/api` from one HTTPS
 origin, using Waitress behind a reverse proxy. Hosting, domain, TLS, persistent

@@ -1,9 +1,9 @@
 # Travel map
 
-Start with the [admin runbook](docs/ADMIN_RUNBOOK.md) for current publishing steps.
+Start with the [admin runbook](../../ADMIN_RUNBOOK.md) for current publishing steps.
 This guide retains implementation and initial-setup details; original photo counts
 and references to an unpublished preview describe the initial build, not live status.
-See the [documentation index](docs/README.md) for related guides.
+See the [documentation index](../../README.md) for related guides.
 
 Preview using website helper option 6, then open
 `http://127.0.0.1:5001/geography/index.html`.

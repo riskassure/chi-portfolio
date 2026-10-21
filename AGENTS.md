@@ -2,7 +2,7 @@
 
 Before maintenance, deployment, or changing administrator workflows, read
 `docs/ADMIN_RUNBOOK.md` and the task-relevant implementation. Consult
-`docs/MAINTENANCE_PLAN.md` before structural cleanup. These files are persistent
+`docs/maintenance/MAINTENANCE_PLAN.md` before structural cleanup. These files are persistent
 references, not substitutes for checking actual code or live state.
 
 - Preserve user edits. Distinguish production, local working databases, immutable

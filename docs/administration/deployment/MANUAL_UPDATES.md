@@ -2,7 +2,7 @@
 
 > This is the older manual package-update and recovery reference. For routine
 > updates, use the reviewed helper workflow in the repository's
-> [admin runbook](docs/ADMIN_RUNBOOK.md). See the [documentation index](docs/README.md)
+> [admin runbook](../../ADMIN_RUNBOOK.md). See the [documentation index](../../README.md)
 > for current and historical guides. Do not combine the two deployment procedures.
 
 The live database at `/home/cwoo/chi-portfolio/backend/portfolio.db` is the
