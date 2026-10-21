@@ -36,17 +36,17 @@ working databases, environments, downloaded data and `dist` artifacts.
 
 ### 1. Make documentation entry points consistent (low risk; first batch)
 
-[UPDATING_WEBSITE.md](../../administration/deployment/MANUAL_UPDATES.md) describes an older whole code-package
+[Manual update guide](../../administration/deployment/MANUAL_UPDATES.md) describes an older whole code-package
 workflow, while [the current helper](../../../backend/website_workflow.py) supports
 specific reviewed packages. [TRAVEL_MAP.md](../../features/travel/TRAVEL_MAP.md) includes historical
 photo counts and a local-preview deployment narrative. The runbook now provides
 context, but people can still enter through an older guide and miss it.
 
-Action: add a documentation index and short current-workflow pointers to older
-operational guides. Label historical setup sections. Do not move every document
-at once: [build_deployment_package.py](../../../backend/build_deployment_package.py)
-explicitly includes root-level `PYTHONANYWHERE.md` and `UPDATING_WEBSITE.md`.
-Moving them requires updating that builder as well as links and references.
+Resolved October 21, 2026 in `5317ffc`: the index, current-workflow pointers and
+historical labels are present. Detailed guides now live under `docs/`.
+[build_deployment_package.py](../../../backend/build_deployment_package.py) now
+includes all `docs/**/*.md` and root `AGENTS.md`; its former root-level guide
+references were removed. Relative links and archive inclusion were verified.
 
 Verification: check local links, command targets and packaging references without
 running deployment commands. Rollback: revert only the documentation changes.

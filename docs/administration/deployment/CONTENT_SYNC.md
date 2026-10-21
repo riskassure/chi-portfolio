@@ -273,11 +273,13 @@ publication requires another live check before retrying. The helper supports new
 text-only entries and existing content/synonym updates; other metadata edits and
 deletions are listed as unsupported. Do not run multiple helpers simultaneously.
 
-After publication, verify the site and download a fresh baseline using the
-existing downloader. Preserve unpublished edits before refreshing the working
-copy, then choose Set baseline and working paths. No databases are automatically
-replaced. Start local server uses the remembered working copy and asks for the
-usual session password; stop any existing local server first.
+After publication, verify the site, stop the local server, and choose **8** to
+bring website changes home. It checks for unpublished/conflicting edits before
+selecting a new baseline and working copy; existing copies are preserved. Read
+the comparison report if it refuses to switch, then restart with **6** after a
+successful refresh. Option **7** (Set baseline and working paths) is for deliberate
+manual configuration of an already verified pair, not routine synchronization;
+it does not download, merge or reconcile changes.
 
 ## Upload a reviewed package through the API
 

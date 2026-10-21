@@ -79,5 +79,5 @@ Detailed guides now reside under administration, features and maintenance folder
 within `docs/`. The root AGENTS.md and short code-adjacent README pointers remain.
 Relative document links and the deployment archive builder were updated together.
 Math authoring and local/production creation workflows are under `docs/features/math/`.
-This organization is local until committed; no production deployment is required
-for reading the repository documentation.
+Committed and pushed in `5317ffc` on October 21, 2026. No production deployment
+is required for reading the repository documentation.

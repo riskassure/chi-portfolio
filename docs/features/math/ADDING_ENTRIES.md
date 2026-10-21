@@ -113,7 +113,7 @@ to bypass that limit. A diagram working locally does not establish publishabilit
 
 Git commit/push does not publish database entries. Do not add working databases to
 Git. Keep the helper's review, receipt and backup references. Detailed technical
-publication procedures are in [MATH_SYNC.md](../../administration/deployment/CONTENT_SYNC.md).
+publication procedures are in [Content synchronization](../../administration/deployment/CONTENT_SYNC.md).
 
 ## B. Production first: create live, then synchronize locally
 
@@ -123,7 +123,7 @@ step and its creation route does not automatically take a backup.
 
 1. Prepare a fresh production database backup before editing. In a PythonAnywhere
    Bash console, use the existing backup tool below with a new, descriptive
-   filename. Replace `UNIQUE-NAME` and wait for ?Database snapshot created.?
+   filename. Replace `UNIQUE-NAME` and wait for `Database snapshot created.`
    The destination must not already exist; do not overwrite older backups.
 
    ```bash
@@ -171,6 +171,34 @@ synchronization are complete.
 - **No database swapping:** never upload the entire laptop database to make the
   sites match. It could overwrite newer music, photo, profile or math content.
 
+## Existing-entry document types and diagram publication gaps
+
+Document types can be changed in the authenticated math editor
+(`math/edit.html?id=ENTRY-ID`), which sends `types` to the existing update route.
+However, the publication helper only supports source-text and synonym changes
+for existing entries. A local document-type change is detected as unsupported;
+there is currently no reviewed helper publication path for it.
+
+For a deliberate production-first type correction, take the fresh backup described
+in section B, open the existing entry's editor on production, preserve its other
+fields, change Document Types and save. Verify the entry while logged out, then
+stop the local server and use **8** to bring it home. Resolve any unpublished local
+changes before doing this; do not duplicate a local metadata edit on production
+and assume the refresh will merge it. This route is confirmed from the editor,
+update route and metadata service, not a live write test. If local-first review is
+required, defer the edit until a metadata publisher is implemented.
+
+**Diagram publication remains an open workflow, not a ready-to-run procedure.**
+Before publishing an entry that needs new diagram assets, define and review:
+
+- The exact source, generated assets, URLs and required rendering tools.
+- How assets and the entry will be backed up, transferred and verified together.
+- How failed or partial publication will be recovered without replacing the database.
+- How those assets return to the local workspace; option 8 does not fetch them.
+
+Neither Git push nor the current text-only publisher completes that plan. Keep
+such work local until a specific supported publication procedure is established.
+
 ## When to commit and push
 
 | What changed? | Git action | How it reaches production |
@@ -193,7 +221,7 @@ not database entries, live credentials or helper-selected local copies.
 ## What the other math documents cover
 
 - [AUTHORING_STANDARDS.md](AUTHORING_STANDARDS.md): writing, notation, structure and review conventions.
-- [README.md](FRONTEND.md): frontend architecture and rendering dependencies.
+- [Math frontend](FRONTEND.md): frontend architecture and rendering dependencies.
 - [ALGEBRA_DEFINITION_AUDIT.md](../../maintenance/history/ALGEBRA_DEFINITION_AUDIT.md) and
   [CATEGORY_DEFINITION_AUDIT.md](../../maintenance/history/CATEGORY_DEFINITION_AUDIT.md): topic-specific audit notes,
   not the general entry-creation workflow.

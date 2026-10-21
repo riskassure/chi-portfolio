@@ -17,18 +17,27 @@ Committing code does not publish it to the website.
 | [Adding a math entry](features/math/ADDING_ENTRIES.md) | Local create/preview/save steps and reviewed publication |
 | [Math frontend](features/math/FRONTEND.md) | Mathematics frontend implementation notes |
 
+## Backup administration
+
+- [Tracked backup review](administration/backups/HISTORICAL_BACKUP_REVIEW.md): provenance, integrity checks and preservation history.
+- [Backup and recovery review](administration/backups/BACKUP_RECOVERY.md): inventory, isolated restore results and proposed retention; not a complete disaster-recovery procedure.
+
 ## Maintenance
 
 - [Maintenance plan](maintenance/MAINTENANCE_PLAN.md): scope, sequence and pending checks.
 - [Assessment](maintenance/assessments/REPOSITORY_ASSESSMENT.md): findings and proposed priorities, not a deletion list.
-- [Tracked backup review](administration/backups/HISTORICAL_BACKUP_REVIEW.md): provenance, integrity checks and proposed preservation.
-- [Backup and recovery review](administration/backups/BACKUP_RECOVERY.md): inventory, isolated database restore results and proposed retention.
 - [Configuration review](maintenance/assessments/CONFIG_REVIEW.md): directory-creation dependencies and proposed explicit setup.
 - [Agent instructions](../AGENTS.md): expectations for future coding sessions.
 
 The math section has already undergone substantial modularization and
 simplification, as confirmed by the owner. Review that history before proposing
 further changes. File size alone is not a reason to refactor it again.
+
+## Math sources and historical audits
+
+- [Knot diagram sources](features/math/KNOT_SOURCES.md): retained image provenance and source files.
+- [Algebra definition audit](maintenance/history/ALGEBRA_DEFINITION_AUDIT.md): historical subject-specific findings.
+- [Category definition audit](maintenance/history/CATEGORY_DEFINITION_AUDIT.md): historical subject-specific findings.
 
 ## Historical and alternative deployment references
 
