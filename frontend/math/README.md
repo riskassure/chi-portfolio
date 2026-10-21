@@ -5,6 +5,8 @@ live in this directory.
 
 The collection-wide writing and notation rules are in
 [`AUTHORING_STANDARDS.md`](AUTHORING_STANDARDS.md).
+For the administrator's local create, preview, save and publish workflow, see
+[`ADDING_ENTRIES.md`](ADDING_ENTRIES.md).
 
 - `render/math_render_helpers.js` exposes `window.MathCmsRender` and orchestrates
   the rendering pipeline.

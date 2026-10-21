@@ -14,6 +14,7 @@ Committing code does not publish it to the website.
 | [Spotify](../backend/src/services/music/README.md) | Current top-track workflow; older export workflow is labeled separately |
 | [Google Photos](../backend/src/services/photography/README.md) | Photo import implementation and setup |
 | [Math authoring](../frontend/math/AUTHORING_STANDARDS.md) | Mathematics content conventions |
+| [Adding a math entry](../frontend/math/ADDING_ENTRIES.md) | Local create/preview/save steps and reviewed publication |
 | [Math frontend](../frontend/math/README.md) | Mathematics frontend implementation notes |
 
 ## Maintenance

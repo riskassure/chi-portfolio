@@ -95,6 +95,31 @@ and downloads missing photos. It does not synchronize website code, private
 credentials, or all other media. File-only travel or styling changes do not require
 option 8. Never replace the entire live database with a laptop copy.
 
+## Add a mathematics entry
+
+Follow [Adding a math entry](../frontend/math/ADDING_ENTRIES.md) for field guidance,
+previewing, local saving and publication. Start with helper option **6**, sign in
+locally, then open `http://127.0.0.1:5001/math/create.html`. Follow the existing
+[authoring standards](../frontend/math/AUTHORING_STANDARDS.md) for mathematical prose
+and notation. Search for duplicates before creating an entry.
+
+For a new text/equation entry, prepare with **2** and publish via **3/4/5** after
+review. The new-entry publisher does not transfer images or generate diagrams;
+entries requiring those need a separate publication plan even if local preview
+works. A Git push does not publish database content. Verify live, then refresh
+the baseline/working copy with **8** after stopping the local server.
+
+Alternatively, the guide's **production-first** section explains backing up,
+creating the entry directly on the live site, verifying it, and using **8** to
+bring it home. A live save is immediately public and does not need helper
+publication. Conflicting unpublished local edits must be reconciled before a
+refresh can switch working copies. Option 8 is not a general two-way merge and
+does not transfer math diagrams or source code.
+
+Database-only entry changes do not require a Git commit. Commit/push any related
+tracked code or documentation separately; deploy required code before content
+that depends on it. The entry guide includes a Git-versus-content checklist.
+
 ## Travel and photography
 
 On the local map, sign in as admin, search a place name or choose a point on the

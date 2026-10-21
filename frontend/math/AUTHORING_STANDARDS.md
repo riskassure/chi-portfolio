@@ -1,5 +1,8 @@
 # Mathematics entry authoring standards
 
+For editor steps and publication limits, see [Adding an entry](ADDING_ENTRIES.md).
+This document covers content and notation standards.
+
 This guide defines the preferred style for new entries and for entries being
 substantially revised. Historical PlanetMath notation may remain when it is
 correct and renders clearly. The compatibility aliases in `mathjax_config.js`
