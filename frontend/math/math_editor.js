@@ -1076,7 +1076,7 @@ function updateSlugPreview(existingSlug = null) {
     const title = titleInput.value.trim();
 
     slugTarget.innerText = title
-        ? generateSlug(title.replace(/\s+/g, ""))
+        ? slugFromTitle(title) || "-- (enter a title with letters or digits)"
         : "--";
 }
 
@@ -1504,16 +1504,15 @@ function csvFromArray(arr) {
         : "";
 }
 
-function generateSlug(canonicalName) {
-    if (!canonicalName) return "";
-
-    const s1 = canonicalName.replace(/(.)([A-Z][a-z]+)/g, "$1-$2");
-    const s2 = s1.replace(/([a-z0-9])([A-Z])/g, "$1-$2");
-
-    return s2
+// Mirrors slug_from_title in backend/src/services/math/slug_helper.py.
+function slugFromTitle(title) {
+    return String(title || "")
+        .normalize("NFKD")
+        .replace(/\p{M}/gu, "")
+        .replace(/['\u2019\u2018\u02bc`]/g, "")
         .toLowerCase()
-        .replace(/_/g, "-")
-        .replace(/--+/g, "-");
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
 }
 
 function showStatus(message, type = "info") {
