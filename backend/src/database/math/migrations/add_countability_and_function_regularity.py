@@ -298,8 +298,7 @@ def apply(path):
         print('Verified compatible chart definition and examples')
 
 if __name__=='__main__':
+    from migration_db import migration_target
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--db',type=Path,default=base.SRC.parent/'portfolio.db')
-    args=p.parse_args()
-    if not args.db.is_file():raise FileNotFoundError(args.db)
-    apply(args.db)
+    with migration_target(p) as db:
+        apply(db)

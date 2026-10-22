@@ -38,6 +38,7 @@ further changes. File size alone is not a reason to refactor it again.
 - [Knot diagram sources](features/math/KNOT_SOURCES.md): retained image provenance and source files.
 - [Algebra definition audit](maintenance/history/ALGEBRA_DEFINITION_AUDIT.md): historical subject-specific findings.
 - [Category definition audit](maintenance/history/CATEGORY_DEFINITION_AUDIT.md): historical subject-specific findings.
+- [Migration scripts review](maintenance/history/MIGRATION_SCRIPTS_REVIEW.md): what each historical math migration script changes.
 
 ## Historical and alternative deployment references
 

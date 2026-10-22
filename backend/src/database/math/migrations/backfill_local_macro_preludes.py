@@ -18,7 +18,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 
-from config import DB_PATH
+from migration_db import add_db_argument
 from services.math.local_macro_helper import (
     LocalMacroDefinition,
     extract_local_newcommands,
@@ -33,11 +33,6 @@ COMMAND_RE = re.compile(
 # Limiting the scan avoids treating examples later in the article as active
 # prelude definitions.
 CLEANED_PRELUDE_SCAN_LIMIT = 12000
-
-BACKUP_DIR = (
-    Path(DB_PATH).parent
-    / "backups"
-)
 
 EXPECTED_PROBLEMATIC_CONCEPTS = 34
 EXPECTED_RECOVERABLE_CONCEPTS = 19
@@ -821,6 +816,7 @@ def validate_update_plan(
 
 def create_database_backup(
     source_conn: sqlite3.Connection,
+    database_path: Path,
 ) -> Path:
     """
     Create and verify a timestamped SQLite backup.
@@ -830,7 +826,7 @@ def create_database_backup(
     or WAL files are active.
     """
 
-    database_path = Path(DB_PATH)
+    backup_dir = database_path.parent / "backups"
 
     timestamp = datetime.now().strftime(
         "%Y%m%d_%H%M%S_%f"
@@ -842,7 +838,7 @@ def create_database_backup(
     )
 
     backup_path = (
-        BACKUP_DIR
+        backup_dir
         / (
             f"{database_path.stem}"
             f"_before_local_macro_backfill_"
@@ -851,7 +847,7 @@ def create_database_backup(
         )
     )
 
-    BACKUP_DIR.mkdir(
+    backup_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
@@ -1034,6 +1030,8 @@ def parse_args() -> argparse.Namespace:
         )
     )
 
+    add_db_argument(parser)
+
     parser.add_argument(
         "--apply",
         action="store_true",
@@ -1047,10 +1045,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def main(
+    db_path: Path,
     apply: bool = False,
 ) -> None:
     conn = sqlite3.connect(
-        str(DB_PATH)
+        str(db_path)
     )
 
     conn.row_factory = sqlite3.Row
@@ -1096,7 +1095,7 @@ def main(
         )
 
         print("Local macro prelude backfill")
-        print(f"Database: {DB_PATH}")
+        print(f"Database: {db_path.resolve()}")
         print(
             f'Audit run: {audit_run["id"]} '
             f'({audit_run["audit_version"]})'
@@ -1134,7 +1133,8 @@ def main(
         if apply:
             if validation_state == "ready":
                 backup_path = create_database_backup(
-                    conn
+                    conn,
+                    db_path,
                 )
 
                 applied_count = apply_backfill_updates(
@@ -1232,5 +1232,6 @@ if __name__ == "__main__":
     arguments = parse_args()
 
     main(
+        db_path=arguments.db,
         apply=arguments.apply,
     )

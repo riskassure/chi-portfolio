@@ -211,6 +211,41 @@ Before publishing an entry that needs new diagram assets, define and review:
 Neither Git push nor the current text-only publisher completes that plan. Keep
 such work local until a specific supported publication procedure is established.
 
+## Migration scripts (historical bulk route)
+
+The scripts in `backend/src/database/math/migrations/` added most of the
+September 2026 entries, before the helper existed. Treat them as a record of
+what was done, not as a way to add entries. Use the helper instead. Do not
+run them in bulk or in order. Many of them check the content as it was then.
+
+Most of them also change existing entries: they edit text and add related
+links, synonyms and defined terms. The helper can't publish those changes, so
+re-running a script leaves the working copy different from the live site in a
+way options 2 to 5 can't fix. The [migration scripts review](../../maintenance/history/MIGRATION_SCRIPTS_REVIEW.md)
+lists what each script changes.
+
+If you do need to reuse one, plan that run on its own and review it first.
+Each script has these safeguards:
+
+- **`--db` is required.** There is no default. The old default,
+  `backend/portfolio.db`, is a stale copy. The path must be an existing math
+  database, and a mistyped path is refused without creating a file.
+- **It previews by default.** The script runs against a temporary copy and
+  lists the new entries and every existing entry it would change. Nothing is
+  written to the database you named.
+- **`--apply` backs up first.** It writes a verified backup to a `backups`
+  folder next to the database, prints the backup path, and then makes the
+  change. If the script fails, it prints the backup path again. Four scripts
+  commit in stages, so restore that backup rather than assume nothing changed.
+
+```text
+python backend/src/database/math/migrations/SCRIPT.py --db PATH-TO-WORKING-DB
+python backend/src/database/math/migrations/SCRIPT.py --db PATH-TO-WORKING-DB --apply
+```
+
+`backfill_local_macro_preludes.py` keeps its own dry run and backup, and also
+requires `--db`.
+
 ## When to commit and push
 
 | What changed? | Git action | How it reaches production |

@@ -387,10 +387,10 @@ def apply(db_path):
 
 
 if __name__ == "__main__":
+    from migration_db import migration_target
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--db", type=Path, default=SRC.parent / "portfolio.db")
-    args = parser.parse_args()
-    count, result = apply(args.db)
-    print(f"Created {count} concepts; verified all eight:")
-    for concept_id, slug, origins in result:
-        print(f"  {concept_id}: {slug} ({origins} incoming-link checks)")
+    with migration_target(parser) as db:
+        count, result = apply(db)
+        print(f"Created {count} concepts; verified all eight:")
+        for concept_id, slug, origins in result:
+            print(f"  {concept_id}: {slug} ({origins} incoming-link checks)")
