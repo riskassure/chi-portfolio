@@ -199,6 +199,22 @@ class CreateRouteTests(unittest.TestCase):
         self.assertEqual(self.created, [])
         self.assertEqual(rows(self.db), before)
 
+    def test_non_text_slugs_are_rejected_before_saving(self):
+        before = rows(self.db)
+        for slug in [42, 0, 1.5, True, ['metric-space'], [], {'slug': 'x'}]:
+            with self.subTest(slug=slug):
+                result = self.post(title='normed space', slug=slug)
+                self.assertEqual(result.status_code, 400)
+                self.assertFalse(result.json['success'])
+                self.assertIn('slug must be text', result.json['message'])
+        self.assertEqual(self.created, [])
+        self.assertEqual(rows(self.db), before)
+
+    def test_null_slug_is_derived_from_the_title(self):
+        result = self.post(title='normed space', slug=None)
+        self.assertEqual(result.status_code, 201)
+        self.assertEqual(self.created, [('NormedSpace', 'normed-space')])
+
     def test_creating_leaves_existing_entries_alone(self):
         before = rows(self.db)
         self.assertEqual(self.post(title='normed space').status_code, 201)

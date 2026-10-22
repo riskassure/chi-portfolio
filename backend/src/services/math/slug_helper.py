@@ -56,6 +56,8 @@ def new_entry_names(cursor, title: str, requested_slug: str | None = None) -> tu
     Refuses what publish_math_entry.check_target would refuse about the
     entry's names, so the problem shows before anything is saved.
     """
+    if requested_slug is not None and not isinstance(requested_slug, str):
+        raise ValueError("The slug must be text, such as 'metric-space', or left blank to use the title.")
     checks = (
         ("the title of", "SELECT title FROM math_concepts WHERE lower(trim(title)) = lower(trim(?))"),
         ("a synonym of", "SELECT mc.title FROM math_synonyms s LEFT JOIN math_concepts mc ON mc.id = s.concept_id "
