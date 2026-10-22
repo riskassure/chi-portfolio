@@ -225,18 +225,42 @@ way options 2 to 5 can't fix. The [migration scripts review](../../maintenance/h
 lists what each script changes.
 
 If you do need to reuse one, plan that run on its own and review it first.
-Each script has these safeguards:
+Apply it only to the local working database, with nothing else writing to it:
+stop the local server you started with option 6, and don't run the helper or
+another script at the same time. Never apply a migration to the live database. Each script has
+these safeguards:
 
 - **`--db` is required.** There is no default. The old default,
   `backend/portfolio.db`, is a stale copy. The path must be an existing math
   database, and a mistyped path is refused without creating a file.
-- **It previews by default.** The script runs against a temporary copy and
-  lists the new entries and every existing entry it would change. Nothing is
-  written to the database you named.
+- **It previews by default.** The script takes a snapshot of the database,
+  runs against a second copy, and compares the two. It lists the new entries
+  and every existing entry it would change. Nothing is written to the database
+  you named, and edits made to it meanwhile aren't reported as the script's.
 - **`--apply` backs up first.** It writes a verified backup to a `backups`
   folder next to the database, prints the backup path, and then makes the
   change. If the script fails, it prints the backup path again. Four scripts
-  commit in stages, so restore that backup rather than assume nothing changed.
+  commit in stages, so don't assume nothing changed.
+
+If a run fails, recover carefully. Restoring the backup replaces the whole
+database, so it also throws away anything saved to it after the backup was
+taken, not just the script's changes:
+
+1. Stop everything that writes to the database: the local server, the helper
+   and any other script.
+2. Check for changes made since the backup. This lists every difference
+   between the backup and the database now:
+
+   ```text
+   python backend/src/database/math/migrations/migration_db.py PATH-TO-BACKUP PATH-TO-WORKING-DB
+   ```
+
+   Compare it with the preview you ran before applying. If every difference is
+   one the preview listed, nothing else changed, and you can restore the backup
+   by copying it over the database while everything is still stopped.
+3. If something else changed too, don't restore over it. Keep the current
+   database, and either reverse the script's changes by hand or copy the
+   unrelated edits into the restored copy first.
 
 ```text
 python backend/src/database/math/migrations/SCRIPT.py --db PATH-TO-WORKING-DB

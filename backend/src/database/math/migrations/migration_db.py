@@ -7,6 +7,7 @@ backend/portfolio.db, is a stale copy, not the helper's working copy.
 By default a script only previews. It runs against a temporary copy and
 reports which entries it would add or change, leaving the database alone.
 With --apply it first takes a verified backup, then changes the database.
+Apply only to a local working database that nothing else is writing to.
 """
 import argparse
 from collections import Counter
@@ -78,14 +79,20 @@ def migration_target(parser, argv=None):
         try:
             yield db
         except BaseException:
-            print(f'The migration failed. Some scripts commit in stages, so check '
-                  f'the database; to undo, restore the backup: {backup}', file=sys.stderr)
+            print(f'The migration failed. Some scripts commit in stages, so part of it may '
+                  f'be saved. Backup taken before the run: {backup}. Before restoring it, stop '
+                  f'everything that writes to the database and check for changes made since '
+                  f'the backup; restoring discards them.', file=sys.stderr)
             raise
         print('Applied.')
         return
     with tempfile.TemporaryDirectory(prefix='migration-preview-', ignore_cleanup_errors=True) as folder:
+        # Compare against a fixed snapshot, not the live file, so edits other
+        # writers make to the database meanwhile are not reported as the script's.
+        start = Path(folder) / ('start-' + db.name)
         copy = Path(folder) / db.name
-        _snapshot(db, copy)
+        _snapshot(db, start)
+        _snapshot(start, copy)
         try:
             yield copy
         except BaseException:
@@ -97,7 +104,7 @@ def migration_target(parser, argv=None):
             gc.collect()
         print()
         print(f'PREVIEW ONLY. Nothing was written to {db}.')
-        print('\n'.join(describe_changes(db, copy)))
+        print('\n'.join(describe_changes(start, copy)))
         print('Run again with --apply to make these changes, after a backup.')
 
 
@@ -223,3 +230,12 @@ def _count(label, plus, minus):
     parts = [f'+{plus}'] if plus else []
     parts += [f'-{minus}'] if minus else []
     return f'{label} ' + ' '.join(parts)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='List what differs between two math databases, such as a backup and the database now.')
+    parser.add_argument('before', type=existing_database)
+    parser.add_argument('after', type=existing_database)
+    args = parser.parse_args()
+    print('\n'.join(describe_changes(args.before, args.after)))

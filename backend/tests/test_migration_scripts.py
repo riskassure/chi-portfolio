@@ -101,6 +101,17 @@ class ScriptCommandLineTests(unittest.TestCase):
             count = c.execute('SELECT count(*) FROM math_synonyms').fetchone()[0]
         self.assertEqual(count, len(add_autolink_inflection_synonyms.INFLECTION_SYNONYMS))
 
+    def test_compare_lists_changes_since_a_backup(self):
+        backup = make_catalog(self.folder / 'backup.db')
+        db = self.folder / 'working.db'
+        db.write_bytes(backup.read_bytes())
+        with closing(sqlite3.connect(db)) as c:
+            c.execute("UPDATE math_concepts SET title='renamed' WHERE slug='beta'")
+            c.commit()
+        result = run(MIGRATIONS / 'migration_db.py', str(backup), str(db), cwd=self.folder)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('  beta: title', result.stdout)
+
     def test_backfill_requires_db(self):
         result = run(MIGRATIONS / 'backfill_local_macro_preludes.py', cwd=self.folder)
         self.assertEqual(result.returncode, 2)
@@ -146,9 +157,24 @@ class DatabaseArgumentTests(unittest.TestCase):
         out = self.target(db, '--apply', change=lambda c: c.execute("UPDATE math_concepts SET title='x'"),
                           fail=True)
         backup = next((self.folder / 'backups').iterdir())
-        self.assertIn(f'restore the backup: {backup}', out)
+        self.assertIn(f'Backup taken before the run: {backup}', out)
+        self.assertIn('stop everything that writes to the database', out)
         with closing(sqlite3.connect(backup)) as c:
             self.assertEqual(c.execute("SELECT title FROM math_concepts WHERE slug='alpha'").fetchone()[0], 'alpha')
+
+    def test_preview_ignores_edits_made_by_another_writer(self):
+        db = make_catalog(self.folder / 'working.db')
+
+        def other_writer(_copy):
+            # The migration itself does nothing; meanwhile the real database changes.
+            with closing(sqlite3.connect(db)) as c:
+                c.execute("UPDATE math_concepts SET title='renamed' WHERE slug='alpha'")
+                c.commit()
+
+        out = self.target(db, change=other_writer)
+        self.assertIn('New entries (0): none', out)
+        self.assertIn('Existing entries changed (0): none', out)
+        self.assertNotIn('alpha', out)
 
     def test_preview_reports_changes_to_existing_entries(self):
         db = make_catalog(self.folder / 'working.db', ('alpha', 'beta', 'gamma'))
