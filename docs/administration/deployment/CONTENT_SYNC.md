@@ -356,6 +356,29 @@ Those edits have no supported publication route yet, so keep them local. The
 production-first behavior above comes from reading the editor and update routes,
 not from a live test.
 
+### Check whether the server can render diagrams
+
+This read-only check answers whether PythonAnywhere can render PSTricks at all:
+
+```powershell
+.\.venv313\Scripts\python.exe backend/probe_server_diagrams.py --output dist\diagram-probe.txt
+```
+
+It uses the same SSH route as option 4, so SSH may ask for the account
+password. On the server it reports whether `latex`, `dvisvgm` and the PSTricks
+packages are installed. It renders two fixed samples (a `pspicture` and a
+`\pstree`) with the site's own document wrapper, plus one stored live diagram,
+in a new folder under the server's temporary directory. Then it deletes that
+folder. It compares the stored diagram's SVG with its fresh rendering. The
+database is opened read-only, the diagrams folder is only read, and the site is
+not reloaded. The report's first line is `SERVER CAN RENDER PSTRICKS` or
+`SERVER CANNOT RENDER PSTRICKS`.
+
+A passing check does not make the live editor a safe route for diagram changes.
+The editor renders inside its database transaction and writes straight to the
+final SVG name. Diagram publication through the helper is planned separately,
+with SVGs rendered on the laptop.
+
 ## Upload a reviewed package through the API
 
 After configuring `backend/pythonanywhere_api.py setup` and passing its `check`,
