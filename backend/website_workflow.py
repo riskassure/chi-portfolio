@@ -1,4 +1,5 @@
 """Guided website publishing and database refresh with remembered local paths."""
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -27,9 +28,11 @@ import frontend_sync
 import site_deployment
 import webbrowser
 import upload_esri_key
+import diagram_sync
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / 'dist' / 'math-workflow.json'
+DIAGRAMS = ROOT / 'backend' / 'data' / 'math' / 'diagrams'
 
 
 def digest(path):
@@ -60,8 +63,8 @@ def explain_rejection(entry, message):
     if message.startswith('Media/diagrams'):
         return 'contains diagrams or images (for example \\includegraphics, figure, pspicture or \\pstree)'
     if message.startswith('Diagram or image changed'):
-        return ('adds, removes or changes a diagram, image or embed; only the text around them can change, '
-                'and diagram publishing is not supported yet')
+        return ('adds, removes or changes a diagram, image or embed; PSTricks diagrams can change once their SVGs '
+                'are rendered (option 19), but other images and embeds must stay exactly as they are')
     if message.startswith('Missing text field: cleaned_tex'):
         return 'has empty content'
     if message.startswith('Include classification'):
@@ -80,6 +83,34 @@ def explain_rejection(entry, message):
     if message.startswith('Duplicate synonyms ignoring case'):
         return 'synonyms repeat a value that differs only in capitalization'
     return message.rstrip('.')
+
+
+def diagram_index(database):
+    """Return {canonical: set of (hash, source, svg path)} for every entry with stored diagrams."""
+    with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True)) as db:
+        try:
+            rows = db.execute('SELECT c.canonical_name, d.source_hash, d.source_tex, d.svg_path FROM math_concept_diagrams d '
+                              'JOIN math_concepts c ON c.id=d.concept_id').fetchall()
+        except sqlite3.DatabaseError:
+            return {}  # No diagram table (or not a database): nothing stored to compare.
+    index = {}
+    for canonical, *row in rows:
+        index.setdefault(canonical, set()).add(tuple(row))
+    return index
+
+
+def diagram_blocker(name, state, snapshots):
+    """Return why option 2 cannot package this entry's diagram change, or None when it can."""
+    try:
+        diagram_sync.build_payload(state['base'], state['working'], name, DIAGRAMS, snapshots=snapshots)
+    except ValueError as error:
+        message = str(error)
+        if message.startswith('Diagrams not ready'):
+            return ('has diagrams with no rendered SVG in your working copy; choose 19 to render them, then 1 again. '
+                    + message[len('Diagrams not ready; run render-missing first. '):])
+        entry = dict(snapshots[1].get(name) or {}, canonical_name=name)
+        return explain_rejection(entry, message)
+    return None
 
 
 def publish_blocker(name, baseline, working, working_db=None):
@@ -113,7 +144,7 @@ def publish_blocker(name, baseline, working, working_db=None):
     missing = working_db and local_missing_svgs(working_db, name, working[name]['cleaned_tex'])
     if missing:
         return (f'has {missing} diagram(s) with no stored SVG, so the page would show '
-                '"[Diagram unavailable]"; rebuilding diagrams is not supported yet')
+                '"[Diagram unavailable]"; choose 19 to render them, then option 2 publishes the diagrams with the text')
     return None
 
 
@@ -121,15 +152,32 @@ def changed_entries(state):
     if digest(state['base']) != state['base_sha256']:
         raise ValueError('The saved baseline changed. Select the correct unchanged baseline before continuing.')
     baseline, working = read_snapshot(state['base']), read_snapshot(state['working'])
+    base_diagrams, working_diagrams = diagram_index(state['base']), diagram_index(state['working'])
     changes = []
+    extract_blocks = diagram_sync.helpers()[0]
     for name in sorted(baseline.keys() | working.keys()):
-        if baseline.get(name) == working.get(name):
+        diagrams = name in working and base_diagrams.get(name, set()) != working_diagrams.get(name, set())
+        if baseline.get(name) == working.get(name) and not diagrams:
             continue
+        if name in working and not diagrams:
+            # Edited text whose diagrams differ from the stored ones also needs the diagram route.
+            planned = {(d['source_hash'], d['source_tex'])
+                       for d in diagram_sync.planned_diagrams(working[name]['cleaned_tex'], extract_blocks)}
+            stored = {row[:2] for row in working_diagrams.get(name, set())}
+            diagrams = planned != stored and (name not in baseline or planned != {
+                (d['source_hash'], d['source_tex'])
+                for d in diagram_sync.planned_diagrams(baseline[name]['cleaned_tex'], extract_blocks)})
         fields = ([key for key in working[name] if working[name][key] != baseline[name][key]]
                   if name in baseline and name in working else [])
-        reason = publish_blocker(name, baseline, working, state['working'])
+        if diagrams:
+            # Stored diagrams changed (an editor rebuild or option 19): SVGs travel with the entry.
+            fields.append('diagrams')
+            reason = diagram_blocker(name, state, (baseline, working))
+        else:
+            reason = publish_blocker(name, baseline, working, state['working'])
         changes.append(dict(canonical=name, title=working.get(name, baseline.get(name))['title'],
-                            fields=fields, supported=reason is None, reason=reason, new=name not in baseline))
+                            fields=fields, supported=reason is None, reason=reason, new=name not in baseline,
+                            diagrams=diagrams))
     return changes
 
 
@@ -143,7 +191,9 @@ def prepare_selected(state, canonical):
     folder = ROOT / 'dist' / 'math-workflow' / uuid.uuid4().hex
     folder.mkdir(parents=True)
     package = folder / 'package.zip'
-    if candidates[canonical]['new']:
+    if candidates[canonical]['diagrams']:
+        report = diagram_sync.prepare(Path(state['base']), Path(state['working']), canonical, package, DIAGRAMS)
+    elif candidates[canonical]['new']:
         entry = dict(read_snapshot(state['working'])[canonical], canonical_name=canonical)
         validate_entry(entry)
         with zipfile.ZipFile(package, 'x', compression=zipfile.ZIP_DEFLATED) as archive:
@@ -153,13 +203,24 @@ def prepare_selected(state, canonical):
         report = prepare(Path(state['base']), Path(state['working']), canonical, package)
     (folder / 'review.txt').write_text(report, encoding='utf-8')
     with zipfile.ZipFile(package) as archive:
-        payload = json.loads(archive.read(archive.namelist()[0]))
-    proposed = (patch_intended(payload) if 'replacement_tex' in payload else
+        payload = json.loads(archive.read(next(n for n in archive.namelist() if n.endswith('.json'))))
+    proposed = (diagram_sync.diagram_intended(payload)[0] if payload.get('kind') == diagram_sync.KIND else
+                patch_intended(payload) if 'replacement_tex' in payload else
                 {k: sorted(v) if isinstance(v, list) else v for k, v in payload.items() if k != 'canonical_name'})
     state['job'] = dict(canonical=canonical, package=str(package), sha256=digest(package),
                         proposed=proposed, remote=None, checked=False)
     save(state)
     return report
+
+
+def render_missing_diagrams(state, canonical):
+    """Render, on this computer, each diagram of one working-copy entry that has no stored SVG."""
+    result = diagram_sync.render_missing(state['working'], canonical, DIAGRAMS)
+    lines = [f"Rendered: {', '.join(result['rendered']) or 'none'}",
+             f"Reused existing SVGs: {', '.join(result['reused']) or 'none'}",
+             f"Already stored: {len(result['unchanged'])}; unused rows removed: {result['removed_rows']}",
+             'Only your working copy changed. Check the page on the local server, then use 1 and 2 to prepare it.']
+    return '\n'.join(lines)
 
 
 def current_job(state):
@@ -383,7 +444,7 @@ def main():
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n17. Upload Esri map key\n18. Prepare saved gallery display settings\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n17. Upload Esri map key\n18. Prepare saved gallery display settings\n19. Render missing diagrams for an entry\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -441,6 +502,10 @@ def main():
             elif choice == '10':
                 print('Keep the local server running (option 6 in another terminal). Opening the photo review page.')
                 webbrowser.open('http://127.0.0.1:5001/api/photography/google/manage')
+            elif choice == '19':
+                canonical = input('Canonical name of the entry (as option 1 shows it in brackets): ').strip()
+                if canonical:
+                    print(render_missing_diagrams(state, canonical))
             elif choice == '18':
                 print(prepare_frontend(state, ['photography/gallery-settings.js']))
                 print('Review the saved photo count, then use 3 (stage), 4 (check live), 5 (publish).')

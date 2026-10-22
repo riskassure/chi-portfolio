@@ -35,6 +35,35 @@ def svg_for(source):
     return SVG.replace('dvisvgm 3.1.2', 'stub ' + hash_pstricks_block(source)).encode()
 
 
+def create_db(path, tex, rows=()):
+    """A math database with one entry, RootedTree (none if tex is None), and diagram rows for rows."""
+    with closing(sqlite3.connect(path)) as db:
+        db.executescript('''
+            CREATE TABLE math_concepts(id INTEGER PRIMARY KEY,canonical_name TEXT,slug TEXT,title TEXT,owner TEXT,cleaned_tex TEXT,is_cleaned INTEGER,rendered_tex TEXT,created_at TEXT,updated_at TEXT);
+            CREATE TABLE math_classifications(id INTEGER PRIMARY KEY,code TEXT);
+            CREATE TABLE math_types(id INTEGER PRIMARY KEY,type_name TEXT);
+            CREATE TABLE math_concept_classifications(concept_id INTEGER,classification_id INTEGER);
+            CREATE TABLE math_concept_types(concept_id INTEGER,type_id INTEGER);
+            CREATE TABLE math_synonyms(concept_id INTEGER,synonym_text TEXT);
+            CREATE TABLE math_definitions(concept_id INTEGER,defined_term TEXT);
+            CREATE TABLE math_link_exclusions(concept_id INTEGER,word TEXT);
+            CREATE TABLE math_related_concepts(concept_id INTEGER,related_canonical_name TEXT,related_concept_id INTEGER);
+            CREATE TABLE math_concept_diagrams(id INTEGER PRIMARY KEY AUTOINCREMENT,concept_id INTEGER NOT NULL,block_index INTEGER NOT NULL,
+                source_hash TEXT NOT NULL,source_tex TEXT NOT NULL,svg_path TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(concept_id,source_hash));
+            INSERT INTO math_classifications VALUES(1,'05C05');
+            INSERT INTO math_types VALUES(1,'Definition');
+        ''')
+        if tex is not None:
+            db.execute("INSERT INTO math_concepts VALUES(1,'RootedTree','rooted-tree','rooted tree','chi',?,1,'old','t','t')", (tex,))
+            db.execute('INSERT INTO math_concept_classifications VALUES(1,1)')
+            db.execute('INSERT INTO math_concept_types VALUES(1,1)')
+        for index, source in enumerate(rows, 1):
+            name = hash_pstricks_block(source) + '.svg'
+            db.execute('INSERT INTO math_concept_diagrams(concept_id,block_index,source_hash,source_tex,svg_path,created_at) '
+                       "VALUES(1,?,?,?,?, 't')", (index, hash_pstricks_block(source), source, '/api/math/diagrams/' + name))
+        db.commit()
+
+
 class SvgCheckTests(unittest.TestCase):
     def test_dvisvgm_style_output_accepted(self):
         check_svg(SVG.encode())
@@ -91,31 +120,7 @@ class DiagramWorkflowTests(unittest.TestCase):
         return svg_for(source)
 
     def create(self, path, tex, rows=()):
-        with closing(sqlite3.connect(path)) as db:
-            db.executescript('''
-                CREATE TABLE math_concepts(id INTEGER PRIMARY KEY,canonical_name TEXT,slug TEXT,title TEXT,owner TEXT,cleaned_tex TEXT,is_cleaned INTEGER,rendered_tex TEXT,created_at TEXT,updated_at TEXT);
-                CREATE TABLE math_classifications(id INTEGER PRIMARY KEY,code TEXT);
-                CREATE TABLE math_types(id INTEGER PRIMARY KEY,type_name TEXT);
-                CREATE TABLE math_concept_classifications(concept_id INTEGER,classification_id INTEGER);
-                CREATE TABLE math_concept_types(concept_id INTEGER,type_id INTEGER);
-                CREATE TABLE math_synonyms(concept_id INTEGER,synonym_text TEXT);
-                CREATE TABLE math_definitions(concept_id INTEGER,defined_term TEXT);
-                CREATE TABLE math_link_exclusions(concept_id INTEGER,word TEXT);
-                CREATE TABLE math_related_concepts(concept_id INTEGER,related_canonical_name TEXT,related_concept_id INTEGER);
-                CREATE TABLE math_concept_diagrams(id INTEGER PRIMARY KEY AUTOINCREMENT,concept_id INTEGER NOT NULL,block_index INTEGER NOT NULL,
-                    source_hash TEXT NOT NULL,source_tex TEXT NOT NULL,svg_path TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(concept_id,source_hash));
-                INSERT INTO math_classifications VALUES(1,'05C05');
-                INSERT INTO math_types VALUES(1,'Definition');
-            ''')
-            if tex is not None:
-                db.execute("INSERT INTO math_concepts VALUES(1,'RootedTree','rooted-tree','rooted tree','chi',?,1,'old','t','t')", (tex,))
-                db.execute('INSERT INTO math_concept_classifications VALUES(1,1)')
-                db.execute('INSERT INTO math_concept_types VALUES(1,1)')
-            for index, source in enumerate(rows, 1):
-                name = hash_pstricks_block(source) + '.svg'
-                db.execute('INSERT INTO math_concept_diagrams(concept_id,block_index,source_hash,source_tex,svg_path,created_at) '
-                           "VALUES(1,?,?,?,?, 't')", (index, hash_pstricks_block(source), source, '/api/math/diagrams/' + name))
-            db.commit()
+        create_db(path, tex, rows)
 
     def working_copy(self, tex=None):
         working = self.root / 'working.db'

@@ -22,6 +22,7 @@ import photo_sync
 import photo_metadata_sync
 import photo_removal_sync
 import frontend_sync
+import diagram_sync
 
 
 def fetch_verified(settings, remote, local):
@@ -101,6 +102,14 @@ def preview(data, snapshot=None, *, live=False):
         if snapshot:
             frontend = Path(snapshot).resolve().parent.parent/'frontend' if live else Path(__file__).resolve().parents[1]/'frontend'
             status = profile_sync.status(snapshot, payload, frontend)
+    elif payload.get('kind') == diagram_sync.KIND:
+        payload, files = diagram_sync.unpack(data)
+        source = Path(snapshot).resolve().parent/'src' if live else None
+        report += [diagram_sync.review(payload, source)]
+        if snapshot:
+            # A downloaded snapshot has no diagram files beside it; only the live check reads them.
+            diagrams = Path(snapshot).resolve().parent/'data'/'math'/'diagrams' if live else None
+            status = diagram_sync.status(snapshot, diagrams, payload, files, source)
     elif 'replacement_tex' in payload:
         intended = patch_intended(payload)
         canonical = payload['canonical_name']

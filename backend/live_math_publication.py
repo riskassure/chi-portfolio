@@ -1,4 +1,5 @@
 """Publish one validated math payload using the existing transactional updaters."""
+import hashlib
 import io
 import json
 import zipfile
@@ -12,6 +13,7 @@ import photo_sync
 import photo_metadata_sync
 import photo_removal_sync
 import frontend_sync
+import diagram_sync
 
 
 def publish(data, database, backups, source):
@@ -30,6 +32,10 @@ def publish(data, database, backups, source):
         return photo_metadata_sync.apply(database, payload, backups, source.parent.parent/'frontend')
     if payload.get('kind') == 'photo-add':
         return photo_sync.apply(database,payload,photo_sync.unpack(data,payload),backups,source.parent.parent/'frontend')
+    if payload.get('kind') == diagram_sync.KIND:
+        payload, files = diagram_sync.unpack(data)
+        return diagram_sync.apply(database, payload, files, backups, source,
+                                  database.parent/'data'/'math'/'diagrams', hashlib.sha256(data).hexdigest())
     if payload.get('kind') == 'profile':
         return profile_sync.apply(database, payload, backups, source.parent.parent/'frontend')
     canonical = payload['canonical_name']

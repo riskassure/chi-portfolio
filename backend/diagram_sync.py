@@ -7,8 +7,8 @@ Images, embeds and any other media must stay exactly as they are (see
 publish_math_entry.media_fragments).
 """
 import argparse
-from contextlib import closing
-from datetime import datetime
+from contextlib import closing, nullcontext
+from datetime import datetime, timezone
 import difflib
 import hashlib
 import io
@@ -27,7 +27,7 @@ from xml.etree import ElementTree
 
 from apply_math_text_patch import patch_intended
 from preview_math_sync import read_snapshot
-from publish_math_entry import validate as validate_entry
+from publish_math_entry import check_target, insert_entry, validate as validate_entry
 
 KIND = 'math-diagrams'
 SVG_LIMIT = 2 * 1024 * 1024
@@ -264,13 +264,14 @@ def place_file(diagram_dir, name, data):
     return True
 
 
-def render_missing(database, canonical, diagram_dir, render=render_svg, source_dir=None):
+def render_missing(database, canonical, diagram_dir, render=None, source_dir=None):
     """Render and store each diagram of one entry that has no row or no valid SVG in the working copy.
 
     Existing valid files are reused and never replaced. Rows the text no
     longer uses are removed, and the stored page HTML is rebuilt from the
     stored SVGs, as the local editor would after a diagram rebuild.
     """
+    render = render or render_svg
     extract_blocks, _ = helpers(source_dir)
     from services.math.concept_render_service import render_tex_reusing_existing_diagrams
     summary = dict(rendered=[], reused=[], unchanged=[], removed_rows=0)
@@ -318,9 +319,12 @@ def render_missing(database, canonical, diagram_dir, render=render_svg, source_d
     return summary
 
 
-def build_payload(base, local, canonical, diagram_dir, source_dir=None):
-    """Return (payload, files) for one entry's diagram change between baseline and working copy."""
-    baseline, working = read_snapshot(base), read_snapshot(local)
+def build_payload(base, local, canonical, diagram_dir, source_dir=None, snapshots=None):
+    """Return (payload, files) for one entry's diagram change between baseline and working copy.
+
+    snapshots, when given, is (baseline, working) as read_snapshot already returned them.
+    """
+    baseline, working = snapshots or (read_snapshot(base), read_snapshot(local))
     if canonical not in working:
         raise ValueError('Entry not found in the local working database.')
     proposed = working[canonical]
@@ -405,6 +409,256 @@ def prepare(base, local, canonical, output, diagram_dir, source_dir=None):
     payload, files = build_payload(base, local, canonical, diagram_dir, source_dir)
     unpack(write_package(payload, files, output))
     return review(payload, source_dir)
+
+
+# ---- Server side: verify files, place them, then update rows in one transaction ----
+
+JOURNALS = 'diagram-publish'
+INCOMING = 'diagrams-incoming'
+ELIGIBLE = ('EXPECTED TEXT MATCHES', 'NO DUPLICATE FOUND')
+
+
+def _checkpoint(step):
+    """Called after each recorded step of apply. Does nothing; tests use it to interrupt a run."""
+
+
+def _row_set(rows):
+    return {(r['source_hash'], r['source_tex'], r['svg_path']) for r in rows}
+
+
+def file_state(diagram_dir, record):
+    """Return 'missing', 'identical', 'kept' (a different but valid SVG) or 'unusable' for one target file.
+
+    File names come from the diagram source, so a different valid file is a
+    rendering of the same diagram; it is kept and never overwritten.
+    """
+    path = Path(diagram_dir) / svg_name(record['source_hash'])
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        return 'unusable'
+    if not path.exists():
+        return 'missing'
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() == record['sha256']:
+        return 'identical'
+    try:
+        check_svg(data)
+    except ValueError:
+        return 'unusable'
+    return 'kept'
+
+
+def status(database, diagram_dir, payload, files, source_dir=None, connection=None):
+    """Return a one-line verdict on applying payload to database; never writes.
+
+    diagram_dir None skips the file checks (for a downloaded snapshot).
+    """
+    entry, rows = diagram_intended(payload, source_dir)
+    canonical = payload['canonical_name']
+    states = ({r['source_hash']: file_state(diagram_dir, r) for r in payload['diagrams']}
+              if diagram_dir is not None else {})
+    unusable = sorted(svg_name(h) for h, state in states.items() if state == 'unusable')
+    if unusable:
+        return 'CONFLICT — unusable diagram file on the server: ' + ', '.join(unusable) + '; review required'
+    with (nullcontext(connection) if connection is not None else
+          closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True))) as db:
+        current = read_snapshot(database, connection=db).get(canonical)
+        stored = stored_diagrams(db, canonical)
+        if current == entry and _row_set(stored) == _row_set(rows) and 'missing' not in states.values():
+            return 'ALREADY PRESENT — entry, diagram rows and SVG files match'
+        if 'entry' in payload:
+            if current is not None:
+                return 'CONFLICT — an entry with this canonical name already exists'
+            try:
+                check_target(db, payload['entry'])
+            except ValueError as error:
+                return 'BLOCKED — ' + str(error)
+            verdict = 'NO DUPLICATE FOUND — eligible for further review'
+        else:
+            if current != payload['expected']:
+                return 'CONFLICT — snapshot differs from expected entry'
+            if _row_set(stored) != _row_set(payload['expected_diagrams']):
+                return 'CONFLICT — stored diagram rows differ from the reviewed ones'
+            verdict = 'EXPECTED TEXT MATCHES — eligible for further review'
+    kept = sorted(svg_name(h) for h, state in states.items() if state == 'kept')
+    if kept:
+        verdict += '; the server already has a different valid SVG for ' + ', '.join(kept) + ', which will be kept'
+    return verdict
+
+
+def _write_journal(path, journal):
+    temporary = path.with_name(path.name + '.tmp')
+    temporary.write_text(json.dumps(journal, indent=2), encoding='utf-8')
+    os.replace(temporary, path)
+
+
+def _backup(database, backup_dir):
+    backup = Path(backup_dir) / ('before-diagram-publish-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+                                 + '-' + uuid.uuid4().hex[:8] + '.db')
+    with backup.open('xb'):
+        pass
+    with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True)) as source, \
+            closing(sqlite3.connect(backup)) as destination:
+        source.backup(destination)
+        if destination.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+            raise ValueError('Backup failed integrity check.')
+    return backup
+
+
+def apply(database, payload, files, backup_dir, source_dir, diagram_dir, package_sha256):
+    """Publish one diagram package: files first, then every row in one transaction.
+
+    A journal in backup_dir/diagram-publish/<package sha256>.json records each
+    step. An interrupted run leaves only unused hash-named SVGs (and possibly a
+    backup); running the same package again skips files already in place.
+    Existing files are never replaced or deleted.
+    """
+    entry, rows = diagram_intended(payload, source_dir)
+    if not re.fullmatch(r'[0-9a-f]{64}', package_sha256 or ''):
+        raise ValueError('Invalid package checksum.')
+    for record in payload['diagrams']:
+        data = files.get(record['source_hash'])
+        if not isinstance(data, bytes) or hashlib.sha256(data).hexdigest() != record['sha256']:
+            raise ValueError(svg_name(record['source_hash']) + ' does not match its checksum.')
+        check_svg(data)
+    canonical = payload['canonical_name']
+    outcome = status(database, diagram_dir, payload, files, source_dir)
+    if outcome.startswith('ALREADY PRESENT'):
+        return dict(status='ALREADY_PRESENT', canonical=canonical, backup=None)
+    if not outcome.startswith(ELIGIBLE):
+        raise ValueError(outcome)
+    diagram_dir, backup_dir = Path(diagram_dir), Path(backup_dir)
+    journals = backup_dir / JOURNALS
+    journals.mkdir(parents=True, exist_ok=True)
+    journal_path = journals / (package_sha256 + '.json')
+    if journal_path.exists():
+        journal = json.loads(journal_path.read_text(encoding='utf-8'))
+        if journal.get('canonical') != canonical:
+            raise ValueError('Journal belongs to a different entry. Nothing changed.')
+    else:
+        # pre_existing is recorded once, so a retry still knows which files this package created.
+        journal = dict(package_sha256=package_sha256, canonical=canonical,
+                       started_utc=datetime.now(timezone.utc).isoformat(), backup=None,
+                       files={svg_name(r['source_hash']): dict(sha256=r['sha256'],
+                                                               pre_existing=file_state(diagram_dir, r) != 'missing',
+                                                               state='planned') for r in payload['diagrams']})
+    journal.update(status='FILES_PENDING', attempt_utc=datetime.now(timezone.utc).isoformat())
+    _write_journal(journal_path, journal)
+    _checkpoint('journal')
+    incoming = diagram_dir.parent / INCOMING / uuid.uuid4().hex
+    try:
+        for record in payload['diagrams']:
+            name = svg_name(record['source_hash'])
+            if file_state(diagram_dir, record) == 'missing':
+                incoming.mkdir(parents=True, exist_ok=True)
+                temporary = incoming / name
+                with temporary.open('xb') as stream:
+                    stream.write(files[record['source_hash']])
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                if hashlib.sha256(temporary.read_bytes()).hexdigest() != record['sha256']:
+                    raise ValueError(name + ' failed verification after writing. Nothing committed.')
+                _checkpoint('incoming:' + name)
+                try:
+                    os.link(temporary, diagram_dir / name)  # Fails rather than replace a file.
+                except FileExistsError:
+                    pass
+            state = file_state(diagram_dir, record)
+            if state not in ('identical', 'kept'):
+                raise ValueError(name + ' could not be placed (' + state + '). Nothing committed.')
+            journal['files'][name]['state'] = 'placed' if state == 'identical' else 'kept_live_copy'
+            _write_journal(journal_path, journal)
+            _checkpoint('placed:' + name)
+    finally:
+        shutil.rmtree(incoming, ignore_errors=True)
+    journal['status'] = 'FILES_PLACED'
+    _write_journal(journal_path, journal)
+    _checkpoint('files')
+    extract_blocks, _ = helpers(source_dir)
+    from services.math.concept_render_service import render_tex_reusing_existing_diagrams
+    with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=rw', uri=True, timeout=10)) as db:
+        db.execute('PRAGMA foreign_keys=ON')
+        db.execute('BEGIN IMMEDIATE')
+        # Repeat every check under the write lock; another writer may have acted since.
+        outcome = status(database, diagram_dir, payload, files, source_dir, connection=db)
+        if outcome.startswith('ALREADY PRESENT'):
+            return dict(status='ALREADY_PRESENT', canonical=canonical, backup=None)
+        if not outcome.startswith(ELIGIBLE):
+            raise ValueError(outcome + '. Nothing committed.')
+        if any(file_state(diagram_dir, r) not in ('identical', 'kept') for r in payload['diagrams']):
+            raise ValueError('A diagram file is missing after placement. Nothing committed.')
+        backup = _backup(database, backup_dir)
+        journal['backup'] = str(backup)
+        _write_journal(journal_path, journal)
+        _checkpoint('backup')
+        now = datetime.now(timezone.utc).isoformat()
+        if 'entry' in payload:
+            ident = insert_entry(db, payload['entry'], '')
+        else:
+            ident = db.execute('SELECT id FROM math_concepts WHERE canonical_name=?', (canonical,)).fetchone()[0]
+            db.execute('UPDATE math_concepts SET cleaned_tex=?, updated_at=? WHERE id=?',
+                       (entry['cleaned_tex'], now, ident))
+            if 'replacement_synonyms' in payload:
+                db.execute('DELETE FROM math_synonyms WHERE concept_id=?', (ident,))
+                db.executemany('INSERT INTO math_synonyms(concept_id,synonym_text) VALUES(?,?)',
+                               [(ident, synonym) for synonym in entry['synonyms']])
+        stale = {r['source_hash'] for r in stored_diagrams(db, canonical)} - {r['source_hash'] for r in rows}
+        db.executemany('DELETE FROM math_concept_diagrams WHERE concept_id=? AND source_hash=?',
+                       [(ident, source_hash) for source_hash in stale])
+        for row in rows:
+            db.execute('INSERT INTO math_concept_diagrams(concept_id, block_index, source_hash, source_tex, svg_path, created_at) '
+                       'VALUES(?,?,?,?,?,?) ON CONFLICT(concept_id, source_hash) DO UPDATE SET '
+                       'block_index=excluded.block_index, source_tex=excluded.source_tex, svg_path=excluded.svg_path',
+                       (ident, row['block_index'], row['source_hash'], row['source_tex'], row['svg_path'],
+                        datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        try:
+            db.execute('DELETE FROM math_concept_diagram_failures WHERE concept_id=?', (ident,))
+        except sqlite3.OperationalError:
+            pass  # Older databases have no failure table.
+        rendered = render_tex_reusing_existing_diagrams(ident, entry['cleaned_tex'], db.cursor())
+        if 'Diagram unavailable' in rendered:
+            raise ValueError('A diagram would show as unavailable. Nothing committed.')
+        db.execute('UPDATE math_concepts SET rendered_tex=? WHERE id=?', (rendered, ident))
+        _checkpoint('rows')
+        if read_snapshot(database, connection=db).get(canonical) != entry or \
+                _row_set(stored_diagrams(db, canonical)) != _row_set(rows):
+            raise ValueError('Verification failed. Nothing committed.')
+        db.commit()
+    journal.update(status='COMMITTED', completed_utc=datetime.now(timezone.utc).isoformat())
+    _write_journal(journal_path, journal)
+    _checkpoint('committed')
+    kept = sorted(name for name, item in journal['files'].items() if item['state'] == 'kept_live_copy')
+    return dict(status='APPLIED', canonical=canonical, backup=str(backup), kept_live_copies=kept)
+
+
+def cleanup(journal_path, database, diagram_dir, remove=False):
+    """List (and with remove=True delete) leftovers of one publish attempt.
+
+    Only files this package created, that no diagram row references and that
+    still hold the package's bytes are listed, plus unfinished incoming
+    folders. Files that existed before the attempt are never touched.
+    """
+    journal_path, diagram_dir = Path(journal_path), Path(diagram_dir)
+    journal = json.loads(journal_path.read_text(encoding='utf-8'))
+    with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True)) as db:
+        referenced = {row[0].rsplit('/', 1)[-1] for row in db.execute('SELECT svg_path FROM math_concept_diagrams')}
+    files = []
+    for name, item in sorted(journal['files'].items()):
+        path = diagram_dir / name
+        if (not item['pre_existing'] and item['state'] == 'placed' and name not in referenced
+                and path.is_file() and not path.is_symlink()
+                and hashlib.sha256(path.read_bytes()).hexdigest() == item['sha256']):
+            files.append(name)
+    incoming = diagram_dir.parent / INCOMING
+    folders = sorted(p.name for p in incoming.iterdir() if p.is_dir() and not p.is_symlink()) if incoming.is_dir() else []
+    if remove:
+        for name in files:
+            (diagram_dir / name).unlink()
+        for name in folders:
+            shutil.rmtree(incoming / name)
+        journal.setdefault('cleaned', []).append(dict(utc=datetime.now(timezone.utc).isoformat(),
+                                                      files=files, incoming=folders))
+        _write_journal(journal_path, journal)
+    return dict(status=journal.get('status'), unused_files=files, incoming_folders=folders, removed=remove)
 
 
 if __name__ == '__main__':

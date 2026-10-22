@@ -109,10 +109,10 @@ check titles against existing synonyms/defined terms. A related concept created
 only locally cannot be assumed to exist on production; publish dependencies in
 an appropriate order and recheck conflicts.
 
-**Scope limit:** the current helper's new-entry publisher supports text/equations,
-not asset transfer or server-side diagram generation. PSTricks, included images,
-TikZ/figure content and other blocked media require a separately reviewed
-publication plan. Do not use a frontend-file upload or replace the live database
+**Scope limit:** the helper publishes new entries with text, equations and PSTricks
+diagrams. Diagrams go through the diagram route, with SVGs rendered on your laptop,
+never on the server. Included images, TikZ/figure content and other blocked media
+require a separately reviewed publication plan. Do not use a frontend-file upload or replace the live database
 to bypass that limit. A diagram working locally does not establish publishability.
 
 Git commit/push does not publish database entries. Do not add working databases to
@@ -186,7 +186,10 @@ there is currently no reviewed helper publication path for it.
 Content and synonym edits to existing entries are allowed when every diagram,
 image and embed stays byte-identical and each PSTricks diagram already has a
 stored SVG. Missing classifications or types and duplicate unchanged metadata do
-not block them. Edits that add, remove or change a diagram or image are refused.
+not block them. Edits that add, remove or change an image or embed are refused.
+Edits that change PSTricks diagrams, and entries whose diagrams have no stored
+SVG, go through the diagram route: option 19 renders the SVGs on your laptop, and
+options 2 to 5 publish them with the entry.
 Option 1 marks refused edits `[unsupported]` and gives the reason. See
 [Entries the helper cannot publish](../../administration/deployment/CONTENT_SYNC.md#entries-the-helper-cannot-publish)
 for the rules and for which of those edits production-first can and cannot cover.
@@ -200,18 +203,15 @@ and assume the refresh will merge it. This route is confirmed from the editor,
 update route and metadata service, not a live write test. If local-first review is
 required, defer the edit until a metadata publisher is implemented. This
 metadata-only route does not extend to edits that change or add diagrams or
-images; those have no supported route yet.
+images. Publish diagram changes through the diagram route from your local copy;
+image files still have no supported route.
 
-**Diagram publication remains an open workflow, not a ready-to-run procedure.**
-Before publishing an entry that needs new diagram assets, define and review:
-
-- The exact source, generated assets, URLs and required rendering tools.
-- How assets and the entry will be backed up, transferred and verified together.
-- How failed or partial publication will be recovered without replacing the database.
-- How those assets return to the local workspace; option 8 does not fetch them.
-
-Neither Git push nor the current text-only publisher completes that plan. Keep
-such work local until a specific supported publication procedure is established.
+**Diagram publication** works for PSTricks (`pspicture` and `\pstree`). The SVGs
+are rendered on your laptop, checked, and published with the entry. The server
+places the files before any row changes, keeps a journal, and never runs LaTeX.
+See [Publish a diagram change](../../administration/deployment/CONTENT_SYNC.md#publish-a-diagram-change)
+for the steps, interruption recovery and cleanup. `\includegraphics` images,
+TikZ and other media still have no publication route.
 
 ## Migration scripts (historical bulk route)
 
