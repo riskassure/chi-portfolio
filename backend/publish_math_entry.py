@@ -57,13 +57,31 @@ def _group_end(tex, start):
     return len(tex)
 
 
+def _tag_end(tex, start):
+    """Return the index after the HTML tag opening at start; a '>' inside a quoted attribute does not end it."""
+    quote = None
+    for position in range(start, len(tex)):
+        if quote:
+            quote = None if tex[position] == quote else quote
+        elif tex[position] in '"\'':
+            quote = tex[position]
+        elif tex[position] == '>':
+            return position + 1
+    return len(tex)
+
+
+# Whitespace or TeX comments between a command and its arguments.
+_GAP = r'(?:\s|%[^\n]*(?:\n|$))*'
+
+
 def media_fragments(tex):
     """Return every diagram, image or embed in tex, in source order, as exact source text.
 
     Existing-entry text patches may only change the prose around these, so
     two versions are compatible exactly when this returns equal lists. Each
-    fragment runs to the matching end of its environment, tag or brace groups,
-    so an edit inside a diagram changes the fragment.
+    fragment runs to the matching end of its environment, element or command
+    arguments, so an edit inside a diagram changes the fragment. When in doubt
+    a fragment runs longer, which only makes the check stricter.
     """
     fragments, end = [], 0
     for match in MEDIA_RE.finditer(tex):
@@ -73,28 +91,39 @@ def media_fragments(tex):
         environment = re.fullmatch(r'\\begin\s*\{([^}]*)\}', token)
         tag = re.fullmatch(r'<\s*(\w+)', token)
         if environment:
-            name = re.escape(environment.group(1))
-            depth, end = 0, len(tex)
-            for edge in re.finditer(r'\\(begin|end)\s*\{' + name + r'\}', tex[match.start():], re.I):
-                depth += 1 if edge.group(1) == 'begin' else -1
-                if not depth:
-                    end = match.start() + edge.end()
-                    break
-        elif tag and tag.group(1).lower() != 'img':
-            close = re.compile(r'</\s*' + tag.group(1) + r'\s*>', re.I).search(tex, match.end())
-            end = close.end() if close else len(tex)
+            end = _matching_end(tex, match.start(), r'\\begin\s*\{' + re.escape(environment.group(1)) + r'\}',
+                                r'\\end\s*\{' + re.escape(environment.group(1)) + r'\}')
         elif tag:
-            close = tex.find('>', match.end())
-            end = close + 1 if close >= 0 else len(tex)
+            end = _tag_end(tex, match.end())
+            if tag.group(1).lower() != 'img' and not tex[:end].endswith('/>'):
+                name = re.escape(tag.group(1))
+                end = _matching_end(tex, match.start(), r'<\s*' + name + r'\b', r'</\s*' + name + r'\s*>')
+        elif token.lower() == '\\pspicture':
+            # Plain TeX form: \\pspicture(...)...\\endpspicture.
+            close = re.compile(r'\\endpspicture\b', re.I).search(tex, match.end())
+            end = close.end() if close else len(tex)
         elif token.startswith('\\'):
-            end = match.end()
+            end = re.compile(r'\*?').match(tex, match.end()).end()  # Starred form, e.g. \\includegraphics*.
             # Include the command's [options] and {arguments}, e.g. a whole \\pstree.
-            while (group := re.compile(r'\s*([\[{])').match(tex, end)):
+            while (group := re.compile(_GAP + r'([\[{])').match(tex, end)):
                 end = _group_end(tex, group.end() - 1)
+            if end == match.end() or tex[match.end():end] == '*':
+                # No braced argument, e.g. \\input file.tex: take the next word.
+                end = re.compile(_GAP + r'[^\s{}\[\]\\]*').match(tex, end).end()
         else:
             end = re.compile(r'[^\s"\'<>)]*').match(tex, match.end()).end()
         fragments.append(tex[match.start():end])
     return fragments
+
+
+def _matching_end(tex, start, opening, closing):
+    """Return the index after the closing pattern that balances the opening at start (or the text end)."""
+    depth = 0
+    for edge in re.finditer('(' + opening + ')|' + closing, tex[start:], re.I):
+        depth += 1 if edge.group(1) else -1
+        if not depth:
+            return start + edge.end()
+    return len(tex)
 
 
 def check_target(db, entry):
