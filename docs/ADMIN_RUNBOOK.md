@@ -62,6 +62,7 @@ preview: the helper explicitly selects a working copy.
 | Change | Preparation option |
 | --- | --- |
 | Supported math changes | **1** lists math changes; **2** prepares one |
+| Math entry with new, changed or missing PSTricks diagrams | **19** renders missing SVGs on this computer, then **1** and **2**; see [Publish a diagram change](administration/deployment/CONTENT_SYNC.md#publish-a-diagram-change) |
 | Biography or resume text | **9** |
 | Import Google Photos locally | **10** opens the local import screen; import alone does not publish |
 | New local photo | **11** |

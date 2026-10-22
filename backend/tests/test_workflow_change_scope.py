@@ -68,7 +68,9 @@ class ChangeScopeTests(unittest.TestCase):
         self.assertIsNone(changes['Stored']['reason'])
         self.assertIsNone(changes['Image']['reason'])
         self.assertIn('no stored SVG', changes['NoSvg']['reason'])
-        self.assertIn('changes a diagram, image or embed', changes['Changed']['reason'])
+        # A changed diagram now takes the diagram route, which needs its new SVG rendered first.
+        self.assertTrue(changes['Changed']['diagrams'])
+        self.assertIn('choose 19 to render them', changes['Changed']['reason'])
 
     def test_missing_classification_and_duplicate_metadata_no_longer_block(self):
         changes = self.scan({'Percentile': entry(classifications=[]),

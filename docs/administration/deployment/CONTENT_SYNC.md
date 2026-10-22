@@ -295,8 +295,9 @@ Option 1 only reports; it changes nothing. The publication safeguards in options
 |---|---|
 | `deleted locally` | Deletions are not supported. |
 | `changes <fields>` | Only content (`cleaned_tex`) and synonyms of an existing entry can be published. Title, classification, type, definition, link-exclusion and related-concept changes have no helper route. |
-| `local version ...` | Your edit itself would fail: empty content, a duplicate or untrimmed synonym, or a diagram, image or embed that was added, removed or changed. |
-| `has N diagram(s) with no stored SVG` | The entry's PSTricks diagrams have no generated SVG in your working database, so the page would show "[Diagram unavailable]". Rebuilding diagrams has no helper route yet. |
+| `local version ...` | Your edit itself would fail: empty content, a duplicate or untrimmed synonym, or an image or embed that was added, removed or changed. |
+| `has N diagram(s) with no stored SVG` | The entry's PSTricks diagrams have no generated SVG in your working database, so the page would show "[Diagram unavailable]". Choose **19** to render them; option 2 then publishes them with the text (see [Publish a diagram change](#publish-a-diagram-change)). |
+| `has diagrams with no rendered SVG` | A changed or new diagram has no SVG in your working copy yet. Choose **19**, then **1** again. |
 | `new entry ...` | A new entry fails the new-entry checks (slug, classification, type, media). |
 
 **Existing entries** are checked only on what the edit changes
@@ -309,7 +310,9 @@ Option 1 only reports; it changes nothing. The publication safeguards in options
   `\includegraphics`, `\input`, `\include`, `figure` and `tikzpicture`
   environments (including their captions), `<img>`, `<svg>`, `<script>`,
   `<iframe>` and `/api/math/diagrams/` references. The prose around them can
-  change freely.
+  change freely. A changed PSTricks diagram takes the diagram route instead
+  (see [Publish a diagram change](#publish-a-diagram-change)), where the same rule
+  holds for everything except the PSTricks blocks.
 - Each PSTricks diagram must already have a stored SVG. Option 1/2 check the
   working database and the live publisher checks the live database again before
   taking its backup. The text update reuses stored SVGs and never runs LaTeX.
@@ -321,7 +324,8 @@ Option 1 only reports; it changes nothing. The publication safeguards in options
 
 **New entries** still go through `publish_math_entry.validate`, which rejects:
 
-- **Diagrams or media in the body** (any of the items listed above).
+- **Diagrams or media in the body** (any of the items listed above). PSTricks
+  diagrams are allowed through the diagram route; other media are not.
 - **No MSC classification or no document type.**
 - **Synonyms, defined terms, link exclusions or related concepts with a
   duplicate or a value with leading/trailing spaces.** Synonyms that differ only
@@ -334,7 +338,8 @@ and synonym fixes now work for the 16 entries without a classification or type
 or with duplicate metadata, and for diagram entries whose diagrams are untouched
 and have stored SVGs. Entries such as `deduction`,
 `derivations-in-natural-deduction` and `rooted-tree` contain `\pstree` with no
-stored SVG and remain blocked. Option 1 is the source of truth for any entry you
+stored SVG; option 19 renders them and option 2 publishes them through the
+diagram route. Option 1 is the source of truth for any entry you
 have edited.
 
 **Production-first is not a universal workaround.** Editing on the live site
@@ -352,7 +357,8 @@ and then bringing the change home with option 8 is reasonable only for:
 It is **not** a route for any change inside a PSTricks block, a new diagram, or new
 or changed image files. The live editor would render diagrams on the server, and
 server-side LaTeX/dvisvgm support is unverified; nothing transfers image files.
-Those edits have no supported publication route yet, so keep them local. The
+Publish PSTricks changes through the diagram route instead; new or changed image
+files still have no supported route, so keep those local. The
 production-first behavior above comes from reading the editor and update routes,
 not from a live test.
 
@@ -379,43 +385,80 @@ The editor renders inside its database transaction and writes straight to the
 final SVG name. Diagram publication through the helper is planned separately,
 with SVGs rendered on the laptop.
 
-### Prepare a diagram change (laptop side; publishing not yet available)
+### Publish a diagram change
 
-`backend/diagram_sync.py` is the laptop half of diagram publishing. Until the
-server half is merged, its packages can be built and reviewed but not staged or
-published.
+PSTricks diagrams (`pspicture`, with any `\psset` just before it, and top-level
+`\pstree`) are rendered **on this computer**, never on the server. Their SVGs
+travel in the package with the entry. This covers:
+- an existing entry whose diagrams changed, with or without content or synonym
+  edits;
+- a new entry with diagrams;
+- an entry whose diagrams have no stored SVG, such as `deduction`,
+  `derivations-in-natural-deduction` and `rooted-tree`.
 
-Use `render-missing` for an entry whose diagrams have no stored SVG in the
-working copy, such as `rooted-tree`. Re-saving such an entry in the local editor
-does not render them.
+`\includegraphics`, `figure`, `tikzpicture`, `<img>` and other media must still
+stay exactly as they are.
+
+1. Edit and save the entry in the local editor. The editor renders a diagram
+   only when its source changed. For diagrams that are still missing (option 1
+   says to choose 19), choose **19** and give the canonical name. Option 19
+   renders each missing diagram with LaTeX and dvisvgm in a throwaway folder,
+   checks the SVG, then links it into `backend/data/math/diagrams/` without
+   replacing any file. It then stores the diagram rows and page in the working
+   copy. Valid existing SVGs are reused. An unusable same-named file stops it
+   and is left for you to remove. Check the page on the local server.
+2. Option **1** lists the entry with `diagrams` among its changes. Option **2**
+   builds the package: `diagrams.json` plus one `svg/<hash>.svg` per diagram.
+   Every SVG must be well-formed and contain no scripts, event handlers or
+   outside links. The review lists diagrams added, kept and removed.
+3. Options **3**, **4** and **5** stage, check and publish as usual. The live
+   check reads each target SVG on the server. It also confirms that the live
+   entry and its diagram rows still match what you prepared.
+
+On the server, the publisher places the files before it changes any row:
+1. It writes a journal, `~/backups/diagram-publish/<package SHA-256>.json`.
+2. It writes each SVG into `backend/data/math/diagrams-incoming/` (never served),
+   checks its SHA-256, then links it into the diagrams folder. A link never
+   replaces a file.
+3. Only after every file checks out does it take the usual verified database
+   backup. Then, in one transaction, it updates the entry and replaces that
+   entry's diagram rows. The page is rebuilt from the stored SVGs, without LaTeX.
+
+A file already on the server under the same name with **different** bytes is a
+rendering of the same diagram source (names come from the source). If it is a
+valid SVG it is kept and reported. If it is not, the check stops and nothing is
+written. Old SVGs from replaced diagrams stay on disk, because another entry may
+use the same source.
+
+**If a publish is interrupted,** the database is unchanged unless the commit
+finished. Any file already placed is complete and simply unused. Run option
+**4** again: it reports either `EXPECTED TEXT MATCHES` (publish the same package
+again with **5**; placed files are skipped) or `ALREADY PRESENT` (the commit
+finished).
+
+To clean up after a publish you abandon, or after restoring the database from
+the journal's backup, list the journals and then the leftovers of one publish.
+Neither command changes anything without `--apply`:
 
 ```powershell
-.\.venv313\Scripts\python.exe backend/diagram_sync.py render-missing --db <working.db> --canonical RootedTree
+.\.venv313\Scripts\python.exe backend/diagram_recovery.py
+.\.venv313\Scripts\python.exe backend/diagram_recovery.py --package <package SHA-256>
+.\.venv313\Scripts\python.exe backend/diagram_recovery.py --package <package SHA-256> --apply
 ```
 
-It renders each missing diagram with LaTeX and dvisvgm on this computer, in a
-throwaway folder. Each SVG is checked, then linked into
-`backend/data/math/diagrams/` without replacing any existing file. The command
-then stores the diagram rows and rebuilds the page in the working copy. Valid
-existing SVGs are reused. An unusable file with the same name stops the command
-and is left for you to remove.
+It removes only SVGs that this publish created, that no diagram row references
+and that still hold the published bytes, plus unfinished incoming folders. To
+undo a committed publish, restore the journal's `backup` the way
+[Backup and recovery](../backups/BACKUP_RECOVERY.md) describes, then run the
+cleanup.
 
-`prepare` builds a review package from the baseline and working copy: one
-`diagrams.json` plus an `svg/<hash>.svg` per diagram.
+The same commands work from the command line: `backend/diagram_sync.py
+render-missing --db <working.db> --canonical <name>` and `backend/diagram_sync.py
+prepare --base <base.db> --local <working.db> --canonical <name> --output <zip>`.
 
-```powershell
-.\.venv313\Scripts\python.exe backend/diagram_sync.py prepare --base <base.db> --local <working.db> --canonical RootedTree --output dist\rooted-tree.zip
-```
-
-It refuses in these cases:
-- a diagram has no matching row or valid SVG;
-- the text still has rows it no longer uses;
-- an image or embed changed;
-- metadata other than content or synonyms changed;
-- no diagram actually changed (use option 2 for text-only edits).
-
-Every SVG must be well-formed and must not contain scripts, event handlers or
-outside links.
+Until option 8 learns to compare diagram rows by content (next change), it stops
+after a diagram publish with "File-backed content changed". Your working copy is
+not affected.
 
 ## Upload a reviewed package through the API
 

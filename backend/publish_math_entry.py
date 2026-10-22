@@ -139,6 +139,25 @@ def check_target(db, entry):
                 raise ValueError(f'Missing live {key}: {value}')
 
 
+def insert_entry(db, entry, rendered):
+    """Insert one checked new entry and its metadata in the caller's transaction; return its id."""
+    now=datetime.now(timezone.utc).isoformat()
+    cursor=db.execute('INSERT INTO math_concepts(canonical_name,slug,title,owner,cleaned_tex,is_cleaned,rendered_tex,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',
+                      tuple(entry[k] for k in ('canonical_name','slug','title','owner','cleaned_tex','is_cleaned'))+(rendered,now,now))
+    ident=cursor.lastrowid
+    for key,table,lookup,column,fk in [('classifications','math_concept_classifications','math_classifications','code','classification_id'),('types','math_concept_types','math_types','type_name','type_id')]:
+        for value in entry[key]:
+            target=db.execute(f'SELECT id FROM {lookup} WHERE {column}=?',(value,)).fetchone()[0]
+            db.execute(f'INSERT INTO {table}(concept_id,{fk}) VALUES(?,?)',(ident,target))
+    for key,table,column in [('synonyms','math_synonyms','synonym_text'),('definitions','math_definitions','defined_term'),('link_exclusions','math_link_exclusions','word')]:
+        for value in entry[key]:
+            db.execute(f'INSERT INTO {table}(concept_id,{column}) VALUES(?,?)',(ident,value))
+    for value in entry['related_concepts']:
+        target=db.execute('SELECT id FROM math_concepts WHERE canonical_name=?',(value,)).fetchone()[0]
+        db.execute('INSERT INTO math_related_concepts(concept_id,related_canonical_name,related_concept_id) VALUES(?,?,?)',(ident,value,target))
+    return ident
+
+
 def apply(database, entry, backup_dir, source_dir):
     validate(entry)
     sys.path.insert(0,str(source_dir.resolve()))
@@ -158,20 +177,7 @@ def apply(database, entry, backup_dir, source_dir):
                 src.backup(dst)
                 if dst.execute('PRAGMA integrity_check').fetchone()[0]!='ok':
                     raise ValueError('Backup failed verification.')
-        now=datetime.now(timezone.utc).isoformat()
-        cursor=db.execute('INSERT INTO math_concepts(canonical_name,slug,title,owner,cleaned_tex,is_cleaned,rendered_tex,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',
-                          tuple(entry[k] for k in ('canonical_name','slug','title','owner','cleaned_tex','is_cleaned'))+(rendered,now,now))
-        ident=cursor.lastrowid
-        for key,table,lookup,column,fk in [('classifications','math_concept_classifications','math_classifications','code','classification_id'),('types','math_concept_types','math_types','type_name','type_id')]:
-            for value in entry[key]:
-                target=db.execute(f'SELECT id FROM {lookup} WHERE {column}=?',(value,)).fetchone()[0]
-                db.execute(f'INSERT INTO {table}(concept_id,{fk}) VALUES(?,?)',(ident,target))
-        for key,table,column in [('synonyms','math_synonyms','synonym_text'),('definitions','math_definitions','defined_term'),('link_exclusions','math_link_exclusions','word')]:
-            for value in entry[key]:
-                db.execute(f'INSERT INTO {table}(concept_id,{column}) VALUES(?,?)',(ident,value))
-        for value in entry['related_concepts']:
-            target=db.execute('SELECT id FROM math_concepts WHERE canonical_name=?',(value,)).fetchone()[0]
-            db.execute('INSERT INTO math_related_concepts(concept_id,related_canonical_name,related_concept_id) VALUES(?,?,?)',(ident,value,target))
+        insert_entry(db,entry,rendered)
         actual=read_snapshot(database,connection=db)[entry['canonical_name']]
         intended={k:sorted(v) if isinstance(v,list) else v for k,v in entry.items() if k!='canonical_name'}
         if actual!=intended:
