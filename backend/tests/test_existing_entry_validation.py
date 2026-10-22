@@ -90,6 +90,26 @@ class PatchRuleTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'Diagram or image changed'):
                     patch_intended(payload(stored(cleaned_tex=old), new))
 
+    def test_image_changes_hidden_by_unusual_syntax_are_refused(self):
+        cases = [('starred command', '\\includegraphics*{old.png}', '\\includegraphics*{new.png}'),
+                 ('starred with options', '\\includegraphics*[width=2cm]{old.png}', '\\includegraphics*[width=2cm]{new.png}'),
+                 ('quoted > in attribute', '<img alt="a > b" src="old.png">', '<img alt="a > b" src="new.png">'),
+                 ("single-quoted '>'", "<img alt='>' src='old.png'>", "<img alt='>' src='new.png'>"),
+                 ('self-closing svg', '<svg width="1"/> <img src="old.png">', '<svg width="1"/> <img src="new.png">'),
+                 ('nested svg', '<svg><svg>a</svg><circle r="1"/></svg>', '<svg><svg>a</svg><circle r="2"/></svg>'),
+                 ('plain TeX pspicture', '\\pspicture(0,0)(1,1)\\psline(0,0)(1,1)\\endpspicture',
+                  '\\pspicture(0,0)(1,1)\\psline(0,0)(1,0)\\endpspicture'),
+                 ('bare \\input', '\\input old.tex', '\\input new.tex'),
+                 ('comment before argument', '\\includegraphics%\n{old.png}', '\\includegraphics%\n{new.png}')]
+        for name, old, new in cases:
+            with self.subTest(name):
+                expected = stored(cleaned_tex='Before. ' + old + ' After.')
+                with self.assertRaisesRegex(ValueError, 'Diagram or image changed'):
+                    patch_intended(payload(expected, 'Before. ' + new + ' After.'))
+                # The prose around the same fragment can still change.
+                self.assertEqual(patch_intended(payload(expected, 'Edited. ' + old + ' After.'))['cleaned_tex'],
+                                 'Edited. ' + old + ' After.')
+
     def test_empty_content_and_malformed_records_are_refused(self):
         for bad in (payload(stored(), '   '), payload(stored(), None), payload({'title': 'x'}, 'Text.'),
                     payload(stored(types=None), 'Text.'), dict(payload(stored(), 'Text.'), title='x')):
