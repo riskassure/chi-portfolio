@@ -9,7 +9,7 @@ import zipfile
 import sqlite3
 
 from preview_math_sync import read_snapshot
-from prepare_math_patch import prepare
+from prepare_math_patch import local_missing_svgs, prepare
 from publish_math_entry import validate as validate_entry
 from inspect_staged_package import preview
 from stage_pythonanywhere_package import stage, read_package
@@ -59,6 +59,11 @@ def explain_rejection(entry, message):
     """Turn a publisher validation message into a reason a person can act on."""
     if message.startswith('Media/diagrams'):
         return 'contains diagrams or images (for example \\includegraphics, figure, pspicture or \\pstree)'
+    if message.startswith('Diagram or image changed'):
+        return ('adds, removes or changes a diagram, image or embed; only the text around them can change, '
+                'and diagram publishing is not supported yet')
+    if message.startswith('Missing text field: cleaned_tex'):
+        return 'has empty content'
     if message.startswith('Include classification'):
         missing = [label for key, label in (('classifications', 'MSC classification'), ('types', 'document type'))
                    if not entry.get(key)]
@@ -77,11 +82,13 @@ def explain_rejection(entry, message):
     return message.rstrip('.')
 
 
-def publish_blocker(name, baseline, working):
+def publish_blocker(name, baseline, working, working_db=None):
     """Return why options 2-5 cannot publish this change, or None when they can.
 
     This runs the same validation as option 2, so option 1 can report the
-    problem before anything is prepared.
+    problem before anything is prepared. New entries must meet every new-entry
+    rule; existing entries are checked only on what the change touches.
+    working_db, when given, is checked for stored diagram SVGs as option 2 does.
     """
     if name not in working:
         return 'deleted locally; deletions are not supported'
@@ -92,16 +99,10 @@ def publish_blocker(name, baseline, working):
         except ValueError as error:
             return 'new entry ' + explain_rejection(entry, str(error))
         return None
-    expected = dict(baseline[name], canonical_name=name)
     fields = {key for key in working[name] if working[name][key] != baseline[name][key]}
     if fields - {'cleaned_tex', 'synonyms'}:
         return ('changes ' + ', '.join(sorted(fields - {'cleaned_tex', 'synonyms'})) +
                 '; only content and synonym changes can be published')
-    try:
-        validate_entry(expected)
-    except ValueError as error:
-        return ('baseline (live) entry ' + explain_rejection(expected, str(error)) +
-                ', so the helper cannot patch it')
     payload = dict(canonical_name=name, expected=baseline[name], replacement_tex=working[name]['cleaned_tex'])
     if 'synonyms' in fields:
         payload['replacement_synonyms'] = working[name]['synonyms']
@@ -109,6 +110,10 @@ def publish_blocker(name, baseline, working):
         patch_intended(payload)
     except ValueError as error:
         return 'local version ' + explain_rejection(entry, str(error))
+    missing = working_db and local_missing_svgs(working_db, name, working[name]['cleaned_tex'])
+    if missing:
+        return (f'has {missing} diagram(s) with no stored SVG, so the page would show '
+                '"[Diagram unavailable]"; rebuilding diagrams is not supported yet')
     return None
 
 
@@ -122,7 +127,7 @@ def changed_entries(state):
             continue
         fields = ([key for key in working[name] if working[name][key] != baseline[name][key]]
                   if name in baseline and name in working else [])
-        reason = publish_blocker(name, baseline, working)
+        reason = publish_blocker(name, baseline, working, state['working'])
         changes.append(dict(canonical=name, title=working.get(name, baseline.get(name))['title'],
                             fields=fields, supported=reason is None, reason=reason, new=name not in baseline))
     return changes

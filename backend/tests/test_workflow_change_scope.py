@@ -1,4 +1,6 @@
+from contextlib import closing
 from pathlib import Path
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -7,6 +9,9 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import website_workflow as helper
 import prepare_math_patch
+from services.math.render_helper import extract_all_pstricks_diagram_blocks
+
+PICTURE = '\\begin{pspicture}(0,0)(1,1)\\end{pspicture}'
 
 
 def entry(**changes):
@@ -20,12 +25,26 @@ def entry(**changes):
 class ChangeScopeTests(unittest.TestCase):
     """Option 1 must report the same scope that option 2 enforces, with a reason."""
 
-    def scan(self, baseline, working):
+    def working_db(self, folder, svgs):
+        """A working database holding only stored diagram SVGs: {canonical: tex whose diagrams have SVGs}."""
+        path = Path(folder)/'working.db'
+        with closing(sqlite3.connect(path)) as db:
+            db.execute('CREATE TABLE math_concepts(id INTEGER PRIMARY KEY, canonical_name TEXT)')
+            db.execute('CREATE TABLE math_concept_diagrams(concept_id INTEGER, source_hash TEXT, svg_path TEXT)')
+            for ident, (name, tex) in enumerate(svgs.items(), 1):
+                db.execute('INSERT INTO math_concepts VALUES(?, ?)', (ident, name))
+                for block in extract_all_pstricks_diagram_blocks(tex):
+                    db.execute("INSERT INTO math_concept_diagrams VALUES(?, ?, 'd.svg')", (ident, block['source_hash']))
+            db.commit()
+        return str(path)
+
+    def scan(self, baseline, working, svgs=None):
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp)/'base.db'
             base.write_bytes(b'baseline')
-            state = dict(base=str(base), base_sha256=helper.digest(base), working='working.db')
-            snapshots = {str(base): baseline, 'working.db': working}
+            local = self.working_db(temp, svgs or {})
+            state = dict(base=str(base), base_sha256=helper.digest(base), working=local)
+            snapshots = {str(base): baseline, local: working}
             with patch.object(helper, 'read_snapshot', side_effect=lambda path: snapshots[str(path)]):
                 return {item['canonical']: item for item in helper.changed_entries(state)}
 
@@ -37,30 +56,36 @@ class ChangeScopeTests(unittest.TestCase):
         self.assertIsNone(changes['MetricSpace']['reason'])
         self.assertTrue(changes['NormedSpace']['supported'])
 
-    def test_existing_diagram_entry_is_flagged_before_option_2(self):
-        tex = 'See the figure.\n\\begin{pspicture}(0,0)(1,1)\\end{pspicture}'
-        changes = self.scan({'VennDiagram': entry(cleaned_tex=tex)},
-                            {'VennDiagram': entry(cleaned_tex=tex + '\nMore text.')})
-        item = changes['VennDiagram']
-        self.assertFalse(item['supported'])
-        self.assertIn('baseline (live) entry contains diagrams or images', item['reason'])
+    def test_existing_diagram_entry_is_editable_only_around_stored_diagrams(self):
+        tex = 'See the figure.\n' + PICTURE
+        baseline = {'Stored': entry(cleaned_tex=tex), 'NoSvg': entry(cleaned_tex=tex), 'Changed': entry(cleaned_tex=tex),
+                    'Image': entry(cleaned_tex='\\includegraphics{x.png}')}
+        working = {'Stored': entry(cleaned_tex='Edited. ' + tex), 'NoSvg': entry(cleaned_tex='Edited. ' + tex),
+                   'Changed': entry(cleaned_tex=tex.replace('(1,1)', '(2,2)')),
+                   'Image': entry(cleaned_tex='Edited. \\includegraphics{x.png}')}
+        changes = self.scan(baseline, working, svgs={'Stored': tex, 'Changed': tex})
+        self.assertIsNone(changes['Stored']['reason'])
+        self.assertIsNone(changes['Image']['reason'])
+        self.assertIn('no stored SVG', changes['NoSvg']['reason'])
+        self.assertIn('changes a diagram, image or embed', changes['Changed']['reason'])
 
-    def test_missing_classification_and_duplicate_metadata_are_named(self):
+    def test_missing_classification_and_duplicate_metadata_no_longer_block(self):
         changes = self.scan({'Percentile': entry(classifications=[]),
                              'Hypergroup': entry(definitions=['absolute identity', 'absolute identity'])},
                             {'Percentile': entry(classifications=[], cleaned_tex='Edited.'),
                              'Hypergroup': entry(definitions=['absolute identity', 'absolute identity'],
                                                  cleaned_tex='Edited.')})
-        self.assertIn('has no MSC classification', changes['Percentile']['reason'])
-        self.assertIn("definitions has duplicate or untrimmed values: 'absolute identity'",
-                      changes['Hypergroup']['reason'])
+        self.assertTrue(changes['Percentile']['supported'])
+        self.assertTrue(changes['Hypergroup']['supported'])
 
     def test_local_edit_that_adds_media_or_bad_synonyms_is_flagged(self):
-        changes = self.scan({'A': entry(), 'B': entry()},
+        changes = self.scan({'A': entry(), 'B': entry(), 'C': entry()},
                             {'A': entry(cleaned_tex='Text \\includegraphics{x.png}'),
-                             'B': entry(synonyms=['Distance space', 'distance space'])})
-        self.assertTrue(changes['A']['reason'].startswith('local version contains diagrams or images'))
+                             'B': entry(synonyms=['Distance space', 'distance space']),
+                             'C': entry(cleaned_tex=' ')})
+        self.assertTrue(changes['A']['reason'].startswith('local version adds, removes or changes a diagram'))
         self.assertIn('differs only in capitalization', changes['B']['reason'])
+        self.assertEqual(changes['C']['reason'], 'local version has empty content')
 
     def test_other_field_changes_deletions_and_bad_new_entries(self):
         changes = self.scan({'A': entry(), 'Gone': entry()},
@@ -72,42 +97,49 @@ class ChangeScopeTests(unittest.TestCase):
 
     def test_option_2_refuses_with_the_same_reason(self):
         candidate = dict(canonical='Deduction', supported=False, new=False,
-                         reason='baseline (live) entry contains diagrams or images')
+                         reason='has 1 diagram(s) with no stored SVG')
         with patch.object(helper, 'changed_entries', return_value=[candidate]):
-            with self.assertRaisesRegex(ValueError, 'baseline \\(live\\) entry contains diagrams'):
+            with self.assertRaisesRegex(ValueError, 'has 1 diagram\\(s\\) with no stored SVG'):
                 helper.prepare_selected({}, 'Deduction')
 
     def test_option_1_agrees_with_the_option_2_preparers(self):
-        pstricks = '\\begin{pspicture}(0,0)(1,1)\\end{pspicture}'
-        baseline = {'Text': entry(), 'Diagram': entry(cleaned_tex=pstricks), 'Unclassified': entry(classifications=[]),
+        baseline = {'Text': entry(), 'Diagram': entry(cleaned_tex=PICTURE), 'NoSvg': entry(cleaned_tex=PICTURE),
+                    'ChangedDiagram': entry(cleaned_tex=PICTURE), 'Unclassified': entry(classifications=[]),
                     'Untyped': entry(types=[]), 'Duplicate': entry(synonyms=['ring', 'ring']),
-                    'Synonyms': entry(), 'CaseSynonyms': entry(), 'AddsImage': entry()}
-        working = {'Text': entry(cleaned_tex='Edited.'), 'Diagram': entry(cleaned_tex=pstricks + ' Edited.'),
+                    'Synonyms': entry(), 'CaseSynonyms': entry(), 'AddsImage': entry(), 'Empty': entry()}
+        working = {'Text': entry(cleaned_tex='Edited.'), 'Diagram': entry(cleaned_tex=PICTURE + ' Edited.'),
+                   'NoSvg': entry(cleaned_tex=PICTURE + ' Edited.'),
+                   'ChangedDiagram': entry(cleaned_tex=PICTURE.replace('(1,1)', '(2,2)')),
                    'Unclassified': entry(classifications=[], cleaned_tex='Edited.'),
                    'Untyped': entry(types=[], cleaned_tex='Edited.'),
                    'Duplicate': entry(synonyms=['ring', 'ring'], cleaned_tex='Edited.'),
                    'Synonyms': entry(synonyms=['distance space', 'metric']),
                    'CaseSynonyms': entry(synonyms=['Metric', 'metric']),
                    'AddsImage': entry(cleaned_tex='<img src="x.png">'),
+                   'Empty': entry(cleaned_tex=''),
                    'NewText': entry(slug='new-text', title='new text'),
-                   'NewDiagram': entry(slug='new-diagram', title='new diagram', cleaned_tex=pstricks),
-                   'NewBadSlug': entry(slug='New_Slug', title='new slug')}
-        changes = self.scan(baseline, working)
+                   'NewDiagram': entry(slug='new-diagram', title='new diagram', cleaned_tex=PICTURE),
+                   'NewBadSlug': entry(slug='New_Slug', title='new slug'),
+                   'NewUnclassified': entry(slug='new-unclassified', title='new unclassified', classifications=[])}
+        svgs = {'Diagram': PICTURE, 'ChangedDiagram': PICTURE}
+        changes = self.scan(baseline, working, svgs)
         self.assertEqual(set(changes), set(working))
         with tempfile.TemporaryDirectory() as temp, \
              patch.object(prepare_math_patch, 'read_snapshot', side_effect=lambda path: baseline if path == 'b' else working):
+            local = self.working_db(temp, svgs)
             for name, item in changes.items():
                 with self.subTest(name):
                     try:
                         if item['new']:
                             helper.validate_entry(dict(working[name], canonical_name=name))
                         else:
-                            prepare_math_patch.prepare('b', 'w', name, Path(temp)/(name + '.zip'))
+                            prepare_math_patch.prepare('b', local, name, Path(temp)/(name + '.zip'))
                         accepted = True
                     except ValueError:
                         accepted = False
                     self.assertEqual(item['supported'], accepted, item['reason'])
-        self.assertEqual({name for name, item in changes.items() if item['supported']}, {'Text', 'Synonyms', 'NewText'})
+        self.assertEqual({name for name, item in changes.items() if item['supported']},
+                         {'Text', 'Diagram', 'Unclassified', 'Untyped', 'Duplicate', 'Synonyms', 'NewText'})
 
 
 if __name__ == '__main__':

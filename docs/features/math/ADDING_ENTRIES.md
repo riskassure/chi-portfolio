@@ -183,9 +183,11 @@ However, the publication helper only supports source-text and synonym changes
 for existing entries. A local document-type change is detected as unsupported;
 there is currently no reviewed helper publication path for it.
 
-Even content and synonym edits are refused for existing entries that contain
-diagrams or images, lack a classification or document type, or have duplicate
-metadata. Option 1 marks these `[unsupported]` and gives the reason. See
+Content and synonym edits to existing entries are allowed when every diagram,
+image and embed stays byte-identical and each PSTricks diagram already has a
+stored SVG. Missing classifications or types and duplicate unchanged metadata do
+not block them. Edits that add, remove or change a diagram or image are refused.
+Option 1 marks refused edits `[unsupported]` and gives the reason. See
 [Entries the helper cannot publish](../../administration/deployment/CONTENT_SYNC.md#entries-the-helper-cannot-publish)
 for the rules and for which of those edits production-first can and cannot cover.
 

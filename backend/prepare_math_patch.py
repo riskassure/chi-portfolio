@@ -1,12 +1,25 @@
 """Package one existing entry's content/synonym changes from a known baseline."""
 import argparse
+from contextlib import closing
 import json
 from pathlib import Path
+import sqlite3
+import sys
 import zipfile
 
-from apply_math_text_patch import patch_intended
+from apply_math_text_patch import missing_diagram_svgs, patch_intended
 from inspect_staged_package import preview
 from preview_math_sync import read_snapshot
+
+
+def local_missing_svgs(database, canonical, tex):
+    """Count diagrams in tex with no stored SVG in database (the local working copy)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent / 'src'))
+    from services.math.render_helper import extract_all_pstricks_diagram_blocks
+    if not extract_all_pstricks_diagram_blocks(tex):
+        return 0
+    with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True)) as db:
+        return missing_diagram_svgs(db, canonical, tex, extract_all_pstricks_diagram_blocks)
 
 
 def prepare(base, local, canonical, output):
@@ -23,6 +36,9 @@ def prepare(base, local, canonical, output):
         payload['replacement_synonyms'] = proposed['synonyms']
     if patch_intended(payload) != proposed:
         raise ValueError('Patch does not exactly reproduce the selected local entry.')
+    missing = local_missing_svgs(local, canonical, proposed['cleaned_tex'])
+    if missing:
+        raise ValueError(f'{missing} diagram(s) have no stored SVG; publishing would show "[Diagram unavailable]".')
     import io
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
