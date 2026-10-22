@@ -211,6 +211,7 @@ def apply(path):
 
 
 if __name__ == "__main__":
+    from migration_db import migration_target
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--db", type=Path, default=SRC.parent/"portfolio.db")
-    apply(p.parse_args().db)
+    with migration_target(p) as db:
+        apply(db)

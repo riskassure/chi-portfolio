@@ -194,7 +194,7 @@ def verify(c):
     assert not c.execute('PRAGMA foreign_key_check').fetchall()
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--db',type=Path,default=SRC.parent/'portfolio.db')
-    args=p.parse_args()
-    if not args.db.is_file(): raise FileNotFoundError(args.db)
-    apply(args.db)
+    from migration_db import migration_target
+    p=argparse.ArgumentParser(description=__doc__)
+    with migration_target(p) as db:
+        apply(db)

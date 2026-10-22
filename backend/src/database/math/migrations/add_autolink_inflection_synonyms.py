@@ -6,11 +6,9 @@ mathematical meaning as their destination. Generic homonyms are intentionally
 excluded and should be reviewed entry by entry.
 """
 
+import argparse
 from pathlib import Path
 import sqlite3
-
-
-DB_PATH = Path(__file__).resolve().parents[4] / "portfolio.db"
 
 
 INFLECTION_SYNONYMS = {
@@ -81,7 +79,7 @@ INFLECTION_SYNONYMS = {
 }
 
 
-def apply(db_path: Path = DB_PATH) -> tuple[int, int]:
+def apply(db_path: Path) -> tuple[int, int]:
     """Insert missing curated synonyms and return (inserted, already_present)."""
     inserted = 0
     already_present = 0
@@ -121,5 +119,8 @@ def apply(db_path: Path = DB_PATH) -> tuple[int, int]:
 
 
 if __name__ == "__main__":
-    added, existing = apply()
-    print(f"Added {added} autolink synonyms; {existing} already present.")
+    from migration_db import migration_target
+    parser = argparse.ArgumentParser(description=__doc__)
+    with migration_target(parser) as db:
+        added, existing = apply(db)
+        print(f"Added {added} autolink synonyms; {existing} already present.")

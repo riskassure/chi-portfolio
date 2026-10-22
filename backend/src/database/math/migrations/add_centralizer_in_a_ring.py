@@ -3,6 +3,7 @@
 Run after the math catalog has been loaded. The migration is safe to rerun.
 """
 
+import argparse
 from datetime import datetime
 from pathlib import Path
 import sqlite3
@@ -16,7 +17,6 @@ from services.math.concept_create_service import create_math_concept
 from services.math.concept_render_service import render_tex_reusing_existing_diagrams
 
 
-DB_PATH = BACKEND_SRC.parent / "portfolio.db"
 TITLE = "centralizer in a ring"
 CANONICAL_NAME = "CentralizerinaRing"
 SLUG = "centralizer-in-a-ring"
@@ -51,7 +51,7 @@ The displayed subring is isomorphic to $A$, even when $A$ is not commutative.
 """
 
 
-def apply(db_path: Path = DB_PATH) -> dict:
+def apply(db_path: Path) -> dict:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     with sqlite3.connect(db_path) as connection:
@@ -138,4 +138,7 @@ def apply(db_path: Path = DB_PATH) -> dict:
 
 
 if __name__ == "__main__":
-    print(apply())
+    from migration_db import migration_target
+    parser = argparse.ArgumentParser(description=__doc__)
+    with migration_target(parser) as db:
+        print(apply(db))

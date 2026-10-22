@@ -647,6 +647,7 @@ def apply(path):
 
 
 if __name__=='__main__':
+    from migration_db import migration_target
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--db',type=Path,default=SRC.parent/'portfolio.db')
-    apply(parser.parse_args().db)
+    with migration_target(parser) as db:
+        apply(db)
