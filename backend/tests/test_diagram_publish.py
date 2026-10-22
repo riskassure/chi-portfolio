@@ -31,6 +31,14 @@ class Interrupted(Exception):
     pass
 
 
+def link_or_copy(source, target):
+    """Point target at source; copy instead where symlinks need privileges (Windows without Developer Mode)."""
+    try:
+        os.symlink(source, target, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        shutil.copytree(source, target, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+
+
 class DiagramPublishTests(unittest.TestCase):
     """The server half: files first, rows in one transaction, a journal, and safe retries."""
 
@@ -47,7 +55,7 @@ class DiagramPublishTests(unittest.TestCase):
         self.live_diagrams.mkdir(parents=True)
         self.live = self.backend / 'portfolio.db'
         self.backups = self.home / 'backups'
-        os.symlink(SOURCE, self.backend / 'src')
+        link_or_copy(SOURCE, self.backend / 'src')
 
     def tearDown(self):
         self.temp.cleanup()
@@ -158,7 +166,7 @@ class DiagramPublishTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'stored diagram rows differ'):
             self.run_publish(data)
         self.assertFalse((self.live_diagrams / self.name(TREE)).exists())
-        self.assertFalse((self.backups / 'diagram-publish').exists())
+        self.assertEqual(list((self.backups / 'diagram-publish').glob('*.json')), [])  # Only the lock file.
         with closing(sqlite3.connect(self.live)) as db:
             db.execute("UPDATE math_concepts SET cleaned_tex='Edited live.'")
             db.commit()
@@ -226,19 +234,102 @@ class DiagramPublishTests(unittest.TestCase):
         journal_path = self.backups / 'diagram-publish' / (hashlib.sha256(data).hexdigest() + '.json')
         result = self.run_publish(data)
         self.assertEqual(cleanup(journal_path, self.live, self.live_diagrams)['unused_files'], [])
-        leftover = self.backend / 'data' / 'math' / 'diagrams-incoming' / ('a' * 32)
-        leftover.mkdir(parents=True)
-        (leftover / self.name(TREE)).write_bytes(b'<svg partial')
+        other = self.incoming() / ('a' * 32)  # Not this publish's folder.
+        other.mkdir(parents=True)
+        (other / self.name(TREE)).write_bytes(b'<svg partial')
         shutil.copyfile(result['backup'], self.live)  # Undo the publish from its backup.
         plan = cleanup(journal_path, self.live, self.live_diagrams)
-        self.assertEqual((plan['unused_files'], plan['incoming_folders']), ([self.name(TREE)], ['a' * 32]))
+        self.assertEqual((plan['unused_files'], plan['incoming_folders'], plan['other_incoming_folders']),
+                         ([self.name(TREE)], [], ['a' * 32]))
         self.assertFalse(plan['removed'])
         self.assertTrue((self.live_diagrams / self.name(TREE)).exists())
         cleanup(journal_path, self.live, self.live_diagrams, remove=True)
         self.assertFalse((self.live_diagrams / self.name(TREE)).exists())
-        self.assertFalse(leftover.exists())
+        self.assertTrue(other.exists())  # Another publish's folder is never removed.
         self.assertTrue((self.live_diagrams / self.name(PICTURE)).exists())  # Existed before; never touched.
         self.assertEqual(json.loads(journal_path.read_text())['cleaned'][0]['files'], [self.name(TREE)])
+
+    def incoming(self):
+        return self.backend / 'data' / 'math' / 'diagrams-incoming'
+
+    def test_cleanup_removes_only_incoming_folders_its_journal_recorded(self):
+        # Two interrupted publishes, each crashing before it could tidy its incoming folder.
+        first = self.package('A rooted tree:\n' + TREE)
+        name = self.name(TREE)
+        with patch.object(diagram_sync, '_checkpoint', side_effect=lambda step: (_ for _ in ()).throw(Interrupted())
+                          if step == 'incoming:' + name else None), \
+                patch.object(diagram_sync.shutil, 'rmtree'):
+            with self.assertRaises(Interrupted):
+                self.run_publish(first)
+        mine = self.journal(first)['incoming']
+        self.assertEqual(len(mine), 1)
+        other = self.incoming() / ('b' * 32)
+        other.mkdir()
+        (other / name).write_bytes(svg_for(TREE))
+        # Chi's reproduction: cleanup with a journal that recorded no folder removes nothing.
+        empty = self.backups / 'diagram-publish' / ('0' * 64 + '.json')
+        empty.write_text(json.dumps(dict(status='FILES_PENDING', files={})))
+        plan = cleanup(empty, self.live, self.live_diagrams, remove=True)
+        self.assertEqual((plan['incoming_folders'], plan['other_incoming_folders']), ([], sorted(mine + ['b' * 32])))
+        self.assertTrue((self.incoming() / mine[0]).is_dir() and other.is_dir())
+        plan = cleanup(self.backups / 'diagram-publish' / (hashlib.sha256(first).hexdigest() + '.json'),
+                       self.live, self.live_diagrams, remove=True)
+        self.assertEqual((plan['incoming_folders'], plan['other_incoming_folders']), (mine, ['b' * 32]))
+        self.assertFalse((self.incoming() / mine[0]).exists())
+        self.assertTrue(other.is_dir())
+
+    def test_recovery_cannot_run_while_a_publish_is_between_placing_and_committing(self):
+        data = self.package('A rooted tree:\n' + TREE)
+        journal_path = self.backups / 'diagram-publish' / (hashlib.sha256(data).hexdigest() + '.json')
+        name, attempts = self.name(TREE), []
+
+        def recover(step):
+            # The file is placed but no row references it yet: exactly when cleanup would delete it.
+            if step == 'files':
+                with self.assertRaisesRegex(ValueError, 'Another diagram publish or recovery is running'):
+                    cleanup(journal_path, self.live, self.live_diagrams, remove=True)
+                attempts.append(step)
+        with patch.object(diagram_sync, 'LOCK_WAIT', 0.3), patch.object(diagram_sync, '_checkpoint', side_effect=recover):
+            self.assertEqual(self.run_publish(data)['status'], 'APPLIED')
+        self.assertEqual(attempts, ['files'])
+        self.assertTrue((self.live_diagrams / name).is_file())
+        self.assert_no_dangling_rows()
+        self.assertNotIn('cleaned', self.journal(data))
+        # Once the publish is done, recovery sees the row and leaves the file alone.
+        self.assertEqual(cleanup(journal_path, self.live, self.live_diagrams, remove=True)['unused_files'], [])
+        self.assertTrue((self.live_diagrams / name).is_file())
+
+    def test_publish_waits_for_recovery_and_gives_up_cleanly(self):
+        data = self.package('A rooted tree:\n' + TREE)
+        before = self.live_state()
+        with patch.object(diagram_sync, 'LOCK_WAIT', 0.3), diagram_sync.publish_lock(self.backups / 'diagram-publish'):
+            with self.assertRaisesRegex(ValueError, 'Another diagram publish or recovery is running'):
+                self.run_publish(data)
+        self.assertEqual(self.live_state(), before)
+        self.assertEqual(list(self.live_diagrams.iterdir()), [])
+        self.assertFalse((self.backups / 'diagram-publish' / (hashlib.sha256(data).hexdigest() + '.json')).exists())
+        self.assertEqual(self.run_publish(data)['status'], 'APPLIED')
+
+    def test_cleanup_holds_the_database_write_lock_while_deleting(self):
+        data = self.package('A rooted tree:\n' + TREE)
+        journal_path = self.backups / 'diagram-publish' / (hashlib.sha256(data).hexdigest() + '.json')
+        with patch.object(diagram_sync, '_checkpoint', side_effect=lambda step: (_ for _ in ()).throw(Interrupted())
+                          if step == 'files' else None):
+            with self.assertRaises(Interrupted):
+                self.run_publish(data)
+        seen = []
+        real_unlink = Path.unlink
+
+        def unlink(path, *args, **kwargs):
+            # Another writer trying to start a transaction mid-deletion must be refused.
+            with closing(sqlite3.connect(self.live, timeout=0)) as other:
+                with self.assertRaises(sqlite3.OperationalError):
+                    other.execute('BEGIN IMMEDIATE')
+            seen.append(path.name)
+            return real_unlink(path, *args, **kwargs)
+        with patch.object(Path, 'unlink', unlink):
+            cleanup(journal_path, self.live, self.live_diagrams, remove=True)
+        self.assertEqual(seen, [self.name(TREE)])
 
     def test_preflight_and_recovery_scripts_run_with_their_shipped_modules(self):
         data = self.package('A rooted tree:\n' + TREE)

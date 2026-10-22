@@ -422,18 +422,23 @@ stay exactly as they are.
    and is left for you to remove. Check the page on the local server.
 2. Option **1** lists the entry with `diagrams` among its changes. Option **2**
    builds the package: `diagrams.json` plus one `svg/<hash>.svg` per diagram.
-   Every SVG must be well-formed and contain no scripts, event handlers or
-   outside links. The review lists diagrams added, kept and removed.
+   Every SVG must be well-formed and static: no scripts, event handlers,
+   animation elements (`set`, `animate` and the like) or outside links. The review lists diagrams added, kept and removed.
 3. Options **3**, **4** and **5** stage, check and publish as usual. The live
    check reads each target SVG on the server. It also confirms that the live
    entry and its diagram rows still match what you prepared.
 
 On the server, the publisher places the files before it changes any row:
-1. It writes a journal, `~/backups/diagram-publish/<package SHA-256>.json`.
-2. It writes each SVG into `backend/data/math/diagrams-incoming/` (never served),
-   checks its SHA-256, then links it into the diagrams folder. A link never
-   replaces a file.
-3. Only after every file checks out does it take the usual verified database
+1. It takes the diagram lock (`~/backups/diagram-publish/.lock`) and keeps it
+   until the commit. Recovery takes the same lock, so the two never overlap. A
+   second publish or recovery waits up to 30 seconds, then stops without
+   changing anything.
+2. It writes a journal, `~/backups/diagram-publish/<package SHA-256>.json`.
+3. It writes each SVG into its own folder under
+   `backend/data/math/diagrams-incoming/` (never served), recording that folder
+   in the journal first. It checks the SHA-256, then links the file into the
+   diagrams folder. A link never replaces a file.
+4. Only after every file checks out does it take the usual verified database
    backup. Then, in one transaction, it updates the entry and replaces that
    entry's diagram rows. The page is rebuilt from the stored SVGs, without LaTeX.
 
@@ -460,7 +465,11 @@ Neither command changes anything without `--apply`:
 ```
 
 It removes only SVGs that this publish created, that no diagram row references
-and that still hold the published bytes, plus unfinished incoming folders. To
+and that still hold the published bytes, plus the incoming folders this
+publish's journal recorded. Other publishes' incoming folders are listed under
+`other_incoming_folders` but never removed. While removing, it holds the diagram
+lock and the database write lock, so nothing can start using a file between its
+reference check and the deletion. To
 undo a committed publish, restore the journal's `backup` the way
 [Backup and recovery](../backups/BACKUP_RECOVERY.md) describes, then run the
 cleanup.

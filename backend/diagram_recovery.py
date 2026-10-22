@@ -2,8 +2,9 @@
 
 Runs over SSH like the live preflight. Without --apply nothing changes. With
 --apply it removes only SVG files the named publish created that no diagram
-row references, plus unfinished incoming folders; files that existed before
-that publish are never touched.
+row references, plus the incoming folders its journal recorded; files that
+existed before that publish, and other publishes' folders, are never touched.
+It shares diagram_sync.publish_lock with the publisher.
 """
 import argparse
 import json
