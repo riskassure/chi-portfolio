@@ -7,7 +7,7 @@ Images, embeds and any other media must stay exactly as they are (see
 publish_math_entry.media_fragments).
 """
 import argparse
-from contextlib import closing, nullcontext
+from contextlib import closing, contextmanager, nullcontext
 from datetime import datetime, timezone
 import difflib
 import hashlib
@@ -21,6 +21,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 import zipfile
 from xml.etree import ElementTree
@@ -38,6 +39,9 @@ SVG_NS = '{http://www.w3.org/2000/svg}'
 # matches nothing in publish_math_entry.MEDIA_RE, so masked text is "plain".
 MASK = '@@PSTRICKS-DIAGRAM@@'
 ACTIVE_ELEMENTS = {'script', 'foreignobject', 'iframe', 'object', 'embed', 'handler', 'listener'}
+# Diagrams are static. Animation can rewrite an attribute (such as href) after
+# the checks below have looked at it, so none is allowed.
+ANIMATION_ELEMENTS = {'set', 'animate', 'animatemotion', 'animatetransform', 'animatecolor', 'discard', 'mpath'}
 
 
 def helpers(source_dir=None):
@@ -77,6 +81,8 @@ def check_svg(data):
         name = element.tag.rsplit('}', 1)[-1].lower() if isinstance(element.tag, str) else ''
         if name in ACTIVE_ELEMENTS:
             raise ValueError('SVG contains a <' + name + '> element.')
+        if name in ANIMATION_ELEMENTS:
+            raise ValueError('SVG contains an animation element <' + name + '>; diagrams must be static.')
         styles = [element.text or ''] if name == 'style' else []
         for attribute, value in element.attrib.items():
             local = attribute.rsplit('}', 1)[-1].lower()
@@ -415,11 +421,60 @@ def prepare(base, local, canonical, output, diagram_dir, source_dir=None):
 
 JOURNALS = 'diagram-publish'
 INCOMING = 'diagrams-incoming'
+LOCK = '.lock'
+LOCK_WAIT = 30
 ELIGIBLE = ('EXPECTED TEXT MATCHES', 'NO DUPLICATE FOUND')
 
 
 def _checkpoint(step):
     """Called after each recorded step of apply. Does nothing; tests use it to interrupt a run."""
+
+
+def _try_lock(stream):
+    if os.name == 'nt':
+        import msvcrt
+        stream.seek(0)
+        msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _unlock(stream):
+    if os.name == 'nt':
+        import msvcrt
+        stream.seek(0)
+        msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def publish_lock(journals):
+    """Hold the lock that diagram publishing and recovery share.
+
+    A publish holds it from its first check until its rows are committed, and
+    recovery holds it while it checks references and deletes, so recovery can
+    never remove a file a publish is about to use. The operating system drops
+    the lock if the process dies.
+    """
+    journals = Path(journals)
+    journals.mkdir(parents=True, exist_ok=True)
+    with open(journals / LOCK, 'a+b') as stream:
+        deadline = time.monotonic() + LOCK_WAIT
+        while True:
+            try:
+                _try_lock(stream)
+                break
+            except OSError:
+                if time.monotonic() > deadline:
+                    raise ValueError('Another diagram publish or recovery is running. Nothing changed.') from None
+                time.sleep(0.2)
+        try:
+            yield
+        finally:
+            _unlock(stream)
 
 
 def _row_set(rows):
@@ -510,8 +565,14 @@ def apply(database, payload, files, backup_dir, source_dir, diagram_dir, package
     A journal in backup_dir/diagram-publish/<package sha256>.json records each
     step. An interrupted run leaves only unused hash-named SVGs (and possibly a
     backup); running the same package again skips files already in place.
-    Existing files are never replaced or deleted.
+    Existing files are never replaced or deleted. The whole run holds
+    publish_lock, so recovery cannot run in the middle of it.
     """
+    with publish_lock(Path(backup_dir) / JOURNALS):
+        return _apply(database, payload, files, backup_dir, source_dir, diagram_dir, package_sha256)
+
+
+def _apply(database, payload, files, backup_dir, source_dir, diagram_dir, package_sha256):
     entry, rows = diagram_intended(payload, source_dir)
     if not re.fullmatch(r'[0-9a-f]{64}', package_sha256 or ''):
         raise ValueError('Invalid package checksum.')
@@ -549,7 +610,11 @@ def apply(database, payload, files, backup_dir, source_dir, diagram_dir, package
         for record in payload['diagrams']:
             name = svg_name(record['source_hash'])
             if file_state(diagram_dir, record) == 'missing':
-                incoming.mkdir(parents=True, exist_ok=True)
+                if not incoming.exists():
+                    # Recorded before the folder exists, so recovery removes only this run's folders.
+                    journal.setdefault('incoming', []).append(incoming.name)
+                    _write_journal(journal_path, journal)
+                    incoming.mkdir(parents=True)
                 temporary = incoming / name
                 with temporary.open('xb') as stream:
                     stream.write(files[record['source_hash']])
@@ -634,31 +699,47 @@ def cleanup(journal_path, database, diagram_dir, remove=False):
     """List (and with remove=True delete) leftovers of one publish attempt.
 
     Only files this package created, that no diagram row references and that
-    still hold the package's bytes are listed, plus unfinished incoming
-    folders. Files that existed before the attempt are never touched.
+    still hold the package's bytes are listed, plus the incoming folders this
+    package's journal recorded. Files that existed before the attempt, and
+    other publishes' folders, are never touched. It holds publish_lock, and
+    while deleting it also holds the database's write lock, so no publish or
+    other writer can start using a file between the reference check and the
+    deletion.
     """
     journal_path, diagram_dir = Path(journal_path), Path(diagram_dir)
-    journal = json.loads(journal_path.read_text(encoding='utf-8'))
-    with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True)) as db:
-        referenced = {row[0].rsplit('/', 1)[-1] for row in db.execute('SELECT svg_path FROM math_concept_diagrams')}
-    files = []
-    for name, item in sorted(journal['files'].items()):
-        path = diagram_dir / name
-        if (not item['pre_existing'] and item['state'] == 'placed' and name not in referenced
-                and path.is_file() and not path.is_symlink()
-                and hashlib.sha256(path.read_bytes()).hexdigest() == item['sha256']):
-            files.append(name)
-    incoming = diagram_dir.parent / INCOMING
-    folders = sorted(p.name for p in incoming.iterdir() if p.is_dir() and not p.is_symlink()) if incoming.is_dir() else []
-    if remove:
-        for name in files:
-            (diagram_dir / name).unlink()
-        for name in folders:
-            shutil.rmtree(incoming / name)
-        journal.setdefault('cleaned', []).append(dict(utc=datetime.now(timezone.utc).isoformat(),
-                                                      files=files, incoming=folders))
-        _write_journal(journal_path, journal)
-    return dict(status=journal.get('status'), unused_files=files, incoming_folders=folders, removed=remove)
+    with publish_lock(journal_path.parent):
+        journal = json.loads(journal_path.read_text(encoding='utf-8'))
+        mode = 'rw' if remove else 'ro'
+        with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=' + mode, uri=True,
+                                     timeout=10, isolation_level=None)) as db:
+            if remove:
+                db.execute('BEGIN IMMEDIATE')
+            referenced = {row[0].rsplit('/', 1)[-1] for row in db.execute('SELECT svg_path FROM math_concept_diagrams')}
+            files = []
+            for name, item in sorted(journal['files'].items()):
+                path = diagram_dir / name
+                if (not item['pre_existing'] and item['state'] == 'placed' and name not in referenced
+                        and path.is_file() and not path.is_symlink()
+                        and hashlib.sha256(path.read_bytes()).hexdigest() == item['sha256']):
+                    files.append(name)
+            incoming = diagram_dir.parent / INCOMING
+            owned = {name for name in journal.get('incoming', []) if re.fullmatch(r'[0-9a-f]{32}', name)}
+            present = {p.name for p in incoming.iterdir()} if incoming.is_dir() else set()
+            folders = sorted(name for name in owned & present
+                             if (incoming / name).is_dir() and not (incoming / name).is_symlink())
+            others = sorted(present - owned)
+            if remove:
+                for name in files:
+                    (diagram_dir / name).unlink()
+                for name in folders:
+                    shutil.rmtree(incoming / name)
+                db.execute('ROLLBACK')  # Nothing was written; the transaction only held the lock.
+        if remove:
+            journal.setdefault('cleaned', []).append(dict(utc=datetime.now(timezone.utc).isoformat(),
+                                                          files=files, incoming=folders))
+            _write_journal(journal_path, journal)
+    return dict(status=journal.get('status'), unused_files=files, incoming_folders=folders,
+                other_incoming_folders=others, removed=remove)
 
 
 if __name__ == '__main__':

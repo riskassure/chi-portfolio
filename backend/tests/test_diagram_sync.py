@@ -81,6 +81,14 @@ class SvgCheckTests(unittest.TestCase):
             'doctype': SVG.replace('<!--', '<!DOCTYPE svg [<!ENTITY a "b">]><!--'),
             'not svg': SVG.replace('<svg ', '<html ').replace('</svg>', '</html>'),
             'malformed': SVG.replace('</svg>', ''),
+            # Chi's case: animation rewrites href to an outside URL after the href check.
+            'animated link': SVG.replace('<defs>', '<defs><set href="#i" attributeName="href" to="https://example.com/x"/>'),
+            'animated xlink': SVG.replace('<defs>', '<defs><set xlink:href="#g0-65" attributeName="xlink:href" '
+                                                   'to="javascript:alert(1)"/>'),
+            'animate': SVG.replace('<defs>', '<defs><animate href="#i" attributeName="href" values="https://example.com/x"/>'),
+            'animateTransform': SVG.replace('<defs>', '<defs><animateTransform attributeName="transform" type="scale"/>'),
+            'animateMotion': SVG.replace('<defs>', '<defs><animateMotion path="M0,0"/>'),
+            'discard': SVG.replace('<defs>', '<defs><discard href="#i"/>'),
         }
         for name, text in cases.items():
             with self.subTest(name):
