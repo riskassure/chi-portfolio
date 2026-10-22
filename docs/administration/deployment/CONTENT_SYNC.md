@@ -309,7 +309,9 @@ The publisher (`publish_math_entry.validate`) rejects an entry when:
 - **Synonyms, defined terms, link exclusions or related concepts contain a
   duplicate or a value with leading/trailing spaces.** Synonyms that differ only
   in capitalization are also rejected.
-- **Its slug is not lowercase words joined by hyphens.**
+- **Its slug is not lowercase words joined by hyphens.** The editor refuses
+  such slugs for entries created since 2026-10-22, so this mainly affects
+  entries made earlier or outside the editor.
 
 On 2026-10-21, 75 existing entries failed these checks (59 with diagrams or
 images, 13 without a classification or type, 3 with duplicate metadata). The full

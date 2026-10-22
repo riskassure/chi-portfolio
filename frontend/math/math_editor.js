@@ -121,6 +121,16 @@ function wireEditorEvents() {
         });
     }
 
+    const slugInput = document.getElementById("slugInput");
+
+    if (slugInput) {
+        // Follow the title until the slug is typed in; clearing it follows the title again.
+        slugInput.addEventListener("input", () => {
+            slugInput.dataset.edited = slugInput.value.trim() ? "1" : "";
+            updateSlugPreview();
+        });
+    }
+
     if (texInput) {
         texInput.addEventListener("input", () => {
             clearTimeout(previewDebounceTimer);
@@ -971,6 +981,12 @@ async function saveEditorPayload() {
 
     let url = `${API_ENDPOINT}/admin/math/create`;
 
+    const slugInput = document.getElementById("slugInput");
+
+    if (editorMode !== "edit" && slugInput) {
+        payload.slug = slugInput.value.trim();
+    }
+
     if (editorMode === "edit") {
         payload.id = Number(document.getElementById("conceptIdInput").value || conceptId);
         url = `${API_ENDPOINT}/admin/math/update`;
@@ -1074,10 +1090,21 @@ function updateSlugPreview(existingSlug = null) {
     }
 
     const title = titleInput.value.trim();
+    const slugInput = document.getElementById("slugInput");
 
-    slugTarget.innerText = title
-        ? slugFromTitle(title) || "-- (enter a title with letters or digits)"
-        : "--";
+    if (slugInput && !slugInput.dataset.edited) {
+        slugInput.value = slugFromTitle(title);
+    }
+
+    const slug = slugInput ? slugInput.value.trim() : slugFromTitle(title);
+
+    if (!slug) {
+        slugTarget.innerText = title ? "-- (enter a slug with letters or digits)" : "--";
+    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+        slugTarget.innerText = `${slug} (not allowed: use lowercase letters and digits joined by single hyphens)`;
+    } else {
+        slugTarget.innerText = slug;
+    }
 }
 
 async function updatePreview() {

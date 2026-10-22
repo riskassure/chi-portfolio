@@ -41,7 +41,8 @@ check the browser's address before pressing Create Concept.
 
 | Editor field | Guidance |
 | --- | --- |
-| Title | Clear mathematical name; required. The server derives the canonical name and URL slug from it. Review the resulting URL after saving. |
+| Title | Clear mathematical name; required. |
+| URL slug | Filled in from the title as lowercase words joined by hyphens: accents become plain letters, apostrophes are dropped and other punctuation becomes a hyphen (`Euler's theorem` gives `eulers-theorem`). You can shorten it, as many existing entries do. The canonical name is built from it (`eulers-theorem` gives `EulersTheorem`). Check *Slug preview* before Create Concept: the slug and canonical name can't be changed after saving. The server refuses a slug that isn't lowercase words joined by hyphens, or one already used by another entry. |
 | Owner | Entry author/owner; defaults to `CWoo` if blank. |
 | Classifications | Select appropriate existing MSC classifications using the suggestions. Choose at least one for helper publication. |
 | Document Types | Select appropriate existing types, such as Definition, Theorem, Proof or Example. At least one is required for helper publication. An entry may have several. |
@@ -82,8 +83,9 @@ checker.
    for the new title and inspect classifications/related links. Use the MathJax
    audit page (`mathjax_audit.html`) for rendering review where needed.
 
-If creation reports a canonical-name or slug conflict, search the existing entries
-and resolve the overlap rather than repeatedly submitting. If a request is
+If creation reports that a slug or canonical name is already used, the message
+names the entry using it. Check whether that entry already covers the concept;
+if not, choose a different slug. If a request is
 interrupted, check whether the entry exists before creating it again. A success
 message does not replace checking diagram/rendering diagnostics.
 
