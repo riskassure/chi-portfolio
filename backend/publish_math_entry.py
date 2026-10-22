@@ -11,6 +11,12 @@ import sys
 import uuid
 from preview_math_sync import read_snapshot
 
+# Diagrams, images and embedded markup. \\psset is included because it changes
+# how later PSTricks diagrams render.
+MEDIA_RE = re.compile(r'\\(?:includegraphics|input|include|pstree|pspicture|psset)'
+                      r'|\\begin\s*\{(?:pspicture\*?|tikzpicture|figure\*?)\}'
+                      r'|<\s*(?:img|svg|script|iframe)\b|/api/math/diagrams/', re.I)
+
 
 def validate(entry):
     required = {'canonical_name','slug','title','owner','cleaned_tex','is_cleaned',
@@ -31,8 +37,64 @@ def validate(entry):
     if not entry['classifications'] or not entry['types']:
         raise ValueError('Include classification and document type.')
     # This first increment deliberately excludes asset transfer and diagram generation.
-    if re.search(r'\\(?:includegraphics|input|include|pstree|pspicture)|\\begin\s*\{(?:pspicture\*?|tikzpicture|figure\*?)\}|<\s*(?:img|svg|script|iframe)\b|/api/math/diagrams/',entry['cleaned_tex'],re.I):
+    if MEDIA_RE.search(entry['cleaned_tex']):
         raise ValueError('Media/diagrams are outside this text-only publisher.')
+
+
+def _group_end(tex, start):
+    """Return the index after the bracket group opening at start, honouring nesting and escapes."""
+    opening = tex[start]
+    closing = ']' if opening == '[' else '}'
+    depth, position = 0, start
+    while position < len(tex):
+        if tex[position] == '\\':
+            position += 2
+            continue
+        depth += (tex[position] == opening) - (tex[position] == closing)
+        position += 1
+        if not depth:
+            return position
+    return len(tex)
+
+
+def media_fragments(tex):
+    """Return every diagram, image or embed in tex, in source order, as exact source text.
+
+    Existing-entry text patches may only change the prose around these, so
+    two versions are compatible exactly when this returns equal lists. Each
+    fragment runs to the matching end of its environment, tag or brace groups,
+    so an edit inside a diagram changes the fragment.
+    """
+    fragments, end = [], 0
+    for match in MEDIA_RE.finditer(tex):
+        if match.start() < end:
+            continue  # Nested inside the previous fragment, e.g. \\includegraphics in a figure.
+        token = match.group(0)
+        environment = re.fullmatch(r'\\begin\s*\{([^}]*)\}', token)
+        tag = re.fullmatch(r'<\s*(\w+)', token)
+        if environment:
+            name = re.escape(environment.group(1))
+            depth, end = 0, len(tex)
+            for edge in re.finditer(r'\\(begin|end)\s*\{' + name + r'\}', tex[match.start():], re.I):
+                depth += 1 if edge.group(1) == 'begin' else -1
+                if not depth:
+                    end = match.start() + edge.end()
+                    break
+        elif tag and tag.group(1).lower() != 'img':
+            close = re.compile(r'</\s*' + tag.group(1) + r'\s*>', re.I).search(tex, match.end())
+            end = close.end() if close else len(tex)
+        elif tag:
+            close = tex.find('>', match.end())
+            end = close + 1 if close >= 0 else len(tex)
+        elif token.startswith('\\'):
+            end = match.end()
+            # Include the command's [options] and {arguments}, e.g. a whole \\pstree.
+            while (group := re.compile(r'\s*([\[{])').match(tex, end)):
+                end = _group_end(tex, group.end() - 1)
+        else:
+            end = re.compile(r'[^\s"\'<>)]*').match(tex, match.end()).end()
+        fragments.append(tex[match.start():end])
+    return fragments
 
 
 def check_target(db, entry):

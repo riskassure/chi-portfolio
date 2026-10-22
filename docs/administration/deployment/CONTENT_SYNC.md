@@ -295,28 +295,47 @@ Option 1 only reports; it changes nothing. The publication safeguards in options
 |---|---|
 | `deleted locally` | Deletions are not supported. |
 | `changes <fields>` | Only content (`cleaned_tex`) and synonyms of an existing entry can be published. Title, classification, type, definition, link-exclusion and related-concept changes have no helper route. |
-| `baseline (live) entry ...` | The entry as it is now on the live site fails the publisher's checks, so the helper cannot patch it at all, whatever you edit. |
-| `local version ...` | Your edit itself would fail, for example it adds an image, diagram or a duplicate synonym. |
+| `local version ...` | Your edit itself would fail: empty content, a duplicate or untrimmed synonym, or a diagram, image or embed that was added, removed or changed. |
+| `has N diagram(s) with no stored SVG` | The entry's PSTricks diagrams have no generated SVG in your working database, so the page would show "[Diagram unavailable]". Rebuilding diagrams has no helper route yet. |
 | `new entry ...` | A new entry fails the new-entry checks (slug, classification, type, media). |
 
-The publisher (`publish_math_entry.validate`) rejects an entry when:
+**Existing entries** are checked only on what the edit changes
+(`apply_math_text_patch.patch_intended`, shared by options 1 to 5):
 
-- **Its body contains diagrams or media:** `\includegraphics`, `\input`,
-  `\include`, `\pstree`, `pspicture`, `tikzpicture`, `figure`, `<img>`, `<svg>`,
-  `<script>`, `<iframe>` or `/api/math/diagrams/`. For existing entries this
-  applies even when the diagram itself is unchanged.
-- **It has no MSC classification or no document type.**
-- **Synonyms, defined terms, link exclusions or related concepts contain a
+- Only content (`cleaned_tex`) and synonyms may change, and content must not be
+  empty.
+- **Every diagram, image and embed must stay byte-identical and in the same
+  order.** This covers PSTricks blocks (`pspicture`, `\pstree`, `\psset`),
+  `\includegraphics`, `\input`, `\include`, `figure` and `tikzpicture`
+  environments (including their captions), `<img>`, `<svg>`, `<script>`,
+  `<iframe>` and `/api/math/diagrams/` references. The prose around them can
+  change freely.
+- Each PSTricks diagram must already have a stored SVG. Option 1/2 check the
+  working database and the live publisher checks the live database again before
+  taking its backup. The text update reuses stored SVGs and never runs LaTeX.
+- **Changed** synonyms must be non-blank, trimmed and unique ignoring
+  capitalization. Unchanged synonyms are left exactly as stored.
+- Metadata the edit does not touch is not judged: a missing classification or
+  type, a duplicate defined term or an older-style slug no longer blocks a text
+  fix. Fix those separately (production-first, below) when you want to.
+
+**New entries** still go through `publish_math_entry.validate`, which rejects:
+
+- **Diagrams or media in the body** (any of the items listed above).
+- **No MSC classification or no document type.**
+- **Synonyms, defined terms, link exclusions or related concepts with a
   duplicate or a value with leading/trailing spaces.** Synonyms that differ only
   in capitalization are also rejected.
-- **Its slug is not lowercase words joined by hyphens.** The editor refuses
-  such slugs for entries created since 2026-10-22, so this mainly affects
-  entries made earlier or outside the editor.
+- **A slug that is not lowercase words joined by hyphens.** The editor refuses
+  such slugs for entries created since 2026-10-22.
 
-On 2026-10-21, 75 existing entries failed these checks (59 with diagrams or
-images, 13 without a classification or type, 3 with duplicate metadata). The full
-list is kept outside the repository with the open code issues; option 1 is the
-current source of truth for any entry you have edited.
+On 2026-10-21, 75 existing entries failed the old existing-entry checks. Text
+and synonym fixes now work for the 16 entries without a classification or type
+or with duplicate metadata, and for diagram entries whose diagrams are untouched
+and have stored SVGs. Entries such as `deduction`,
+`derivations-in-natural-deduction` and `rooted-tree` contain `\pstree` with no
+stored SVG and remain blocked. Option 1 is the source of truth for any entry you
+have edited.
 
 **Production-first is not a universal workaround.** Editing on the live site
 (after a fresh backup, as in

@@ -105,8 +105,6 @@ def preview(data, snapshot=None, *, live=False):
         intended = patch_intended(payload)
         canonical = payload['canonical_name']
         expected = payload['expected']
-        validate_entry(dict(expected, canonical_name=canonical))
-        validate_entry(dict(expected, canonical_name=canonical, cleaned_tex=payload['replacement_tex']))
         report += ['Proposed operation: change existing entry text and/or synonyms', 'Entry: ' + canonical]
         report += list(difflib.unified_diff(expected['cleaned_tex'].splitlines(),
                       payload['replacement_tex'].splitlines(), fromfile='expected text',
