@@ -55,6 +55,63 @@ def configure(base, working, username='cwoo'):
     return state
 
 
+def explain_rejection(entry, message):
+    """Turn a publisher validation message into a reason a person can act on."""
+    if message.startswith('Media/diagrams'):
+        return 'contains diagrams or images (for example \\includegraphics, figure, pspicture or \\pstree)'
+    if message.startswith('Include classification'):
+        missing = [label for key, label in (('classifications', 'MSC classification'), ('types', 'document type'))
+                   if not entry.get(key)]
+        return 'has no ' + ' and no '.join(missing or ['classification or document type'])
+    if message.startswith('Invalid metadata: '):
+        key = message[len('Invalid metadata: '):]
+        values = entry.get(key) if isinstance(entry.get(key), list) else []
+        problems = sorted({repr(v) for v in values if isinstance(v, str) and values.count(v) > 1})
+        problems += sorted(repr(v) for v in values if isinstance(v, str) and v != v.strip())
+        return key.replace('_', ' ') + ' ' + ('has duplicate or untrimmed values: ' + ', '.join(problems)
+                                              if problems else 'has blank, duplicate or untrimmed values')
+    if message.startswith('Use a lowercase'):
+        return 'slug ' + repr(entry.get('slug')) + ' is not lowercase words joined by hyphens'
+    if message.startswith('Duplicate synonyms ignoring case'):
+        return 'synonyms repeat a value that differs only in capitalization'
+    return message.rstrip('.')
+
+
+def publish_blocker(name, baseline, working):
+    """Return why options 2-5 cannot publish this change, or None when they can.
+
+    This runs the same validation as option 2, so option 1 can report the
+    problem before anything is prepared.
+    """
+    if name not in working:
+        return 'deleted locally; deletions are not supported'
+    entry = dict(working[name], canonical_name=name)
+    if name not in baseline:
+        try:
+            validate_entry(entry)
+        except ValueError as error:
+            return 'new entry ' + explain_rejection(entry, str(error))
+        return None
+    expected = dict(baseline[name], canonical_name=name)
+    fields = {key for key in working[name] if working[name][key] != baseline[name][key]}
+    if fields - {'cleaned_tex', 'synonyms'}:
+        return ('changes ' + ', '.join(sorted(fields - {'cleaned_tex', 'synonyms'})) +
+                '; only content and synonym changes can be published')
+    try:
+        validate_entry(expected)
+    except ValueError as error:
+        return ('baseline (live) entry ' + explain_rejection(expected, str(error)) +
+                ', so the helper cannot patch it')
+    payload = dict(canonical_name=name, expected=baseline[name], replacement_tex=working[name]['cleaned_tex'])
+    if 'synonyms' in fields:
+        payload['replacement_synonyms'] = working[name]['synonyms']
+    try:
+        patch_intended(payload)
+    except ValueError as error:
+        return 'local version ' + explain_rejection(entry, str(error))
+    return None
+
+
 def changed_entries(state):
     if digest(state['base']) != state['base_sha256']:
         raise ValueError('The saved baseline changed. Select the correct unchanged baseline before continuing.')
@@ -65,16 +122,19 @@ def changed_entries(state):
             continue
         fields = ([key for key in working[name] if working[name][key] != baseline[name][key]]
                   if name in baseline and name in working else [])
-        supported = name in working and (name not in baseline or set(fields) <= {'cleaned_tex', 'synonyms'})
+        reason = publish_blocker(name, baseline, working)
         changes.append(dict(canonical=name, title=working.get(name, baseline.get(name))['title'],
-                            fields=fields, supported=supported, new=name not in baseline))
+                            fields=fields, supported=reason is None, reason=reason, new=name not in baseline))
     return changes
 
 
 def prepare_selected(state, canonical):
     candidates = {c['canonical']: c for c in changed_entries(state)}
-    if canonical not in candidates or not candidates[canonical]['supported']:
-        raise ValueError('No supported change selected. Deletions and other metadata changes are not supported yet.')
+    if canonical not in candidates:
+        raise ValueError('No local change found for this entry.')
+    if not candidates[canonical]['supported']:
+        raise ValueError('This change cannot be published through the helper: ' + candidates[canonical]['reason'] +
+                         '. See "Entries the helper cannot publish" in CONTENT_SYNC.md.')
     folder = ROOT / 'dist' / 'math-workflow' / uuid.uuid4().hex
     folder.mkdir(parents=True)
     package = folder / 'package.zip'
@@ -335,6 +395,11 @@ def main():
                     print(f"{index}. {item['title']} ({item['canonical']}) — " +
                           ('new entry' if item['new'] else ', '.join(item['fields'])) +
                           ('' if item['supported'] else ' [unsupported]'))
+                    if not item['supported']:
+                        print('   Why:', item['reason'])
+                if any(not item['supported'] for item in changes):
+                    print('Entries marked [unsupported] cannot be prepared with option 2. '
+                          'See "Entries the helper cannot publish" in CONTENT_SYNC.md.')
                 if not changes:
                     print('No math changes compared with your baseline.')
                 elif choice == '2':

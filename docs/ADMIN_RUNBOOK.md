@@ -114,7 +114,13 @@ creating the entry directly on the live site, verifying it, and using **8** to
 bring it home. A live save is immediately public and does not need helper
 publication. Conflicting unpublished local edits must be reconciled before a
 refresh can switch working copies. Option 8 is not a general two-way merge and
-does not transfer math diagrams or source code.
+does not transfer math diagrams or source code. Production-first is not a route
+for new or changed diagrams or images, because server-side diagram rendering is
+unverified.
+
+Option **1** marks any math change that option 2 would refuse as `[unsupported]`
+and explains why. Some existing entries cannot be patched through the helper at
+all; see [Entries the helper cannot publish](administration/deployment/CONTENT_SYNC.md#entries-the-helper-cannot-publish).
 
 Database-only entry changes do not require a Git commit. Commit/push any related
 tracked code or documentation separately; deploy required code before content

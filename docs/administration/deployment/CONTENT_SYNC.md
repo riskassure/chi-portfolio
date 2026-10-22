@@ -270,8 +270,11 @@ Prepared packages, review reports and receipts are retained under ignored
 `dist/math-workflow/`. Baseline or package changes and edits to the selected local
 entry invalidate the prepared workflow. Conflicts prevent publication. A failed
 publication requires another live check before retrying. The helper supports new
-text-only entries and existing content/synonym updates; other metadata edits and
-deletions are listed as unsupported. Do not run multiple helpers simultaneously.
+text-only entries and content/synonym updates to existing entries that pass the
+publisher's checks. Option 1 runs the same checks as option 2 and marks any other
+change `[unsupported]` with a `Why:` line; see
+[Entries the helper cannot publish](#entries-the-helper-cannot-publish). Do not
+run multiple helpers simultaneously.
 
 After publication, verify the site, stop the local server, and choose **8** to
 bring website changes home. It checks for unpublished/conflicting edits before
@@ -280,6 +283,57 @@ the comparison report if it refuses to switch, then restart with **6** after a
 successful refresh. Option **7** (Set baseline and working paths) is for deliberate
 manual configuration of an already verified pair, not routine synchronization;
 it does not download, merge or reconcile changes.
+
+### Entries the helper cannot publish
+
+Options 1 and 2 apply the same eligibility rules, so an entry shown as
+`[unsupported]` in option 1 will be refused by option 2 with the same reason.
+Option 1 only reports; it changes nothing. The publication safeguards in options
+3 to 5 are unchanged and still repeat every check.
+
+| Option 1 reason begins with | Meaning |
+|---|---|
+| `deleted locally` | Deletions are not supported. |
+| `changes <fields>` | Only content (`cleaned_tex`) and synonyms of an existing entry can be published. Title, classification, type, definition, link-exclusion and related-concept changes have no helper route. |
+| `baseline (live) entry ...` | The entry as it is now on the live site fails the publisher's checks, so the helper cannot patch it at all, whatever you edit. |
+| `local version ...` | Your edit itself would fail, for example it adds an image, diagram or a duplicate synonym. |
+| `new entry ...` | A new entry fails the new-entry checks (slug, classification, type, media). |
+
+The publisher (`publish_math_entry.validate`) rejects an entry when:
+
+- **Its body contains diagrams or media:** `\includegraphics`, `\input`,
+  `\include`, `\pstree`, `pspicture`, `tikzpicture`, `figure`, `<img>`, `<svg>`,
+  `<script>`, `<iframe>` or `/api/math/diagrams/`. For existing entries this
+  applies even when the diagram itself is unchanged.
+- **It has no MSC classification or no document type.**
+- **Synonyms, defined terms, link exclusions or related concepts contain a
+  duplicate or a value with leading/trailing spaces.** Synonyms that differ only
+  in capitalization are also rejected.
+- **Its slug is not lowercase words joined by hyphens.**
+
+On 2026-10-21, 75 existing entries failed these checks (59 with diagrams or
+images, 13 without a classification or type, 3 with duplicate metadata). The full
+list is kept outside the repository with the open code issues; option 1 is the
+current source of truth for any entry you have edited.
+
+**Production-first is not a universal workaround.** Editing on the live site
+(after a fresh backup, as in
+[Adding a math entry](../../features/math/ADDING_ENTRIES.md#b-production-first-create-live-then-synchronize-locally))
+and then bringing the change home with option 8 is reasonable only for:
+
+- metadata fixes with unchanged text (adding a missing classification or type,
+  removing a duplicate term); the editor re-renders using the stored diagrams;
+- text edits that leave every PSTricks block (`pspicture`, `\pstree`)
+  byte-identical; check the live page for "[Diagram unavailable]";
+- text edits near `\includegraphics`/`figure` that leave the image references
+  unchanged; check that the images still show.
+
+It is **not** a route for any change inside a PSTricks block, a new diagram, or new
+or changed image files. The live editor would render diagrams on the server, and
+server-side LaTeX/dvisvgm support is unverified; nothing transfers image files.
+Those edits have no supported publication route yet, so keep them local. The
+production-first behavior above comes from reading the editor and update routes,
+not from a live test.
 
 ## Upload a reviewed package through the API
 

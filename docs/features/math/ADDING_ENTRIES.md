@@ -91,7 +91,9 @@ message does not replace checking diagram/rendering diagnostics.
 
 In the helper:
 
-1. **1** lists supported math differences from the unchanged baseline.
+1. **1** lists math differences from the unchanged baseline. Anything option 2
+   would refuse is marked `[unsupported]` with a `Why:` line, for example a slug
+   the publisher rejects or content containing diagrams.
 2. **2** prepares the new entry you select. Review its text and all metadata.
 3. **3** stages the reviewed package.
 4. **4** checks the live database for conflicts and missing metadata/targets.
@@ -179,6 +181,12 @@ However, the publication helper only supports source-text and synonym changes
 for existing entries. A local document-type change is detected as unsupported;
 there is currently no reviewed helper publication path for it.
 
+Even content and synonym edits are refused for existing entries that contain
+diagrams or images, lack a classification or document type, or have duplicate
+metadata. Option 1 marks these `[unsupported]` and gives the reason. See
+[Entries the helper cannot publish](../../administration/deployment/CONTENT_SYNC.md#entries-the-helper-cannot-publish)
+for the rules and for which of those edits production-first can and cannot cover.
+
 For a deliberate production-first type correction, take the fresh backup described
 in section B, open the existing entry's editor on production, preserve its other
 fields, change Document Types and save. Verify the entry while logged out, then
@@ -186,7 +194,9 @@ stop the local server and use **8** to bring it home. Resolve any unpublished lo
 changes before doing this; do not duplicate a local metadata edit on production
 and assume the refresh will merge it. This route is confirmed from the editor,
 update route and metadata service, not a live write test. If local-first review is
-required, defer the edit until a metadata publisher is implemented.
+required, defer the edit until a metadata publisher is implemented. This
+metadata-only route does not extend to edits that change or add diagrams or
+images; those have no supported route yet.
 
 **Diagram publication remains an open workflow, not a ready-to-run procedure.**
 Before publishing an entry that needs new diagram assets, define and review:
