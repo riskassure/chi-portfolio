@@ -379,6 +379,44 @@ The editor renders inside its database transaction and writes straight to the
 final SVG name. Diagram publication through the helper is planned separately,
 with SVGs rendered on the laptop.
 
+### Prepare a diagram change (laptop side; publishing not yet available)
+
+`backend/diagram_sync.py` is the laptop half of diagram publishing. Until the
+server half is merged, its packages can be built and reviewed but not staged or
+published.
+
+Use `render-missing` for an entry whose diagrams have no stored SVG in the
+working copy, such as `rooted-tree`. Re-saving such an entry in the local editor
+does not render them.
+
+```powershell
+.\.venv313\Scripts\python.exe backend/diagram_sync.py render-missing --db <working.db> --canonical RootedTree
+```
+
+It renders each missing diagram with LaTeX and dvisvgm on this computer, in a
+throwaway folder. Each SVG is checked, then linked into
+`backend/data/math/diagrams/` without replacing any existing file. The command
+then stores the diagram rows and rebuilds the page in the working copy. Valid
+existing SVGs are reused. An unusable file with the same name stops the command
+and is left for you to remove.
+
+`prepare` builds a review package from the baseline and working copy: one
+`diagrams.json` plus an `svg/<hash>.svg` per diagram.
+
+```powershell
+.\.venv313\Scripts\python.exe backend/diagram_sync.py prepare --base <base.db> --local <working.db> --canonical RootedTree --output dist\rooted-tree.zip
+```
+
+It refuses in these cases:
+- a diagram has no matching row or valid SVG;
+- the text still has rows it no longer uses;
+- an image or embed changed;
+- metadata other than content or synonyms changed;
+- no diagram actually changed (use option 2 for text-only edits).
+
+Every SVG must be well-formed and must not contain scripts, event handlers or
+outside links.
+
 ## Upload a reviewed package through the API
 
 After configuring `backend/pythonanywhere_api.py setup` and passing its `check`,
