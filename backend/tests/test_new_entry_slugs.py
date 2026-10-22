@@ -53,6 +53,10 @@ INSERT INTO math_concepts(canonical_name, slug, title, cleaned_tex) VALUES
     ('MetricSpace', 'metric-space', 'metric space', 'A metric space.'),
     ('Monic', 'monomorphism', 'monomorphism', 'A monic arrow.'),
     ('Metricspace', 'metricspace', 'metricspace', 'Made by the old editor rule.');
+CREATE TABLE math_synonyms(id INTEGER PRIMARY KEY, concept_id INTEGER, synonym_text TEXT);
+CREATE TABLE math_definitions(id INTEGER PRIMARY KEY, concept_id INTEGER, defined_term TEXT);
+INSERT INTO math_synonyms(concept_id, synonym_text) VALUES (1, 'distance space');
+INSERT INTO math_definitions(concept_id, defined_term) VALUES (2, 'monic arrow');
 '''
 
 
@@ -126,11 +130,19 @@ class NewEntryNameTests(unittest.TestCase):
 
     def test_duplicates_are_rejected_case_insensitively(self):
         with self.assertRaisesRegex(ValueError, "slug 'metric-space' is already used by 'metric space'"):
-            self.names('Metric Space')
+            self.names('Metric-space!')
         with self.assertRaisesRegex(ValueError, "canonical name 'Monic'"):
             self.names('monic')
         with self.assertRaisesRegex(ValueError, 'already used'):
             self.names('another title', 'monomorphism')
+
+
+    def test_titles_already_in_use_are_rejected(self):
+        for title, message in [(' Metric Space ', "already the title of 'metric space'"),
+                               ('Distance space', "already a synonym of 'metric space'"),
+                               ('monic arrow', "already a term defined in 'monomorphism'")]:
+            with self.subTest(title=title), self.assertRaisesRegex(ValueError, message):
+                self.names(title, 'unused-slug')
 
 
 class CreateRouteTests(unittest.TestCase):
@@ -177,7 +189,8 @@ class CreateRouteTests(unittest.TestCase):
 
     def test_rejected_before_saving_and_existing_rows_untouched(self):
         before = rows(self.db)
-        for body in [dict(title='metric space'), dict(title='x', slug='Bad Slug'), dict(title='∞')]:
+        for body in [dict(title='metric space'), dict(title='distance space', slug='distance-space'),
+                     dict(title='x', slug='Bad Slug'), dict(title='∞')]:
             with self.subTest(body=body):
                 result = self.post(**body)
                 self.assertEqual(result.status_code, 400)

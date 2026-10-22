@@ -51,7 +51,22 @@ def canonical_from_slug(slug: str) -> str:
 
 
 def new_entry_names(cursor, title: str, requested_slug: str | None = None) -> tuple[str, str]:
-    """Return (canonical_name, slug) for a new entry, or raise ValueError."""
+    """Return (canonical_name, slug) for a new entry, or raise ValueError.
+
+    Refuses what publish_math_entry.check_target would refuse about the
+    entry's names, so the problem shows before anything is saved.
+    """
+    checks = (
+        ("the title of", "SELECT title FROM math_concepts WHERE lower(trim(title)) = lower(trim(?))"),
+        ("a synonym of", "SELECT mc.title FROM math_synonyms s LEFT JOIN math_concepts mc ON mc.id = s.concept_id "
+                         "WHERE lower(trim(s.synonym_text)) = lower(trim(?))"),
+        ("a term defined in", "SELECT mc.title FROM math_definitions d LEFT JOIN math_concepts mc ON mc.id = d.concept_id "
+                              "WHERE lower(trim(d.defined_term)) = lower(trim(?))"),
+    )
+    for kind, query in checks:
+        row = cursor.execute(query, (title,)).fetchone()
+        if row:
+            raise ValueError(f"The title '{title.strip()}' is already {kind} '{row[0] or 'an entry'}'; review that entry first.")
     slug = (requested_slug or "").strip() or slug_from_title(title)
     if not slug:
         raise ValueError("The title has no letters or digits to build a URL slug from; enter a slug.")
