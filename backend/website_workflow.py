@@ -487,12 +487,17 @@ def main():
                 if input('Type STOPPED when the local server is stopped (anything else cancels): ').strip() != 'STOPPED':
                     continue
                 snapshot = download(Path.home()/'Downloads'/'chi-portfolio'/'database', state['username'])
-                result = refresh(state, snapshot, ROOT/'dist'/'home-sync', save, frontend=ROOT/'frontend')
+                result = refresh(state, snapshot, ROOT/'dist'/'home-sync', save, frontend=ROOT/'frontend', diagrams=DIAGRAMS)
                 print(result['reason'])
                 print('Comparison report:', result['report'])
                 if result['safe']:
                     print('New working copy:', result['working'])
                     print(f"Gallery: {result['photos_verified']} images verified, {result['photos_downloaded']} downloaded; {result['local_drafts_preserved']} local import drafts preserved.")
+                    print(f"Diagrams: {result['diagrams_verified']} SVGs verified, {result['diagrams_downloaded']} downloaded.")
+                    if result['diagrams_kept_local']:
+                        print('Kept your own rendering of the same diagram source:', ', '.join(result['diagrams_kept_local']))
+                    if result['diagrams_missing_on_server']:
+                        print('Missing on the server too (those pages show a broken image):', ', '.join(result['diagrams_missing_on_server']))
                     print('Choose 6 to restart the local server using this copy. Website program files and other media were not downloaded.')
                 else:
                     print('Saved paths and existing databases are unchanged. Review the report before proceeding.')

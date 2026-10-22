@@ -105,19 +105,19 @@ locally, then open `http://127.0.0.1:5001/math/create.html`. Follow the existing
 and notation. Search for duplicates before creating an entry.
 
 For a new text/equation entry, prepare with **2** and publish via **3/4/5** after
-review. The new-entry publisher does not transfer images or generate diagrams;
-entries requiring those need a separate publication plan even if local preview
-works. A Git push does not publish database content. Verify live, then refresh
+review. PSTricks diagrams are rendered on this computer with **19** and published
+with the entry. Included images and other media still need a separate
+publication plan, even if local preview works. A Git push does not publish database content. Verify live, then refresh
 the baseline/working copy with **8** after stopping the local server.
 
 Alternatively, the guide's **production-first** section explains backing up,
 creating the entry directly on the live site, verifying it, and using **8** to
 bring it home. A live save is immediately public and does not need helper
 publication. Conflicting unpublished local edits must be reconciled before a
-refresh can switch working copies. Option 8 is not a general two-way merge and
-does not transfer math diagrams or source code. Production-first is not a route
-for new or changed diagrams or images, because server-side diagram rendering is
-unverified.
+refresh can switch working copies. Option 8 is not a general two-way merge. It
+downloads missing math diagram SVGs but not source code. Production-first is not
+a route for new or changed diagrams or images, because the live editor would
+render diagrams on the server. Use the diagram route instead.
 
 Option **1** marks any math change that option 2 would refuse as `[unsupported]`
 and explains why. Some existing entries cannot be patched through the helper at

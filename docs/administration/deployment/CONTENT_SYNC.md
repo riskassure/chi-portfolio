@@ -222,6 +222,11 @@ against the remembered baseline and working copy, not just math fields.
 
 For ordinary tables, refresh requires that local content is unchanged from the
 baseline or matches live (profile save timestamps/JSON spacing are ignored).
+Math entries and their diagram rows are compared by what the entry is: canonical
+name, text, metadata and diagrams. Row ids, `created_at`/`updated_at` and the
+generated page HTML are ignored, so an entry you published matches the local
+copy it came from. An unpublished local edit still stops the refresh. Local
+diagram-failure diagnostics are not carried into the new copies.
 Photos are compared individually by filename and editable metadata, including
 visibility. Gallery IDs, rotation counters and rotation timestamps may differ.
 Unpublished or conflicting local photos still stop the refresh. Unrecognized
@@ -234,6 +239,14 @@ A missing remote image, unsafe filename or different local image stops the
 refresh. Same-filename image replacements require manual review. Limits are
 25 MB per image and 1 GB for the gallery. Files absent from the live catalog are
 not deleted locally.
+
+Every hash-named diagram SVG referenced by the live diagram rows is checked
+against a read-only SSH manifest. Missing SVGs are downloaded with SCP into the
+new sync folder, verified (checksum and the same SVG safety check as publishing),
+then installed into `backend/data/math/diagrams/` without overwriting. A local
+SVG with different bytes is kept when it is a valid SVG, because it renders the
+same diagram source. It stops the refresh when it is not valid. A file the
+server itself lacks is reported, not fatal.
 
 Local Google Photos import drafts are preserved in the new working database;
 their gallery links are remapped by filename to the live IDs. Private draft
@@ -248,8 +261,8 @@ Choose **6** to restart the local server on the refreshed working copy. The
 baseline must remain unchanged. A comparison report is saved on both successful
 and blocked comparisons. No live database writes or reloads are performed.
 
-Website program files and other media (music, PDFs, math diagrams) are not
-downloaded. If a transfer or state save fails, the old database paths remain
+Website program files and other media (music, PDFs) are not downloaded; math
+diagram SVGs are. If a transfer or state save fails, the old database paths remain
 active; verified extra images may remain and can be reused on retry. The report's
 `refresh_complete` flag indicates whether the switch finished. Stop the local server before switching copies
 so it does not keep writing to the old database. Do not run concurrent helpers.
@@ -456,9 +469,7 @@ The same commands work from the command line: `backend/diagram_sync.py
 render-missing --db <working.db> --canonical <name>` and `backend/diagram_sync.py
 prepare --base <base.db> --local <working.db> --canonical <name> --output <zip>`.
 
-Until option 8 learns to compare diagram rows by content (next change), it stops
-after a diagram publish with "File-backed content changed". Your working copy is
-not affected.
+After publishing, option 8 brings the entry home and checks or downloads its SVGs.
 
 ## Upload a reviewed package through the API
 

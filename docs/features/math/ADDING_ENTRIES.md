@@ -95,7 +95,8 @@ In the helper:
 
 1. **1** lists math differences from the unchanged baseline. Anything option 2
    would refuse is marked `[unsupported]` with a `Why:` line, for example a slug
-   the publisher rejects or content containing diagrams.
+   the publisher rejects or included images. An entry whose PSTricks diagrams
+   have no SVG yet asks you to choose **19**, which renders them on this computer.
 2. **2** prepares the new entry you select. Review its text and all metadata.
 3. **3** stages the reviewed package.
 4. **4** checks the live database for conflicts and missing metadata/targets.
