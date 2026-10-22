@@ -7,6 +7,21 @@ from services.math.render_helper import render_prose_latex_to_html
 
 
 class DiagramProtectionTests(unittest.TestCase):
+    def test_generated_image_is_outside_display_math(self):
+        image = '<div class="math-diagram-wrap"><img src="/api/math/diagrams/test.svg"></div>'
+        for opening, closing in (('$$', '$$'), (r'\[', r'\]')):
+            with self.subTest(opening=opening):
+                rendered = render_prose_latex_to_html('Before.\n' + opening + '\n' + image + '\n' + closing + '\nAfter.')
+                self.assertIn(image, rendered)
+                self.assertNotIn(opening, rendered)
+                self.assertIn('Before.', rendered)
+                self.assertIn('After.', rendered)
+
+    def test_display_with_additional_math_is_not_stripped(self):
+        image = '<div class="math-diagram-wrap"><img src="test.svg"></div>'
+        rendered = render_prose_latex_to_html('$$x + ' + image + '$$')
+        self.assertIn('$$', rendered)
+
     def test_display_diagram_preserves_rows_and_labels(self):
         diagram = r"\[\xymatrix{A\ar[r]^f\ar[d]_u & B\ar[d]^v \\" + "\n" + r"C\ar[r]_g & D}\]"
         rendered = render_prose_latex_to_html("Before.\n\n" + diagram + "\n\nAfter.")

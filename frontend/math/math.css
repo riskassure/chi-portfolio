@@ -1077,6 +1077,19 @@ dfn {
     transform: rotate(180deg);
 }
 
+/* Generated diagrams keep their natural size and sit centered in the entry. */
+.math-diagram-wrap {
+    margin: 1.25rem 0;
+    text-align: center;
+}
+
+.math-diagram-wrap .math-diagram {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-inline: auto;
+}
+
 .pm-reidemeister-arrow {
     color: #334155;
     font-family: Georgia, "Times New Roman", serif;

@@ -1,5 +1,11 @@
 # Add a new mathematics entry
 
+Diagram display fix (October 22, 2026): a generated diagram image that is the
+entire contents of `$$...$$` or `\[...\]` is rendered outside those delimiters,
+so MathJax does not typeset its HTML. Existing stored pages need their rendered
+HTML rebuilt (option 19 reuses the SVG). Deploy the matching `render_helper.py`
+before publishing such an entry, because publication rebuilds its HTML on the server.
+
 Checked against `create.html`, `math_editor.js`, the concept-creation route/service,
 and the website helper on October 21, 2026. This guide describes the recommended
 local-first workflow and the alternative production-first workflow. It does not

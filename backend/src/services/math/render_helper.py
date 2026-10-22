@@ -1730,6 +1730,14 @@ def render_prose_latex_to_html(tex: str) -> str:
 
     html = strip_latex_comments(html)
 
+    # A replaced PSTricks block may have been the entire display equation.
+    # Its generated HTML must sit outside MathJax delimiters; keep displays
+    # containing any additional mathematical source unchanged.
+    diagram_html = r'(<div class="(?:math-diagram-wrap|img-placeholder)">(?:(?!</div>)[\s\S])*?</div>)'
+    for opening, closing in ((r'\$\$', r'\$\$'), (r'\\\[', r'\\\]')):
+        html = re.sub(opening + r'\s*' + diagram_html + r'\s*' + closing,
+                      lambda match: '\n\n' + match.group(1) + '\n\n', html)
+
     html = render_cyrillic_latex_macros(html)
 
     # Protect display-math environments during prose spacing cleanup.
