@@ -1,6 +1,7 @@
 # backend/src/services/math/slug_helper.py
 
 import re
+import unicodedata
 
 
 def generate_slug(
@@ -26,3 +27,57 @@ def generate_slug(
         .replace("_", "-")
         .replace("--", "-")
     )
+
+# New entries made in the editor. generate_slug above is kept for the
+# PlanetMath import pipeline, whose output is what existing URLs use.
+
+# Same format publish_math_entry.py requires.
+NEW_SLUG_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+
+APOSTROPHES = "'’‘ʼ`"
+
+
+def slug_from_title(title: str | None) -> str:
+    """Lowercase ASCII words joined by hyphens; apostrophes are dropped."""
+    text = unicodedata.normalize("NFKD", title or "")
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = re.sub(f"[{APOSTROPHES}]", "", text).lower()
+    return re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+
+
+def canonical_from_slug(slug: str) -> str:
+    """metric-space -> MetricSpace."""
+    return "".join(word[:1].upper() + word[1:] for word in slug.split("-"))
+
+
+def new_entry_names(cursor, title: str, requested_slug: str | None = None) -> tuple[str, str]:
+    """Return (canonical_name, slug) for a new entry, or raise ValueError.
+
+    Refuses what publish_math_entry.check_target would refuse about the
+    entry's names, so the problem shows before anything is saved.
+    """
+    checks = (
+        ("the title of", "SELECT title FROM math_concepts WHERE lower(trim(title)) = lower(trim(?))"),
+        ("a synonym of", "SELECT mc.title FROM math_synonyms s LEFT JOIN math_concepts mc ON mc.id = s.concept_id "
+                         "WHERE lower(trim(s.synonym_text)) = lower(trim(?))"),
+        ("a term defined in", "SELECT mc.title FROM math_definitions d LEFT JOIN math_concepts mc ON mc.id = d.concept_id "
+                              "WHERE lower(trim(d.defined_term)) = lower(trim(?))"),
+    )
+    for kind, query in checks:
+        row = cursor.execute(query, (title,)).fetchone()
+        if row:
+            raise ValueError(f"The title '{title.strip()}' is already {kind} '{row[0] or 'an entry'}'; review that entry first.")
+    slug = (requested_slug or "").strip() or slug_from_title(title)
+    if not slug:
+        raise ValueError("The title has no letters or digits to build a URL slug from; enter a slug.")
+    if not NEW_SLUG_PATTERN.fullmatch(slug):
+        raise ValueError(f"Slug '{slug}' must be lowercase letters and digits joined by single hyphens.")
+    canonical_name = canonical_from_slug(slug)
+    for column, value in (("slug", slug), ("canonical_name", canonical_name)):
+        row = cursor.execute(
+            f"SELECT title FROM math_concepts WHERE lower(trim({column})) = lower(trim(?))",
+            (value,),
+        ).fetchone()
+        if row:
+            raise ValueError(f"The {column.replace('_', ' ')} '{value}' is already used by '{row[0]}'; choose another slug.")
+    return canonical_name, slug

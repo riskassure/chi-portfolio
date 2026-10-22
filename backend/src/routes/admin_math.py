@@ -11,7 +11,7 @@ from services.math.concept_render_service import (
 )
 
 from services.math.slug_helper import (
-    generate_slug,
+    new_entry_names,
 )
 
 from services.math.audit_service import (
@@ -912,8 +912,6 @@ def create_new_math_concept():
                 "message": "Title and LaTeX body fields are strictly required."
             }), 400
 
-        canonical_name = title.replace(" ", "")
-        slug = generate_slug(canonical_name)
         uniform_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         conn = None
@@ -922,6 +920,14 @@ def create_new_math_concept():
             conn = sqlite3.connect(str(DB_PATH))
             cursor = conn.cursor()
             cursor.execute("PRAGMA foreign_keys = ON;")
+
+            try:
+                canonical_name, slug = new_entry_names(cursor, title, data.get("slug"))
+            except ValueError as e:
+                return jsonify({
+                    "success": False,
+                    "message": str(e)
+                }), 400
 
             create_result = create_math_concept(
                 cursor=cursor,
