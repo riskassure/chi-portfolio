@@ -43,6 +43,21 @@ def fetch_verified(settings, remote, local):
     return validate_package(data)
 
 
+def new_entry_status(db, payload):
+    """Return the one-line verdict on adding a new text entry to the database open as db; never writes.
+
+    ALREADY PRESENT needs the complete entry and all its metadata to match, not just its name.
+    """
+    intended = {k: sorted(v) if isinstance(v, list) else v for k, v in payload.items() if k != 'canonical_name'}
+    if read_snapshot(None, connection=db).get(payload['canonical_name']) == intended:
+        return 'ALREADY PRESENT — do not apply again'
+    try:
+        check_target(db, payload)
+    except ValueError as error:
+        return 'BLOCKED — ' + str(error)
+    return 'NO DUPLICATE FOUND — eligible for further review'
+
+
 def preview(data, snapshot=None, *, live=False):
     validate_package(data)
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
@@ -131,17 +146,7 @@ def preview(data, snapshot=None, *, live=False):
         report += ['Proposed operation: add one new entry', json.dumps(payload, ensure_ascii=False, indent=2)]
         if snapshot:
             with closing(sqlite3.connect(Path(snapshot).resolve().as_uri() + '?mode=ro', uri=True)) as db:
-                records = read_snapshot(snapshot, connection=db)
-                intended = {k: sorted(v) if isinstance(v, list) else v
-                            for k, v in payload.items() if k != 'canonical_name'}
-                if records.get(payload['canonical_name']) == intended:
-                    status = 'ALREADY PRESENT — do not apply again'
-                else:
-                    try:
-                        check_target(db, payload)
-                        status = 'NO DUPLICATE FOUND — eligible for further review'
-                    except ValueError as error:
-                        status = 'BLOCKED — ' + str(error)
+                status = new_entry_status(db, payload)
     if snapshot:
         report += [('File root: '+str(frontend) if payload.get('kind') in ('frontend-files', 'website-code') else
                     ('Live database: ' if live else 'Comparison snapshot: ') + str(Path(snapshot).resolve())), status,
