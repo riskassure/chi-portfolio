@@ -227,6 +227,14 @@ September 2026 entries, before the helper existed. Treat them as a record of
 what was done, not as a way to add entries. Use the helper instead. Do not
 run them in bulk or in order. Many of them check the content as it was then.
 
+The three `add_*_entries_20261023.py` scripts (field theory, real analysis,
+averages) are records of entries written locally and then published one at a
+time through the helper. They only add their own new entries, and their
+related links are the published ones: a related link to an entry published
+later in the batch was dropped, because the live publisher accepts only
+related entries that are already live. Their shared code is in
+`math_entry_batch.py`.
+
 Most of them also change existing entries: they edit text and add related
 links, synonyms and defined terms. The helper can't publish those changes, so
 re-running a script leaves the working copy different from the live site in a
