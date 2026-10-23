@@ -376,8 +376,9 @@ and then bringing the change home with option 8 is reasonable only for:
   unchanged; check that the images still show.
 
 It is **not** a route for any change inside a PSTricks block, a new diagram, or new
-or changed image files. The live editor would render diagrams on the server, and
-server-side LaTeX/dvisvgm support is unverified; nothing transfers image files.
+or changed image files. The live editor would render diagrams on the server inside its
+database transaction, and its output differs from the stored SVGs (see the
+probe result below); nothing transfers image files.
 Publish PSTricks changes through the diagram route instead; new or changed image
 files still have no supported route, so keep those local. The
 production-first behavior above comes from reading the editor and update routes,
@@ -401,10 +402,18 @@ database is opened read-only, the diagrams folder is only read, and the site is
 not reloaded. The report's first line is `SERVER CAN RENDER PSTRICKS` or
 `SERVER CANNOT RENDER PSTRICKS`.
 
+**Result (run by Chi on 2026-10-22):** `SERVER CAN RENDER PSTRICKS`. The server
+has TeX Live 2022 (Debian) `latex`, `dvisvgm` 2.13.1, and `pstricks`, `pst-tree`,
+`pst-plot`, `pst-node` and `multido`. Both samples rendered (778 and 2,539
+bytes). The fresh server rendering of the stored live diagram
+`053dab2b6a207be8.svg` **differs in bytes** from the stored file, so the server's
+toolchain does not reproduce the existing SVGs exactly. The probe changed
+nothing.
+
 A passing check does not make the live editor a safe route for diagram changes.
 The editor renders inside its database transaction and writes straight to the
-final SVG name. Diagram publication through the helper is planned separately,
-with SVGs rendered on the laptop.
+final SVG name, and its output would not match the laptop's. Publish diagram
+changes through the diagram route below, with SVGs rendered on the laptop.
 
 ### Publish a diagram change
 
