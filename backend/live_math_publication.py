@@ -2,6 +2,7 @@
 import hashlib
 import io
 import json
+import sys
 import zipfile
 
 from inspect_staged_package import preview
@@ -17,6 +18,9 @@ import diagram_sync
 
 
 def publish(data, database, backups, source):
+    # Diagram preview needs the site's extractor before the updater runs.
+    # Isolated SSH processes do not inherit the local helper's import path.
+    sys.path.insert(0, str(source.resolve()))
     # Validates archive and supported payload without executing bundled scripts.
     preview(data)
     with zipfile.ZipFile(io.BytesIO(data)) as archive:

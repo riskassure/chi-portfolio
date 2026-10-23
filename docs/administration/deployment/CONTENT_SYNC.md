@@ -1,5 +1,13 @@
 # Website content synchronization
 
+Diagram publication troubleshooting: a `No module named 'services'` traceback
+inside the initial package preview indicates an older helper publisher that did
+not initialize the site's source import path. Restart the helper with the updated
+code, retain the pending receipt, then repeat option 4 before retrying option 5.
+The corrected publisher is sent over SSH by the helper; this fix does not require
+a website code deployment. Initial preview runs before publication changes files
+or database rows; other interruption locations still require checking live state.
+
 For the everyday workflow and environment overview, start with the
 [admin runbook](../../ADMIN_RUNBOOK.md). This guide provides detailed helper
 procedures. Other guides are listed in the [documentation index](../../README.md).

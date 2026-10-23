@@ -20,6 +20,7 @@ from diagram_sync import build_payload, cleanup, render_missing, write_package
 from inspect_staged_package import preview
 from live_math_publication import publish
 import preflight_live_package
+import publish_staged_package
 from preview_math_sync import read_snapshot
 from services.math.render_helper import hash_pstricks_block
 from test_diagram_sync import FIGURE, PICTURE, SVG, TREE, create_db, svg_for
@@ -343,7 +344,13 @@ class DiagramPublishTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('EXPECTED TEXT MATCHES', result.stdout)
         self.assertEqual(before, hashlib.sha256(self.live.read_bytes()).digest())
-        self.run_publish(data)
+        request['modules'].append(('live_math_publication',
+                                  (SOURCE.parent / 'live_math_publication.py').read_text(encoding='utf-8')))
+        result = subprocess.run([sys.executable, '-I', '-B', '-c', publish_staged_package.BOOTSTRAP],
+                                input=json.dumps(request), capture_output=True, text=True, encoding='utf-8')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout.split('PUBLICATION_RESULT=')[1])['status'], 'APPLIED')
+        self.assert_no_dangling_rows()
         for package_sha, expected in ((None, 'COMMITTED'), (hashlib.sha256(data).hexdigest(), [])):
             request = diagram_recovery.build_request('cwoo', package_sha, False)
             request['database'] = str(self.live)
