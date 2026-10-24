@@ -512,7 +512,10 @@ stay out of a batch; publish existing-entry edits one at a time with option 2.
    copy but not the baseline), with any that option 2 would refuse and why. It
    also lists other local changes, which are not published and may later stop
    option 8. Choose entries (`1,3-5` or `ALL`) and give the batch a name.
-2. **Check before anything is written.** It reports every blocker at once:
+2. **Check before anything is written.** It first reads the names of the live
+   entries over SSH (read-only), so related concepts and link targets outside
+   the batch are checked against the live site as it is now, not against an
+   older baseline. It then reports every blocker at once:
    - an entry option 1 marks `[unsupported]`, including missing diagram SVGs
      (render them first with **19**);
    - two entries in the batch with the same canonical name, slug or title, or a
@@ -566,7 +569,8 @@ is not enough: a partial match is a conflict, and the batch stops.
 
 **When it stops.** Progress, staging paths and receipts are saved in
 `manifest.json` after every step, and a lock file stops two helper windows from
-running the same batch. Choose **20** again and type `RESUME`; it carries on
+running the same batch: option 20 takes it before showing or changing anything
+about a saved batch, including `SET ASIDE`, and rereads the manifest once it has it. Choose **20** again and type `RESUME`; it carries on
 from the saved state and never re-prepares packages from the working copy.
 - A connection failure while staging or checking is retried after 30, 60 and
   120 seconds, then the batch stops.

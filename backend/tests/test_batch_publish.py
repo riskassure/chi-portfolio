@@ -92,6 +92,10 @@ class BatchFixture(unittest.TestCase):
             item.stop()
         self.temp.cleanup()
 
+    def plan(self, selected, title, live=None):
+        """Plan with the live site's names; by default the live site matches the baseline."""
+        return bp.plan(self.state, selected, title, sorted(bp.read_snapshot(self.base)) if live is None else live)
+
     def add_batch(self):
         """Three new entries: Subgroup needs Group (live); Coset needs Subgroup; Index links to Coset."""
         add_entry(self.working, 'Subgroup', r'A subset of a \PMlinkname{group}{Group}.', related=['Group'])
@@ -103,7 +107,7 @@ class PlanTests(BatchFixture):
     def test_plan_orders_freezes_and_changes_no_database(self):
         self.add_batch()
         before = file_hash(self.base), file_hash(self.working)
-        manifest, lines = bp.plan(self.state, ['IndexOfASubgroup', 'Coset', 'Subgroup'], 'groups')
+        manifest, lines = self.plan(['IndexOfASubgroup', 'Coset', 'Subgroup'], 'groups')
         self.assertEqual(manifest['order'], ['Subgroup', 'Coset', 'IndexOfASubgroup'])
         self.assertEqual((file_hash(self.base), file_hash(self.working)), before)
         self.assertEqual(manifest['entries']['IndexOfASubgroup']['needs'], ['Coset'])
@@ -124,7 +128,7 @@ class PlanTests(BatchFixture):
         add_entry(self.working, 'Coset', 'Text.', related=['LeftCoset'])
         add_entry(self.working, 'Monoid', 'Text.')
         before = file_hash(self.working)
-        manifest, lines = bp.plan(self.state, ['LeftCoset', 'RightCoset', 'Coset', 'Monoid'], 'cosets')
+        manifest, lines = self.plan(['LeftCoset', 'RightCoset', 'Coset', 'Monoid'], 'cosets')
         self.assertIsNone(manifest)
         report = '\n'.join(lines)
         self.assertIn('LeftCoset ↔ RightCoset', report)
@@ -132,7 +136,7 @@ class PlanTests(BatchFixture):
         self.assertNotIn('Monoid from', report)
         self.assertEqual(file_hash(self.working), before)
         self.assertFalse((self.root / 'batches').exists())
-        manifest, _ = bp.plan(self.state, ['Monoid'], 'monoid')
+        manifest, _ = self.plan(['Monoid'], 'monoid')
         self.assertEqual(manifest['order'], ['Monoid'])
 
     def test_unresolved_ambiguous_and_outside_targets_block(self):
@@ -143,18 +147,35 @@ class PlanTests(BatchFixture):
         add_entry(self.working, 'Draft', 'Not selected.')
         add_entry(self.working, 'Ideal', r'In a \PMlinkname{ring}{ring}, see \PMlinkname{x}{NoSuchEntry} '
                                          r'and \PMlinkname{d}{Draft}.', related=['Draft'])
-        manifest, lines = bp.plan(self.state, ['Ideal'], 'ideal')
+        manifest, lines = self.plan(['Ideal'], 'ideal')
         report = '\n'.join(lines)
         self.assertIsNone(manifest)
         self.assertIn('ring matches more than one canonical name', report)
         self.assertIn('NoSuchEntry matches no live entry or entry in this batch', report)
         self.assertIn('Draft matches no live entry or entry in this batch (a local entry not in this batch)', report)
-        self.assertIn('Ideal is related to Draft, which is a local entry not in this batch', report)
+        self.assertIn('Ideal is related to Draft, which is not on the live site and not in this batch', report)
+
+    def test_dependencies_are_checked_against_the_live_site_not_an_older_baseline(self):
+        # Ring went live after the baseline was taken; Field was removed from the live site since.
+        add_entry(self.base, 'Field', 'Old.')
+        shutil.copyfile(self.base, self.working)
+        self.state['base_sha256'] = w.digest(self.base)
+        add_entry(self.working, 'Ring', 'Live since the baseline.')
+        add_entry(self.working, 'Ideal', r'A subset of a \PMlinkname{ring}{Ring}.', related=['Ring'])
+        add_entry(self.working, 'Subfield', 'Text.', related=['Field'])
+        live = ['Group', 'Ring']
+        manifest, lines = self.plan(['Ideal'], 'ideals', live)
+        self.assertIsNotNone(manifest, lines)
+        self.assertEqual(manifest['entries']['Ideal']['needs'], [])
+        self.assertEqual(manifest['entries']['Ideal']['links'][0]['canonical'], 'Ring')
+        manifest, lines = self.plan(['Subfield'], 'fields', live)
+        self.assertIsNone(manifest)
+        self.assertIn('Subfield is related to Field, which is not on the live site and not in this batch', '\n'.join(lines))
 
     def test_names_clashing_inside_the_batch_block(self):
         add_entry(self.working, 'NormalSubgroup', 'Text.', synonyms=['Invariant subgroup'])
         add_entry(self.working, 'InvariantSubgroup', 'Text.', title='Invariant subgroup', slug='invariant-subgroup')
-        manifest, lines = bp.plan(self.state, ['NormalSubgroup', 'InvariantSubgroup'], 'normal')
+        manifest, lines = self.plan(['NormalSubgroup', 'InvariantSubgroup'], 'normal')
         self.assertIsNone(manifest)
         self.assertIn("InvariantSubgroup's title is a synonym or defined term of NormalSubgroup", '\n'.join(lines))
 
@@ -197,7 +218,7 @@ class RemoteCheckTests(BatchFixture):
 
     def test_projected_batch_passes_but_each_entry_needs_its_dependencies_live(self):
         self.add_batch()
-        manifest, _ = bp.plan(self.state, ['Subgroup', 'Coset', 'IndexOfASubgroup'], 'groups')
+        manifest, _ = self.plan(['Subgroup', 'Coset', 'IndexOfASubgroup'], 'groups')
         projected = self.run_check(manifest, manifest['order'], True)
         self.assertTrue(all(status.startswith('NO DUPLICATE FOUND') and not found
                             for status, found in projected.values()), projected)
@@ -208,9 +229,25 @@ class RemoteCheckTests(BatchFixture):
         self.assertEqual(self.run_check(manifest, ['Subgroup'], False)['Subgroup'], (
             'NO DUPLICATE FOUND — eligible for further review', []))
 
+    def test_live_catalog_is_read_in_isolation_and_plans_against_the_live_site(self):
+        add_entry(self.live, 'Ring', 'Created live after the baseline.')
+        add_entry(self.working, 'Ideal', r'A subset of a \PMlinkname{ring}{Ring}.', related=['Ring'])
+        request = batch_check.catalog_request('cwoo')
+        request['database'] = str(self.live)
+        before = file_hash(self.live)
+        result = subprocess.run([sys.executable, '-I', '-B', '-c', batch_check.CATALOG_BOOTSTRAP], input=json.dumps(request),
+                                capture_output=True, text=True, encoding='utf-8')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(file_hash(self.live), before)
+        live = batch_check.read_catalog(result.stdout)
+        self.assertEqual(live, ['Group', 'Ring'])
+        manifest, lines = self.plan(['Ideal'], 'ideals', live)
+        self.assertIsNotNone(manifest, lines)
+        self.assertEqual(self.run_check(manifest, ['Ideal'], False)['Ideal'], ('NO DUPLICATE FOUND — eligible for further review', []))
+
     def test_already_present_needs_a_full_match(self):
         self.add_batch()
-        manifest, _ = bp.plan(self.state, ['Subgroup'], 'one')
+        manifest, _ = self.plan(['Subgroup'], 'one')
         add_entry(self.live, 'Subgroup', r'A subset of a \PMlinkname{group}{Group}.', related=['Group'])
         self.assertTrue(self.run_check(manifest, ['Subgroup'], False)['Subgroup'][0].startswith('ALREADY PRESENT'))
         with closing(sqlite3.connect(self.live)) as db:
@@ -223,7 +260,7 @@ class RemoteCheckTests(BatchFixture):
     def test_new_entry_with_diagrams_needs_its_rows_and_files_for_already_present(self):
         add_entry(self.working, 'RootedTree', 'A rooted tree:\n' + TREE)
         diagram_sync.render_missing(self.working, 'RootedTree', self.root / 'diagrams', svg_for)
-        manifest, _ = bp.plan(self.state, ['RootedTree'], 'trees')
+        manifest, _ = self.plan(['RootedTree'], 'trees')
         entry = manifest['entries']['RootedTree']
         self.assertTrue(entry['diagrams'])
         preview = Path(manifest['folder']) / 'previews' / entry['diagram_files'][0]['file']
@@ -244,7 +281,7 @@ class RemoteCheckTests(BatchFixture):
 
     def test_a_blocked_entry_blocks_what_needs_it_in_the_projection(self):
         self.add_batch()
-        manifest, _ = bp.plan(self.state, ['Subgroup', 'Coset'], 'two')
+        manifest, _ = self.plan(['Subgroup', 'Coset'], 'two')
         add_entry(self.live, 'Subgroup2', 'Clash.', title='Subgroup', slug='subgroup-2')
         projected = self.run_check(manifest, manifest['order'], True)
         self.assertIn('Duplicate title', projected['Subgroup'][0])
@@ -301,7 +338,7 @@ class PublishTests(BatchFixture):
             item.start()
 
     def make(self, names=('Subgroup', 'Coset', 'IndexOfASubgroup')):
-        manifest, _ = bp.plan(self.state, list(names), 'groups')
+        manifest, _ = self.plan(list(names), 'groups')
         self.state['batch'] = manifest['folder']
         site = FakeSite({n: set(manifest['entries'][n]['needs']) | ({'Group'} if n == 'Subgroup' else set())
                          for n in manifest['order']})
@@ -313,6 +350,7 @@ class PublishTests(BatchFixture):
         bring_home = bring_home or (lambda state: dict(safe=True, report='r.json'))
         with patch.object(bp, 'stage', site.stage), patch.object(bp, 'check', site.check), \
                 patch.object(bp, 'publish_staged', site.publish), patch.object(w, 'bring_home', bring_home), \
+                patch.object(batch_check, 'live_catalog', lambda username: sorted(site.live)), \
                 patch('builtins.input', side_effect=list(answers)):
             bp.run(self.state)
 
@@ -419,6 +457,28 @@ class PublishTests(BatchFixture):
         (Path(manifest['folder']) / '.lock').write_text('{}')
         with self.assertRaisesRegex(bp.BatchStopped, 'Another option 20 run'):
             self.run_option(site, ['RESUME'])
+        self.assertEqual(site.published, [])
+
+    def test_set_aside_waits_for_the_lock_and_changes_nothing_while_another_run_holds_it(self):
+        manifest, site = self.make()
+        before = (Path(manifest['folder']) / 'manifest.json').read_text()
+        with bp.locked(manifest):
+            with self.assertRaisesRegex(bp.BatchStopped, 'Another option 20 run'):
+                self.run_option(site, [])  # no prompt is shown, so SET ASIDE can't even be typed
+        self.assertEqual((Path(manifest['folder']) / 'manifest.json').read_text(), before)
+        self.assertEqual(self.state['batch'], manifest['folder'])
+        self.run_option(site, ['SET ASIDE', ''])
+        self.assertNotIn('batch', self.state)
+        self.assertIn('set_aside', self.manifest(manifest))
+
+    def test_the_batch_is_reloaded_after_taking_the_lock(self):
+        manifest, site = self.make()
+        stale = json.loads(json.dumps(manifest))
+        manifest['publication'] = 'invalidated'  # what another run saved before releasing the lock
+        bp.save_manifest(manifest)
+        with patch.object(bp, 'load_manifest', lambda state: stale):
+            with self.assertRaisesRegex(bp.BatchStopped, 'approval no longer holds'):
+                self.run_option(site, ['RESUME'])
         self.assertEqual(site.published, [])
 
     def test_blocked_synchronization_is_kept_and_retried_without_republishing(self):

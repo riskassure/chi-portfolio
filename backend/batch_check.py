@@ -32,7 +32,7 @@ MODULES = ('pythonanywhere_api', 'stage_pythonanywhere_package', 'preview_math_s
            'apply_math_text_patch', 'profile_sync', 'photo_sync', 'photo_metadata_sync', 'photo_removal_sync',
            'frontend_sync', 'diagram_sync', 'inspect_staged_package', 'batch_links', 'batch_check')
 READY = ('NO DUPLICATE FOUND', 'ALREADY PRESENT')
-BOOTSTRAP = '''
+LOADER = '''
 import sys, json, types, hashlib, base64
 from pathlib import Path
 from datetime import datetime, timezone
@@ -42,6 +42,13 @@ for name, source in config['modules']:
     module.__file__ = '<trusted-local-batch-check>/' + name + '.py'
     sys.modules[name] = module
     exec(compile(source, module.__file__, 'exec'), module.__dict__)
+'''
+# Read-only: the canonical names on the live site now, for planning a batch.
+CATALOG_BOOTSTRAP = LOADER + '''
+from batch_check import catalog
+print('BATCH_CATALOG_RESULT=' + json.dumps(catalog(Path(config['database']))))
+'''
+BOOTSTRAP = LOADER + '''
 from stage_pythonanywhere_package import read_package, validate_package
 from batch_check import check_items
 packages = []
@@ -56,6 +63,39 @@ results = check_items(packages, database, database.parent / 'src', database.pare
 print('BATCH_CHECK_RESULT=' + json.dumps(dict(checked_utc=datetime.now(timezone.utc).isoformat(),
                                               sha256=[item['sha256'] for item in config['items']], results=results)))
 '''
+
+
+def catalog(database):
+    """Return the canonical names in database, read-only."""
+    with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True)) as db:
+        return sorted(row[0] for row in db.execute('SELECT canonical_name FROM math_concepts WHERE canonical_name IS NOT NULL'))
+
+
+def catalog_request(username):
+    if not re.fullmatch(r'[A-Za-z0-9_]+', username):
+        raise ValueError('Invalid username.')
+    return dict(database=f'/home/{username}/chi-portfolio/backend/portfolio.db',
+                modules=[(name, Path(__file__).with_name(name + '.py').read_text(encoding='utf-8')) for name in MODULES])
+
+
+def live_catalog(username):
+    """Read the live site's canonical names over SSH, without changing anything."""
+    request = catalog_request(username)
+    if not shutil.which('ssh'):
+        raise ValueError('Windows OpenSSH Client is required.')
+    result = subprocess.run(['ssh', username + '@ssh.pythonanywhere.com', 'python3.13 -I -B -c ' + shlex.quote(CATALOG_BOOTSTRAP)],
+                            input=json.dumps(request), stdout=subprocess.PIPE, text=True, encoding='utf-8', check=True)
+    return read_catalog(result.stdout)
+
+
+def read_catalog(stdout):
+    lines = [line[len('BATCH_CATALOG_RESULT='):] for line in stdout.splitlines() if line.startswith('BATCH_CATALOG_RESULT=')]
+    if len(lines) != 1:
+        raise ValueError('No unambiguous list of live entries received; nothing prepared.')
+    names = json.loads(lines[0])
+    if not isinstance(names, list) or not all(isinstance(name, str) for name in names):
+        raise ValueError('Invalid list of live entries; nothing prepared.')
+    return names
 
 
 def read_item(data):

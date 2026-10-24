@@ -164,20 +164,23 @@ def duplicates(selected, working):
     return found
 
 
-def dependencies(state, selected, baseline, working):
-    """Return (graph, links per entry, blockers). graph maps each entry to the batch entries it needs first."""
+def dependencies(selected, live, working):
+    """Return (graph, links per entry, blockers). graph maps each entry to the batch entries it needs first.
+
+    live is the set of canonical names on the live site now, not the (possibly older) baseline.
+    """
     render = renderer()
-    index = name_index(sorted(set(baseline) | set(selected)))
-    unselected = name_index(sorted(set(working) - set(baseline) - set(selected)))
+    index = name_index(sorted(set(live) | set(selected)))
+    unselected = name_index(sorted(set(working) - set(live) - set(selected)))
     graph, links, blockers = {}, {}, []
     for name in selected:
         needs = set()
         for target in working[name]['related_concepts']:
             if target in selected:
                 needs.add(target)
-            elif target not in baseline:
-                blockers.append(f'{name} is related to {target}, which is ' +
-                                ('a local entry not in this batch' if target in working else 'not in the database'))
+            elif target not in live:
+                blockers.append(f'{name} is related to {target}, which is not on the live site ' +
+                                ('and not in this batch' if target in working else 'or in your working copy'))
         links[name] = entry_links(name, working[name]['cleaned_tex'], render, index)
         for link in links[name]:
             if link['status'] == 'ambiguous':
@@ -192,16 +195,18 @@ def dependencies(state, selected, baseline, working):
     return graph, links, blockers
 
 
-def plan(state, selected, title):
+def plan(state, selected, title, live_names):
     """Check the selected new entries and, if nothing blocks them, freeze the batch.
 
+    live_names are the canonical names on the live site now (batch_check.live_catalog): related
+    concepts and link targets outside the batch must be there, whatever the baseline says.
     Return (manifest or None, report lines). Only files under dist/math-batches are written.
     """
     new = {c['canonical']: c for c in w.changed_entries(state) if c['new']}
-    baseline, working = read_snapshot(state['base']), read_snapshot(state['working'])
+    working = read_snapshot(state['working'])
     blockers = [f"{name}: {new[name]['reason']}" for name in selected if not new[name]['supported']]
     blockers += duplicates(selected, working)
-    graph, links, found = dependencies(state, selected, baseline, working)
+    graph, links, found = dependencies(selected, set(live_names), working)
     blockers += found
     for loop in cycles(graph):
         blockers.append('These entries need each other in a loop, so no order works: ' + ' ↔ '.join(loop) +
@@ -533,7 +538,9 @@ def start(state):
     title = input('Batch name (for example: averages): ').strip()
     if not title:
         return None
-    manifest, lines = plan(state, selected, title)
+    print('Reading the names of the live entries (read-only).', flush=True)
+    live = retried(lambda: batch_check.live_catalog(state['username']), 'Reading the live entries')
+    manifest, lines = plan(state, selected, title, live)
     print('\n'.join(lines))
     if manifest is None:
         return None
@@ -578,35 +585,47 @@ def resume_choice(manifest):
                  '(anything else returns to the menu): ').strip()
 
 
+def reload(manifest):
+    """The manifest as saved now; another run may have changed it before this one took the lock."""
+    return json.loads((Path(manifest['folder']) / 'manifest.json').read_text(encoding='utf-8'))
+
+
 def run(state):
     manifest = load_manifest(state)
     if manifest:
-        choice = resume_choice(manifest)
-        if choice == 'SET ASIDE':
+        # Take the lock before reading the batch's state or changing anything about it.
+        with locked(manifest):
+            manifest = reload(manifest)
+            choice = resume_choice(manifest)
+            if choice == 'RESUME':
+                return proceed(manifest, state)
+            if choice != 'SET ASIDE':
+                return
             manifest['set_aside'] = now()
             save_manifest(manifest)
             state.pop('batch', None)
             w.save(state)
-            manifest = None
-        elif choice != 'RESUME':
-            return
-        elif manifest['publication'] == 'invalidated':
-            raise BatchStopped('This batch\'s approval no longer holds. Set it aside and start a new batch.')
+    manifest = start(state)
     if manifest is None:
-        manifest = start(state)
-        if manifest is None:
-            return
+        return
     with locked(manifest):
-        if manifest['publication'] in ('planned',):
-            if not approve(manifest, state):
-                return
-        elif manifest['publication'] in ('approved', 'publishing', 'stopped'):
-            if manifest['approval'] is None or manifest['approval']['fingerprint'] != fingerprint(manifest):
-                raise BatchStopped('The approved package list no longer matches this batch. Set it aside and start a new one.')
-            confirm_frozen(manifest, state)
-        if manifest['publication'] != 'complete':
-            publish_all(manifest, state)
-            print(progress(manifest))
-        if (manifest['verification'] or {}).get('status') != 'verified' and not verify(manifest):
+        proceed(reload(manifest), state)
+
+
+def proceed(manifest, state):
+    """Carry a batch on from its saved state. The caller holds its lock."""
+    if manifest['publication'] == 'invalidated':
+        raise BatchStopped('This batch\'s approval no longer holds. Set it aside and start a new batch.')
+    if manifest['publication'] in ('planned',):
+        if not approve(manifest, state):
             return
-        synchronize(manifest, state)
+    elif manifest['publication'] in ('approved', 'publishing', 'stopped'):
+        if manifest['approval'] is None or manifest['approval']['fingerprint'] != fingerprint(manifest):
+            raise BatchStopped('The approved package list no longer matches this batch. Set it aside and start a new one.')
+        confirm_frozen(manifest, state)
+    if manifest['publication'] != 'complete':
+        publish_all(manifest, state)
+        print(progress(manifest))
+    if (manifest['verification'] or {}).get('status') != 'verified' and not verify(manifest):
+        return
+    synchronize(manifest, state)
