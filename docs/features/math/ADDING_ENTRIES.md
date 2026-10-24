@@ -116,6 +116,20 @@ check titles against existing synonyms/defined terms. A related concept created
 only locally cannot be assumed to exist on production; publish dependencies in
 an appropriate order and recheck conflicts.
 
+**Several new entries at once.** When you have written a group of new entries
+locally, choose **20** instead of repeating 2 to 5 for each. Select the entries
+and name the batch. It checks them all first, orders them so each entry comes
+after the related concepts and `\PMlinkname` targets it needs, writes one
+review (`review.txt` under `dist/math-batches/<batch id>/`), and runs a
+read-only batch check against the live site. After you read the review and type
+`PUBLISH ALL`, it publishes each reviewed package in order, confirming right
+before each one that its dependencies are live. It then asks you to check the
+live pages (`VERIFIED`) and offers option 8. Entries that relate to or link to
+each other in a loop can't go in the same batch: both links are kept, so leave
+those entries out (with anything that depends on them) until a supported route
+exists. Details, stops and resuming:
+[Publish a batch of new entries](../../administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries).
+
 **Scope limit:** the helper publishes new entries with text, equations and PSTricks
 diagrams. Diagrams go through the diagram route, with SVGs rendered on your laptop,
 never on the server. Included images, TikZ/figure content and other blocked media

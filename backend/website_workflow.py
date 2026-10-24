@@ -185,15 +185,27 @@ def prepare_selected(state, canonical):
     candidates = {c['canonical']: c for c in changed_entries(state)}
     if canonical not in candidates:
         raise ValueError('No local change found for this entry.')
-    if not candidates[canonical]['supported']:
-        raise ValueError('This change cannot be published through the helper: ' + candidates[canonical]['reason'] +
+    package, report, proposed = build_package(state, candidates[canonical], ROOT / 'dist' / 'math-workflow' / uuid.uuid4().hex)
+    state['job'] = dict(canonical=canonical, package=str(package), sha256=digest(package),
+                        proposed=proposed, remote=None, checked=False)
+    save(state)
+    return report
+
+
+def build_package(state, change, folder):
+    """Write the review package for one changed entry (an item of changed_entries) into folder, which must be new.
+
+    Return (package path, review text, the entry as the package proposes it).
+    """
+    canonical = change['canonical']
+    if not change['supported']:
+        raise ValueError('This change cannot be published through the helper: ' + change['reason'] +
                          '. See "Entries the helper cannot publish" in CONTENT_SYNC.md.')
-    folder = ROOT / 'dist' / 'math-workflow' / uuid.uuid4().hex
     folder.mkdir(parents=True)
     package = folder / 'package.zip'
-    if candidates[canonical]['diagrams']:
+    if change['diagrams']:
         report = diagram_sync.prepare(Path(state['base']), Path(state['working']), canonical, package, DIAGRAMS)
-    elif candidates[canonical]['new']:
+    elif change['new']:
         entry = dict(read_snapshot(state['working'])[canonical], canonical_name=canonical)
         validate_entry(entry)
         with zipfile.ZipFile(package, 'x', compression=zipfile.ZIP_DEFLATED) as archive:
@@ -207,10 +219,7 @@ def prepare_selected(state, canonical):
     proposed = (diagram_sync.diagram_intended(payload)[0] if payload.get('kind') == diagram_sync.KIND else
                 patch_intended(payload) if 'replacement_tex' in payload else
                 {k: sorted(v) if isinstance(v, list) else v for k, v in payload.items() if k != 'canonical_name'})
-    state['job'] = dict(canonical=canonical, package=str(package), sha256=digest(package),
-                        proposed=proposed, remote=None, checked=False)
-    save(state)
-    return report
+    return package, report, proposed
 
 
 def render_missing_diagrams(state, canonical):
@@ -437,6 +446,29 @@ def publish_reviewed(state):
         print('Verify the live page, then download a fresh baseline. Existing local databases were not replaced.')
 
 
+def bring_home(state):
+    """Option 8: download the live database and refresh the local copies. Return the result, or None if cancelled."""
+    print('Stop your local server first (Ctrl+C in its terminal). Old databases and review packages will be preserved.')
+    if input('Type STOPPED when the local server is stopped (anything else cancels): ').strip() != 'STOPPED':
+        return None
+    snapshot = download(Path.home()/'Downloads'/'chi-portfolio'/'database', state['username'])
+    result = refresh(state, snapshot, ROOT/'dist'/'home-sync', save, frontend=ROOT/'frontend', diagrams=DIAGRAMS)
+    print(result['reason'])
+    print('Comparison report:', result['report'])
+    if result['safe']:
+        print('New working copy:', result['working'])
+        print(f"Gallery: {result['photos_verified']} images verified, {result['photos_downloaded']} downloaded; {result['local_drafts_preserved']} local import drafts preserved.")
+        print(f"Diagrams: {result['diagrams_verified']} SVGs verified, {result['diagrams_downloaded']} downloaded.")
+        if result['diagrams_kept_local']:
+            print('Kept your own rendering of the same diagram source:', ', '.join(result['diagrams_kept_local']))
+        if result['diagrams_missing_on_server']:
+            print('Missing on the server too (those pages show a broken image):', ', '.join(result['diagrams_missing_on_server']))
+        print('Choose 6 to restart the local server using this copy. Website program files and other media were not downloaded.')
+    else:
+        print('Saved paths and existing databases are unchanged. Review the report before proceeding.')
+    return result
+
+
 def main():
     state = json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else None
     while True:
@@ -444,7 +476,7 @@ def main():
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n17. Upload Esri map key\n18. Prepare saved gallery display settings\n19. Render missing diagrams for an entry\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n17. Upload Esri map key\n18. Prepare saved gallery display settings\n19. Render missing diagrams for an entry\n20. Publish a batch of new entries\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -483,24 +515,10 @@ def main():
             elif choice == '6':
                 subprocess.run([sys.executable, str(ROOT / 'backend/start_local.py'), '--database', state['working']], check=True)
             elif choice == '8':
-                print('Stop your local server first (Ctrl+C in its terminal). Old databases and review packages will be preserved.')
-                if input('Type STOPPED when the local server is stopped (anything else cancels): ').strip() != 'STOPPED':
-                    continue
-                snapshot = download(Path.home()/'Downloads'/'chi-portfolio'/'database', state['username'])
-                result = refresh(state, snapshot, ROOT/'dist'/'home-sync', save, frontend=ROOT/'frontend', diagrams=DIAGRAMS)
-                print(result['reason'])
-                print('Comparison report:', result['report'])
-                if result['safe']:
-                    print('New working copy:', result['working'])
-                    print(f"Gallery: {result['photos_verified']} images verified, {result['photos_downloaded']} downloaded; {result['local_drafts_preserved']} local import drafts preserved.")
-                    print(f"Diagrams: {result['diagrams_verified']} SVGs verified, {result['diagrams_downloaded']} downloaded.")
-                    if result['diagrams_kept_local']:
-                        print('Kept your own rendering of the same diagram source:', ', '.join(result['diagrams_kept_local']))
-                    if result['diagrams_missing_on_server']:
-                        print('Missing on the server too (those pages show a broken image):', ', '.join(result['diagrams_missing_on_server']))
-                    print('Choose 6 to restart the local server using this copy. Website program files and other media were not downloaded.')
-                else:
-                    print('Saved paths and existing databases are unchanged. Review the report before proceeding.')
+                bring_home(state)
+            elif choice == '20':
+                import batch_publish
+                batch_publish.run(state)
             elif choice == '9':
                 print(prepare_profile(state, input('Page to prepare (bio or resume): ').strip()))
                 print('Review the changes above, then choose 3 to stage, 4 to check live, and 5 to publish.')
