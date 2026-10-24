@@ -69,7 +69,7 @@ def save_manifest(manifest):
     path = Path(manifest['folder']) / 'manifest.json'
     temporary = path.with_suffix('.tmp')
     temporary.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding='utf-8')
-    temporary.replace(path)
+    w.replace_file(temporary, path)
 
 
 def load_manifest(state):
