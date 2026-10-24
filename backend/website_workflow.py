@@ -498,6 +498,8 @@ def main():
                         print('Kept your own rendering of the same diagram source:', ', '.join(result['diagrams_kept_local']))
                     if result['diagrams_missing_on_server']:
                         print('Missing on the server too (those pages show a broken image):', ', '.join(result['diagrams_missing_on_server']))
+                    if result.get('music_ranking_replaced'):
+                        print('Music: the live Spotify ranking replaced the local one. If you use the local Spotify schedule, rerun backend/install_music_schedule.ps1 so it targets this copy.')
                     print('Choose 6 to restart the local server using this copy. Website program files and other media were not downloaded.')
                 else:
                     print('Saved paths and existing databases are unchanged. Review the report before proceeding.')

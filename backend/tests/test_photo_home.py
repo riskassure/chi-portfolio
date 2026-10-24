@@ -117,6 +117,26 @@ class PhotoHomeTests(unittest.TestCase):
         self.sql(self.live, 'UPDATE photography_catalog SET location_name=?', ('Road edit',))
         self.assertTrue(self.run_refresh()['safe'])
 
+    def test_local_title_edit_published_while_live_rotated_allowed(self):
+        for database in (self.base, self.local, self.live):
+            self.add_photo(database)
+        self.state['base_sha256'] = self.hash(self.base)
+        for database in (self.local, self.live):
+            self.sql(database, 'UPDATE photography_catalog SET title=?', ('Published title',))
+        # The live rotation hides the photo and bumps its counters on its own.
+        self.sql(self.live, 'UPDATE photography_catalog SET is_currently_displayed=0,display_count=5,last_displayed_date=?', ('today',))
+        self.assertTrue(self.run_refresh()['safe'])
+
+    def test_unpublished_title_edit_still_blocks_after_live_rotation(self):
+        for database in (self.base, self.local, self.live):
+            self.add_photo(database)
+        self.state['base_sha256'] = self.hash(self.base)
+        self.sql(self.local, 'UPDATE photography_catalog SET title=?', ('Local only',))
+        self.sql(self.live, 'UPDATE photography_catalog SET is_currently_displayed=0')
+        result = self.run_refresh()
+        self.assertFalse(result['safe'])
+        self.assertEqual(result['photo_conflicts'], [self.path])
+
     def test_existing_identical_file_not_downloaded(self):
         self.add_photo(self.live)
         target = self.front/self.path

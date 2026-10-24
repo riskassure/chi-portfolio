@@ -102,6 +102,32 @@ class BringHomeTests(unittest.TestCase):
         self.assertEqual(result['media_review'], ['photography_catalog'])
         self.save.assert_not_called()
 
+    def music(self, path, ranking):
+        with closing(sqlite3.connect(path)) as db:
+            db.execute('CREATE TABLE IF NOT EXISTS music_publication(track_id TEXT PRIMARY KEY, rank INTEGER, data TEXT NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS music_publication_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+            db.execute('DELETE FROM music_publication')
+            db.executemany('INSERT INTO music_publication VALUES(?,?,?)', [(t, i, '{}') for i, t in enumerate(ranking, 1)])
+            db.execute("INSERT OR REPLACE INTO music_publication_meta VALUES('published_at', ?)", (','.join(ranking),))
+            db.commit()
+
+    def test_each_side_regenerating_spotify_ranking_does_not_block(self):
+        for path, ranking in ((self.base, ['a', 'b']), (self.local, ['b', 'c']), (self.live, ['c', 'a'])):
+            self.music(path, ranking)
+        self.state['base_sha256'] = self.hash(self.base)
+        result = self.run_refresh()
+        self.assertTrue(result['safe'])
+        self.assertTrue(result['music_ranking_replaced'])
+        with closing(sqlite3.connect(self.state['working'])) as db:
+            self.assertEqual(db.execute('SELECT track_id FROM music_publication ORDER BY rank').fetchall(), [('c',), ('a',)])
+
+    def test_music_overrides_still_compared(self):
+        for path in (self.base, self.local, self.live):
+            self.edit(path, 'CREATE TABLE music_overrides(track_id TEXT, field TEXT, value TEXT)')
+        self.state['base_sha256'] = self.hash(self.base)
+        self.edit(self.local, "INSERT INTO music_overrides VALUES('a','genre','Local')")
+        self.assertFalse(self.run_refresh()['safe'])
+
     def test_schema_change_blocks(self):
         self.edit(self.live, 'ALTER TABLE math_concepts ADD COLUMN extra TEXT')
         self.assertFalse(self.run_refresh()['safe'])

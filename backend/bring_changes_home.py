@@ -15,6 +15,9 @@ import photo_home
 FILE_TABLES = {'music_catalog', 'stg_spotify_import', 'photography_catalog',
                'music_publication', 'music_publication_meta', 'music_overrides',
                'google_photo_drafts', 'math_concept_diagrams', 'math_concept_diagram_failures'}
+# Each website regenerates its own Spotify ranking on a timer and the ranking is
+# never published from the laptop, so the live copy simply replaces the local one.
+REGENERATED_TABLES = ('music_publication', 'music_publication_meta')
 # Compared by content, with their SVGs synchronized, when refresh is given a diagrams folder.
 DIAGRAM_TABLES = ('math_concept_diagrams', 'math_concept_diagram_failures')
 # Math tables compared by what an entry is, not by row ids, timestamps or the generated page HTML,
@@ -81,6 +84,8 @@ def assess(base, local, live, by_content=()):
     blocked = []
     changed = []
     for name in base[1]:
+        if name in REGENERATED_TABLES:
+            continue
         b, w, r = base[1][name], local[1][name], live[1][name]
         if w != b and w != r:
             blocked.append(name)
@@ -132,6 +137,8 @@ def refresh(state, snapshot, destination, save_state, frontend=None, diagrams=No
                              if name not in {'photography_catalog', 'google_photo_drafts'}})
                            for schema, tables in inventories]
         result = assess(*inventories, by_content=by_content)
+        result['music_ranking_replaced'] = any(inventories[1][1].get(name) != inventories[2][1].get(name)
+                                               for name in REGENERATED_TABLES)
         if photo_plan is not None:
             result['photo_conflicts'] = photo_plan['blocked']
             result['local_drafts_preserved'] = len(photo_plan['drafts'])

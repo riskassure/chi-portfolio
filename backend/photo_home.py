@@ -9,8 +9,9 @@ import subprocess
 
 from photo_sync import LIMIT, target_path
 
-PHOTO_FIELDS = ('file_path', 'title', 'location_name', 'latitude', 'longitude',
-                'is_currently_displayed')
+PHOTO_FIELDS = ('file_path', 'title', 'location_name', 'latitude', 'longitude')
+# Rotation state: the live site's rotation rewrites these on its own, so they are not content.
+ROTATION_FIELDS = ('is_currently_displayed', 'last_displayed_date', 'display_count')
 DRAFT_SQL = """CREATE TABLE google_photo_drafts (
     digest TEXT PRIMARY KEY, title TEXT NOT NULL, location TEXT NOT NULL DEFAULT '',
     published_id INTEGER)"""
@@ -18,7 +19,7 @@ DRAFT_SQL = """CREATE TABLE google_photo_drafts (
 
 def photos(db):
     columns = {row[1] for row in db.execute('PRAGMA table_info(photography_catalog)')}
-    if columns != {'image_id', *PHOTO_FIELDS, 'last_displayed_date', 'display_count'}:
+    if columns != {'image_id', *PHOTO_FIELDS, *ROTATION_FIELDS}:
         raise ValueError('Unrecognized gallery schema; review required.')
     rows = db.execute('SELECT image_id,' + ','.join(PHOTO_FIELDS) + ' FROM photography_catalog').fetchall()
     result = {}
