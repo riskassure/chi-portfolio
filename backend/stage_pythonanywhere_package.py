@@ -50,6 +50,17 @@ def validate_package(data):
     return data
 
 
+def cause(error):
+    """A short reason for a failed transfer that never includes the request headers (the token)."""
+    if isinstance(error, HTTPError):
+        return f'HTTP {error.code}'
+    if isinstance(error, URLError):
+        return 'connection error: ' + str(error.reason)[:200]
+    if isinstance(error, TimeoutError):
+        return 'timed out'
+    return type(error).__name__ + (': ' + str(error)[:200] if isinstance(error, RuntimeError) else '')
+
+
 def stage(settings, package):
     validate(settings)
     data = read_package(package)
@@ -80,9 +91,9 @@ def stage(settings, package):
             received = response.read(MAX_BYTES + 1)
         if hashlib.sha256(received).hexdigest() != digest:
             raise RuntimeError('Uploaded package verification failed.')
-    except (HTTPError, URLError, TimeoutError, OSError, RuntimeError):
+    except (HTTPError, URLError, TimeoutError, OSError, RuntimeError) as error:
         state = 'An unverified upload may remain at' if posted else 'No upload was attempted at'
-        raise RuntimeError(f'Staging failed. {state} {remote}. The live site was not changed.') from None
+        raise RuntimeError(f'Staging failed ({cause(error)}). {state} {remote}. The live site was not changed.') from None
     return remote, digest
 
 

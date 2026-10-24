@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import time
 import uuid
 import zipfile
 import sqlite3
@@ -39,11 +40,26 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def replace_file(temporary, path, waits=(0.1, 0.2, 0.5, 1, 2, 3)):
+    """Move temporary over path, retrying while Windows reports the target as in use.
+
+    Antivirus and search indexing briefly open a file that was just written, and
+    Windows then refuses to replace it ([WinError 5] Access is denied)."""
+    for wait in waits + (None,):
+        try:
+            Path(temporary).replace(path)
+            return
+        except PermissionError:
+            if wait is None:
+                raise
+            time.sleep(wait)
+
+
 def save(state):
     STATE.parent.mkdir(parents=True, exist_ok=True)
     temporary = STATE.with_suffix('.tmp')
     temporary.write_text(json.dumps(state, indent=2), encoding='utf-8')
-    temporary.replace(STATE)
+    replace_file(temporary, STATE)
 
 
 def configure(base, working, username='cwoo'):

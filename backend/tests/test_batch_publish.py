@@ -509,3 +509,55 @@ class PublishTests(BatchFixture):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class WindowsFileTests(unittest.TestCase):
+    """Windows refuses to replace a file that antivirus or indexing has just opened."""
+
+    def test_manifest_save_retries_while_the_target_is_in_use(self):
+        with tempfile.TemporaryDirectory() as folder:
+            manifest = dict(folder=folder, entries={})
+            bp.save_manifest(manifest)
+            real, calls = Path.replace, []
+
+            def busy_twice(source, target):
+                calls.append(target)
+                if len(calls) <= 2:
+                    raise PermissionError(5, 'Access is denied')
+                return real(source, target)
+
+            manifest['entries'] = {'A': 1}
+            with patch.object(Path, 'replace', busy_twice), patch('website_workflow.time.sleep') as sleep:
+                bp.save_manifest(manifest)
+            self.assertEqual(len(calls), 3)
+            self.assertEqual(sleep.call_count, 2)
+            self.assertEqual(json.loads((Path(folder) / 'manifest.json').read_text())['entries'], {'A': 1})
+
+    def test_a_file_that_stays_in_use_still_stops_with_the_error(self):
+        with tempfile.TemporaryDirectory() as folder:
+            def busy(source, target):
+                raise PermissionError(5, 'Access is denied')
+            with patch.object(Path, 'replace', busy), patch('website_workflow.time.sleep'):
+                with self.assertRaises(PermissionError):
+                    bp.save_manifest(dict(folder=folder, entries={}))
+
+    def test_a_failed_staging_names_its_cause_without_the_token(self):
+        from urllib.error import URLError
+        import stage_pythonanywhere_package as s
+        with tempfile.TemporaryDirectory() as folder:
+            package = Path(folder) / 'package.zip'
+            with __import__('zipfile').ZipFile(package, 'w') as archive:
+                archive.writestr('a.txt', 'x')
+            settings = dict(username='cwoo', token='secret-token-value')
+
+            class Opener:
+                def open(self, request, timeout):
+                    raise URLError('temporary failure in name resolution')
+
+            with patch.object(s, 'validate'), patch.object(s, 'build_opener', return_value=Opener()):
+                with self.assertRaises(RuntimeError) as caught:
+                    s.stage(settings, package)
+            message = str(caught.exception)
+            self.assertIn('connection error: temporary failure in name resolution', message)
+            self.assertIn('No upload was attempted', message)
+            self.assertNotIn('secret-token-value', message)
