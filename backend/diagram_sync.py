@@ -27,7 +27,7 @@ import zipfile
 from xml.etree import ElementTree
 
 from apply_math_text_patch import patch_intended
-from preview_math_sync import read_snapshot
+from preview_math_sync import read_snapshot, read_status
 from publish_math_entry import check_target, insert_entry, validate as validate_entry
 
 KIND = 'math-diagrams'
@@ -531,6 +531,8 @@ def status(database, diagram_dir, payload, files, source_dir=None, connection=No
         else:
             if current != payload['expected']:
                 return 'CONFLICT — snapshot differs from expected entry'
+            if read_status(database, connection=db).get(canonical, {}).get('retired'):
+                return 'CONFLICT — this entry is retired; undo the retirement before changing it'
             if _row_set(stored) != _row_set(payload['expected_diagrams']):
                 return 'CONFLICT — stored diagram rows differ from the reviewed ones'
             verdict = 'EXPECTED TEXT MATCHES — eligible for further review'

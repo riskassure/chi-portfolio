@@ -37,6 +37,34 @@ def read_snapshot(path, connection=None):
     return result
 
 
+def has_retirement(db):
+    """Whether the open database has the retirement columns (after the schema upgrade)."""
+    return any(row[1] == 'retired_at' for row in db.execute('PRAGMA table_info(math_concepts)'))
+
+
+def active_sql(db, alias='mc'):
+    """SQL condition true for active entries of alias; always true before the schema upgrade."""
+    return f'{alias}.retired_at IS NULL' if has_retirement(db) else '1 = 1'
+
+
+def read_status(path, connection=None):
+    """Return {canonical: {'retired', 'retired_into', 'reason'}} for every entry.
+
+    read_snapshot deliberately leaves retirement out: its exact shape is part of
+    every existing package and check. retired_into is the survivor's canonical
+    name (None without one). Before the schema upgrade every entry is active.
+    """
+    with (nullcontext(connection) if connection is not None else
+          closing(sqlite3.connect(Path(path).resolve().as_uri()+'?mode=ro', uri=True))) as db:
+        if not has_retirement(db):
+            return {name: dict(retired=False, retired_into=None, reason=None)
+                    for name, in db.execute('SELECT canonical_name FROM math_concepts')}
+        names = dict(db.execute('SELECT id, canonical_name FROM math_concepts'))
+        return {name: dict(retired=retired is not None, retired_into=names.get(into), reason=reason)
+                for name, retired, into, reason in db.execute(
+                    'SELECT canonical_name, retired_at, retired_into_id, retirement_reason FROM math_concepts')}
+
+
 def compare(base, local, live):
     changes = []
     for key in sorted(base.keys() | local.keys() | live.keys()):

@@ -44,6 +44,12 @@ from services.math.concept_update_service import (
     update_math_concept,
 )
 
+from services.math.retirement import (
+    active_condition,
+    retirement_enabled,
+    retirement_info,
+)
+
 math_bp = Blueprint("math_bp", __name__)
 
 
@@ -65,13 +71,17 @@ def get_active_classifications():
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        cursor.execute("""
+        # A classification used only by retired entries has no page to list.
+        cursor.execute(f"""
             SELECT DISTINCT
                 mcl.code,
                 mcl.text
             FROM math_classifications mcl
             JOIN math_concept_classifications mcc
                 ON mcl.id = mcc.classification_id
+            JOIN math_concepts mc
+                ON mc.id = mcc.concept_id
+            WHERE {active_condition(cursor, "mc")}
             ORDER BY mcl.code ASC;
         """)
 
@@ -174,12 +184,17 @@ def search_admin_math_concepts():
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            cursor.execute("""
+            # Retired entries are listed so they can be found, marked as retired.
+            retired_column = (
+                "mc.retired_at IS NOT NULL" if retirement_enabled(cursor) else "0"
+            )
+            cursor.execute(f"""
                 SELECT DISTINCT
                     mc.id,
                     mc.title,
                     mc.canonical_name,
-                    mc.slug
+                    mc.slug,
+                    {retired_column} AS retired
                 FROM math_concepts mc
                 LEFT JOIN math_synonyms ms
                     ON ms.concept_id = mc.id
@@ -206,7 +221,10 @@ def search_admin_math_concepts():
                 like_q
             ))
 
-            rows = [dict(row) for row in cursor.fetchall()]
+            rows = [
+                dict(row, retired=bool(row["retired"]))
+                for row in cursor.fetchall()
+            ]
 
             return jsonify({
                 "status": "success",
@@ -836,6 +854,15 @@ def update_math_metadata():
             conn = sqlite3.connect(str(DB_PATH))
             cursor = conn.cursor()
             cursor.execute("PRAGMA foreign_keys = ON;")
+
+            if retirement_info(cursor, concept_id):
+                return jsonify({
+                    "success": False,
+                    "message": (
+                        "This entry is retired and cannot be edited. "
+                        "Undo the retirement with option 21 first."
+                    ),
+                }), 409
 
             update_result = update_math_concept(
                 cursor=cursor,

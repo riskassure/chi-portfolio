@@ -3,6 +3,10 @@
 from services.math.autolink_service import (
     apply_math_autolinker,
 )
+from services.math.retirement import (
+    redirects,
+    retirement_info,
+)
 
 
 def _fetch_public_concept_row(
@@ -126,29 +130,57 @@ def _fetch_public_related_concepts(
     cursor,
     concept_id: int,
 ) -> list[dict]:
+    """Related entries, with a link to a merged entry shown as its survivor.
+
+    Links to an entry retired without a survivor are dropped, as are links
+    that a redirect turns into duplicates or into links back to this entry.
+    The stored rows are never changed here.
+    """
+    moved = redirects(cursor)
+
     cursor.execute("""
-        SELECT
-            rc.related_concept_id AS id,
-            mc.title,
-            mc.canonical_name,
-            mc.slug
-        FROM math_related_concepts rc
-        JOIN math_concepts mc
-            ON mc.id = rc.related_concept_id
-        WHERE rc.concept_id = ?
-        ORDER BY mc.title ASC;
+        SELECT related_concept_id
+        FROM math_related_concepts
+        WHERE concept_id = ?
+          AND related_concept_id IS NOT NULL;
     """, (concept_id,))
 
-    return [
-        dict(row)
-        for row in cursor.fetchall()
-    ]
+    stored = [row[0] for row in cursor.fetchall()]
+    targets = [target for target in stored if target not in moved]
+    for target in stored:
+        survivor = moved.get(target, target)
+        if target in moved and survivor is not None and survivor != concept_id and survivor not in targets:
+            targets.append(survivor)
+
+    related = []
+    for target in targets:
+        cursor.execute("""
+            SELECT
+                mc.id,
+                mc.title,
+                mc.canonical_name,
+                mc.slug
+            FROM math_concepts mc
+            WHERE mc.id = ?;
+        """, (target,))
+        row = cursor.fetchone()
+        if row:
+            related.append(dict(row))
+
+    return sorted(related, key=lambda item: item["title"] or "")
 
 
 def fetch_public_math_concept_detail(
     cursor,
     identifier,
+    _redirect_depth=0,
 ):
+    """Return an entry's public page data, or None if no entry has this slug or id.
+
+    For a retired entry merged into another, return the survivor's data with
+    merged_from naming the retired entry. For one retired without a survivor,
+    return only its title, slug and retirement details with retired=True.
+    """
     concept_row = _fetch_public_concept_row(
         cursor,
         identifier,
@@ -159,6 +191,31 @@ def fetch_public_math_concept_detail(
 
     concept_data = dict(concept_row)
     concept_id = concept_data["id"]
+
+    retired = retirement_info(cursor, concept_id)
+    if retired:
+        survivor_id = redirects(cursor).get(concept_id)
+        if survivor_id is not None and _redirect_depth < 1:
+            # The old URL shows the survivor; the page then switches its address.
+            survivor = fetch_public_math_concept_detail(
+                cursor,
+                survivor_id,
+                _redirect_depth=_redirect_depth + 1,
+            )
+            if survivor is not None:
+                survivor["merged_from"] = {
+                    "title": concept_data["title"],
+                    "slug": concept_data["slug"],
+                }
+                return survivor
+        return {
+            "id": concept_id,
+            "title": concept_data["title"],
+            "slug": concept_data["slug"],
+            "retired": True,
+            "retired_at": retired["retired_at"],
+            "retirement_reason": retired["retirement_reason"],
+        }
 
     display_tex = (
         concept_data["rendered_tex"]

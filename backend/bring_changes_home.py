@@ -1,6 +1,6 @@
 """Conservatively refresh local databases from a verified live snapshot."""
 from collections import Counter
-from contextlib import closing
+from contextlib import closing, contextmanager
 import hashlib
 import json
 from pathlib import Path
@@ -9,6 +9,7 @@ import uuid
 
 from download_live_database import verify
 import diagram_home
+import math_schema
 import photo_home
 
 # File-backed content needs a separate download/reconciliation workflow.
@@ -23,8 +24,10 @@ DIAGRAM_TABLES = ('math_concept_diagrams', 'math_concept_diagram_failures')
 # Math tables compared by what an entry is, not by row ids, timestamps or the generated page HTML,
 # so a published entry matches the local one it came from.
 MATH_TABLES = ('math_concepts', 'math_concept_classifications', 'math_concept_types', 'math_synonyms',
-               'math_definitions', 'math_link_exclusions', 'math_related_concepts')
+               'math_definitions', 'math_link_exclusions', 'math_related_concepts', 'math_concept_merges')
 MATH_IGNORED = {'id', 'created_at', 'updated_at', 'rendered_tex', 'related_concept_id'}
+# Columns holding an entry's id, compared as that entry's canonical name.
+CONCEPT_COLUMNS = {'concept_id', 'retired_into_id', 'absorbed_id', 'survivor_id'}
 
 
 def math_rows(db, name):
@@ -35,7 +38,8 @@ def math_rows(db, name):
     canonical = dict(db.execute('SELECT id, canonical_name FROM math_concepts'))
     rows = []
     for row in db.execute('SELECT ' + ','.join('"' + c.replace('"', '""') + '"' for c in kept) + ' FROM ' + quoted):
-        rows.append(tuple((column, canonical.get(value, ('missing concept', value)) if column == 'concept_id' else value)
+        rows.append(tuple((column, canonical.get(value, ('missing concept', value))
+                           if column in CONCEPT_COLUMNS and value is not None else value)
                           for column, value in zip(kept, row)))
     return rows
 
@@ -99,6 +103,43 @@ def assess(base, local, live, by_content=()):
                 blocked=sorted(blocked), live_changed=sorted(changed), media_review=assets)
 
 
+@contextmanager
+def schema_upgraded_copies(baseline, local, live, folder, files):
+    """Return the three connections to compare, allowing for the known math schema upgrade.
+
+    When live has the retirement schema upgrade and the baseline and working
+    copy have none of it, return upgraded temporary copies of those two in
+    folder, so the comparison sees only content differences. files are the
+    baseline and working database paths; they are copied through separate
+    read-only connections because the refresh holds the working copy's write
+    lock. The originals are
+    never changed; the new copies are later made from live, which already has
+    the upgrade. In every other case return the connections as given, and a
+    schema difference stops the refresh as before.
+    """
+    if not (math_schema.state(live) == 'current' and math_schema.state(baseline) == 'absent'
+            and math_schema.state(local) == 'absent'):
+        yield baseline, local, live
+        return
+    paths = [folder / 'baseline-upgraded.db', folder / 'working-upgraded.db']
+    copies = []
+    try:
+        for path, source in zip(paths, files):
+            copy = sqlite3.connect(path)
+            copies.append(copy)
+            with closing(sqlite3.connect(Path(source).resolve().as_uri() + '?mode=ro', uri=True)) as reader:
+                reader.backup(copy)
+            copy.execute('BEGIN')
+            math_schema.upgrade(copy)
+            copy.commit()
+        yield copies[0], copies[1], live
+    finally:
+        for copy in copies:
+            copy.close()
+        for path in paths:
+            path.unlink(missing_ok=True)
+
+
 def refresh(state, snapshot, destination, save_state, frontend=None, diagrams=None):
     """Create new copies and switch saved paths only after a conservative comparison.
 
@@ -125,7 +166,8 @@ def refresh(state, snapshot, destination, save_state, frontend=None, diagrams=No
         # No SQL writes are issued, and closing rolls this transaction back.
         local.execute('BEGIN IMMEDIATE')
         by_content = DIAGRAM_TABLES + MATH_TABLES if diagrams is not None else ()
-        inventories = [inventory(db, by_content) for db in (baseline, local, live)]
+        with schema_upgraded_copies(baseline, local, live, folder, (base, working)) as compared:
+            inventories = [inventory(db, by_content) for db in compared]
         photo_plan = None
         if frontend is not None:
             photo_plan = photo_home.reconcile(baseline, local, live)

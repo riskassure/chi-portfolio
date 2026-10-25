@@ -7,7 +7,7 @@ from pathlib import Path
 import sqlite3
 import sys
 import uuid
-from preview_math_sync import read_snapshot
+from preview_math_sync import read_snapshot, read_status
 from publish_math_entry import media_fragments
 
 LIST_FIELDS = ('classifications', 'types', 'synonyms', 'definitions', 'link_exclusions', 'related_concepts')
@@ -98,6 +98,8 @@ def apply_patch(database, payload, backup_dir, source_dir):
         current=read_snapshot(database,connection=db).get(canonical)
         if current != expected:
             raise ValueError('Conflict: live entry no longer matches the reviewed snapshot. Nothing changed.')
+        if read_status(database, connection=db)[canonical]['retired']:
+            raise ValueError('This entry is retired; undo the retirement before changing it. Nothing changed.')
         missing=missing_diagram_svgs(db,canonical,replacement,extract_all_pstricks_diagram_blocks)
         if missing:
             raise ValueError(f'{missing} diagram(s) have no stored SVG and would show "[Diagram unavailable]". Nothing changed.')

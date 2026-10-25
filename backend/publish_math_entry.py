@@ -9,7 +9,7 @@ import shutil
 import sqlite3
 import sys
 import uuid
-from preview_math_sync import read_snapshot
+from preview_math_sync import active_sql, read_snapshot, read_status
 
 # Diagrams, images and embedded markup. \\psset is included because it changes
 # how later PSTricks diagrams render.
@@ -127,16 +127,28 @@ def _matching_end(tex, start, opening, closing):
 
 
 def check_target(db, entry):
+    # Canonical names and slugs are reserved by every entry, retired ones included.
+    # Titles and aliases are compared with active entries only: a retired entry's
+    # title and terms were copied to its survivor.
+    active = active_sql(db)
     for column in ('canonical_name','slug','title'):
-        if db.execute(f'SELECT 1 FROM math_concepts WHERE lower(trim({column}))=lower(trim(?))',(entry[column],)).fetchone():
+        condition = '' if column != 'title' else ' AND ' + active
+        if db.execute(f'SELECT 1 FROM math_concepts mc WHERE lower(trim(mc.{column}))=lower(trim(?))'+condition,(entry[column],)).fetchone():
             raise ValueError('Duplicate '+column+'; nothing added.')
     for table,column in [('math_synonyms','synonym_text'),('math_definitions','defined_term')]:
-        if db.execute(f'SELECT 1 FROM {table} WHERE lower(trim({column}))=lower(trim(?))',(entry['title'],)).fetchone():
+        if db.execute(f'SELECT 1 FROM {table} a LEFT JOIN math_concepts mc ON mc.id=a.concept_id '
+                      f'WHERE lower(trim(a.{column}))=lower(trim(?)) AND {active}',(entry['title'],)).fetchone():
             raise ValueError('Title already appears as a synonym/defined term; review it first.')
     for key,table,column in [('classifications','math_classifications','code'),('types','math_types','type_name'),('related_concepts','math_concepts','canonical_name')]:
         for value in entry[key]:
             if not db.execute(f'SELECT 1 FROM {table} WHERE {column}=?',(value,)).fetchone():
                 raise ValueError(f'Missing live {key}: {value}')
+    status = read_status(None, connection=db)
+    for value in entry['related_concepts']:
+        if status[value]['retired']:
+            survivor = status[value]['retired_into']
+            raise ValueError(f'Related concept {value} is retired'
+                             + (f'; relate to {survivor} instead.' if survivor else '.'))
 
 
 def insert_entry(db, entry, rendered):

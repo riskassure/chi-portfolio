@@ -22,12 +22,56 @@ async function bootConceptView() {
         const response = await fetch(fetchUrl);
         const json = await response.json();
         if (json.status !== "success") throw new Error(json.message);
-        
+
+        if (json.data.retired) {
+            renderRetiredNotice(json.data);
+            return;
+        }
+        if (json.data.merged_from) {
+            showMergedNotice(json.data);
+        }
         renderConceptPage(json.data);
     } catch (err) {
         console.error(err);
         document.getElementById("mathContentCanvas").innerHTML = `Failed to process content entry: ${err.message}`;
     }
+}
+
+// An old URL of an entry merged into another shows the survivor: switch the
+// address and the canonical link to the survivor, and say what happened.
+function showMergedNotice(concept) {
+    const survivorUrl = `concept.html?slug=${encodeURIComponent(concept.slug)}`;
+    history.replaceState(null, "", survivorUrl);
+
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+        canonical = document.createElement("link");
+        canonical.rel = "canonical";
+        document.head.appendChild(canonical);
+    }
+    canonical.href = new URL(survivorUrl, window.location.href).href;
+
+    const notice = document.createElement("p");
+    notice.id = "conceptMergedNotice";
+    notice.className = "math-merged-notice";
+    notice.style.cssText = "background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;padding:0.6rem 0.9rem;border-radius:6px;";
+    const oldTitle = document.createElement("em");
+    oldTitle.textContent = concept.merged_from.title || concept.merged_from.slug;
+    notice.append(oldTitle, " has been merged into this entry.");
+    const title = document.getElementById("conceptTitle");
+    title.parentNode.insertBefore(notice, title);
+}
+
+// An entry retired without a survivor keeps its URL but has no content to show.
+function renderRetiredNotice(concept) {
+    document.title = `${concept.title || "Math Concept"} | Library`;
+    document.getElementById("conceptTitle").textContent = concept.title || "Retired entry";
+    const canvas = document.getElementById("mathContentCanvas");
+    canvas.textContent = "This entry has been retired"
+        + (concept.retirement_reason ? `: ${concept.retirement_reason}` : ".");
+    const link = document.createElement("p");
+    link.innerHTML = '<a href="index.html">Browse the library</a>';
+    canvas.appendChild(link);
 }
 
 async function renderConceptPage(concept) {

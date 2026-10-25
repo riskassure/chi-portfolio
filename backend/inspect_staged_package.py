@@ -15,7 +15,7 @@ import zipfile
 from pythonanywhere_api import HOST, SETTINGS, NoRedirects, validate
 from stage_pythonanywhere_package import MAX_BYTES, read_package, validate_package
 from publish_math_entry import validate as validate_entry, check_target
-from preview_math_sync import read_snapshot
+from preview_math_sync import read_snapshot, read_status
 from apply_math_text_patch import patch_intended
 import profile_sync
 import photo_sync
@@ -23,6 +23,7 @@ import photo_metadata_sync
 import photo_removal_sync
 import frontend_sync
 import diagram_sync
+import math_schema
 
 
 def fetch_verified(settings, remote, local):
@@ -77,7 +78,7 @@ def preview(data, snapshot=None, *, live=False):
             frontend = Path(snapshot).resolve().parent.parent/'frontend' if live else Path(__file__).resolve().parents[1]/'frontend'
             if payload['kind'] == 'website-code':
                 frontend = frontend.parent
-            status = frontend_sync.status(payload, frontend)
+            status = frontend_sync.status(payload, frontend, snapshot if live else None)
     elif payload.get('kind') == 'photo-remove':
         photo_removal_sync.unpack(data, payload)
         report += ['Proposed operation: REMOVE one gallery entry', 'Photo: '+payload['file_path'],
@@ -117,6 +118,10 @@ def preview(data, snapshot=None, *, live=False):
         if snapshot:
             frontend = Path(snapshot).resolve().parent.parent/'frontend' if live else Path(__file__).resolve().parents[1]/'frontend'
             status = profile_sync.status(snapshot, payload, frontend)
+    elif payload.get('kind') == math_schema.KIND:
+        report += [math_schema.review(payload)]
+        if snapshot:
+            status = math_schema.status(snapshot)
     elif payload.get('kind') == diagram_sync.KIND:
         payload, files = diagram_sync.unpack(data)
         source = Path(snapshot).resolve().parent/'src' if live else None
@@ -141,6 +146,8 @@ def preview(data, snapshot=None, *, live=False):
             status = ('ALREADY PRESENT — no update needed' if current == intended else
                       'EXPECTED TEXT MATCHES — eligible for further review' if current == expected else
                       'CONFLICT — snapshot differs from expected entry')
+            if status.startswith('EXPECTED') and read_status(snapshot).get(canonical, {}).get('retired'):
+                status = 'CONFLICT — this entry is retired; undo the retirement before changing it'
     else:
         validate_entry(payload)
         report += ['Proposed operation: add one new entry', json.dumps(payload, ensure_ascii=False, indent=2)]

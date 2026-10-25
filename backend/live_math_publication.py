@@ -15,6 +15,7 @@ import photo_metadata_sync
 import photo_removal_sync
 import frontend_sync
 import diagram_sync
+import math_schema
 
 
 def publish(data, database, backups, source):
@@ -27,7 +28,9 @@ def publish(data, database, backups, source):
         name = next(n for n in archive.namelist() if n.endswith('.json'))
         payload = json.loads(archive.read(name))
     if payload.get('kind') == 'website-code':
-        return frontend_sync.apply(payload, source.parent.parent, backups)
+        return frontend_sync.apply(payload, source.parent.parent, backups, database)
+    if payload.get('kind') == math_schema.KIND:
+        return math_schema.apply(database, payload, backups)
     if payload.get('kind') == 'frontend-files':
         return frontend_sync.apply(payload, source.parent.parent/'frontend', backups)
     if payload.get('kind') == 'photo-remove':

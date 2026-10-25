@@ -254,6 +254,8 @@ def current_job(state):
         raise ValueError('Prepare a selected entry first.')
     if digest(state['base']) != state['base_sha256'] or digest(job['package']) != job['sha256']:
         raise ValueError('Baseline or package changed. Prepare a new review package.')
+    if job.get('kind') == 'math-schema':
+        return job  # Its content is fixed by math_schema.py, not by any local file.
     if job.get('kind') in ('frontend-files', 'website-code'):
         code = job['kind'] == 'website-code'
         for path, expected_hash in job['proposed'].items():
@@ -426,7 +428,7 @@ def check_live(state):
     report = Path(job['package']).parent / ('preflight-' + uuid.uuid4().hex + '.txt')
     result = preflight(state['username'], job['remote'], Path(job['package']), report)
     status = result['report'].splitlines()[-3]
-    job['checked'] = status.startswith(('EXPECTED TEXT MATCHES', 'NO DUPLICATE FOUND', 'ALREADY PRESENT'))
+    job['checked'] = status.startswith(('EXPECTED TEXT MATCHES', 'NO DUPLICATE FOUND', 'ALREADY PRESENT', 'ELIGIBLE'))
     job['preflight_status'] = status
     save(state)
     print(result['report'])
@@ -458,6 +460,9 @@ def publish_reviewed(state):
         finish_code_deployment(state)
     elif job.get('kind') == 'frontend-files':
         print('Frontend files verified. Hard-refresh the affected live pages (Ctrl+F5). No reload or database refresh is needed for this file-only update.')
+    elif job.get('kind') == 'math-schema':
+        print('Schema upgraded on live. The website behaves exactly as before. Next: publish the retirement-aware '
+              'website code with option 15 if not done yet, then run option 8.')
     else:
         print('Verify the live page, then download a fresh baseline. Existing local databases were not replaced.')
 
@@ -494,7 +499,7 @@ def main():
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n17. Upload Esri map key\n18. Prepare saved gallery display settings\n19. Render missing diagrams for an entry\n20. Publish a batch of new entries\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n17. Upload Esri map key\n18. Prepare saved gallery display settings\n19. Render missing diagrams for an entry\n20. Publish a batch of new entries\n21. Merge or retire entries\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -537,6 +542,9 @@ def main():
             elif choice == '20':
                 import batch_publish
                 batch_publish.run(state)
+            elif choice == '21':
+                import merge_workflow
+                merge_workflow.run(state, save)
             elif choice == '9':
                 print(prepare_profile(state, input('Page to prepare (bio or resume): ').strip()))
                 print('Review the changes above, then choose 3 to stage, 4 to check live, and 5 to publish.')
