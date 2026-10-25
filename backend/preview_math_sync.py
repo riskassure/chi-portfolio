@@ -23,18 +23,35 @@ def read_snapshot(path, connection=None):
             key = item.pop('canonical_name')
             if not key or key in result:
                 raise ValueError('Missing or duplicate canonical name.')
-            queries = {
-                'classifications': 'SELECT c.code FROM math_classifications c JOIN math_concept_classifications m ON c.id=m.classification_id WHERE m.concept_id=?',
-                'types': 'SELECT t.type_name FROM math_types t JOIN math_concept_types m ON t.id=m.type_id WHERE m.concept_id=?',
-                'synonyms': 'SELECT synonym_text FROM math_synonyms WHERE concept_id=?',
-                'definitions': 'SELECT defined_term FROM math_definitions WHERE concept_id=?',
-                'link_exclusions': 'SELECT word FROM math_link_exclusions WHERE concept_id=?',
-                'related_concepts': 'SELECT related_canonical_name FROM math_related_concepts WHERE concept_id=?',
-            }
-            for name, query in queries.items():
-                item[name] = sorted((r[0] for r in db.execute(query,(ident,))), key=lambda v: (v is not None, v or ''))
-            result[key] = item
+            result[key] = _with_lists(db, ident, item)
     return result
+
+
+# Each entry's metadata lists, as read_snapshot returns them.
+LIST_QUERIES = {
+    'classifications': 'SELECT c.code FROM math_classifications c JOIN math_concept_classifications m ON c.id=m.classification_id WHERE m.concept_id=?',
+    'types': 'SELECT t.type_name FROM math_types t JOIN math_concept_types m ON t.id=m.type_id WHERE m.concept_id=?',
+    'synonyms': 'SELECT synonym_text FROM math_synonyms WHERE concept_id=?',
+    'definitions': 'SELECT defined_term FROM math_definitions WHERE concept_id=?',
+    'link_exclusions': 'SELECT word FROM math_link_exclusions WHERE concept_id=?',
+    'related_concepts': 'SELECT related_canonical_name FROM math_related_concepts WHERE concept_id=?',
+}
+
+
+def _with_lists(db, ident, item):
+    for name, query in LIST_QUERIES.items():
+        item[name] = sorted((r[0] for r in db.execute(query,(ident,))), key=lambda v: (v is not None, v or ''))
+    return item
+
+
+def read_entry(db, canonical):
+    """Return one entry exactly as read_snapshot would, from the open database db, or None."""
+    row = db.execute('SELECT id, slug, title, owner, cleaned_tex, is_cleaned FROM math_concepts WHERE canonical_name=?',
+                     (canonical,)).fetchone()
+    if row is None:
+        return None
+    ident, slug, title, owner, cleaned_tex, is_cleaned = row
+    return _with_lists(db, ident, dict(slug=slug, title=title, owner=owner, cleaned_tex=cleaned_tex, is_cleaned=is_cleaned))
 
 
 def has_retirement(db):

@@ -10,7 +10,7 @@ import uuid
 import zipfile
 import sqlite3
 
-from preview_math_sync import read_snapshot
+from preview_math_sync import read_snapshot, read_status
 from prepare_math_patch import local_missing_svgs, prepare
 from publish_math_entry import validate as validate_entry
 from inspect_staged_package import preview
@@ -194,7 +194,18 @@ def changed_entries(state):
         changes.append(dict(canonical=name, title=working.get(name, baseline.get(name))['title'],
                             fields=fields, supported=reason is None, reason=reason, new=name not in baseline,
                             diagrams=diagrams))
-    return changes
+    # Retirement is not part of the snapshot; only option 21 publishes it.
+    base_status, working_status = read_status(state['base']), read_status(state['working'])
+    listed = {item['canonical']: item for item in changes}
+    for name in sorted(base_status.keys() & working_status.keys()):
+        if base_status[name] != working_status[name]:
+            item = listed.get(name) or dict(canonical=name, title=working[name]['title'], fields=[],
+                                            new=False, diagrams=False)
+            item.update(fields=item['fields'] + ['retirement'], supported=False,
+                        reason='retirement changed locally; merges and retirements are published only with option 21')
+            if name not in listed:
+                changes.append(item)
+    return sorted(changes, key=lambda item: item['canonical'])
 
 
 def prepare_selected(state, canonical):
@@ -256,6 +267,10 @@ def current_job(state):
         raise ValueError('Baseline or package changed. Prepare a new review package.')
     if job.get('kind') == 'math-schema':
         return job  # Its content is fixed by math_schema.py, not by any local file.
+    if job.get('kind') == 'math-merge':
+        import merge_workflow
+        merge_workflow.check_job(state, job)
+        return job
     if job.get('kind') in ('frontend-files', 'website-code'):
         code = job['kind'] == 'website-code'
         for path, expected_hash in job['proposed'].items():
@@ -460,6 +475,12 @@ def publish_reviewed(state):
         finish_code_deployment(state)
     elif job.get('kind') == 'frontend-files':
         print('Frontend files verified. Hard-refresh the affected live pages (Ctrl+F5). No reload or database refresh is needed for this file-only update.')
+    elif job.get('kind') == 'math-merge':
+        import merge_workflow
+        merge_workflow.record_receipt(state, job, result)
+        save(state)
+        print('Published. Verify the live site: the surviving page, the old URL, a search for the old title and '
+              'a page that linked to it. Then run option 8; option 21 prepares nothing more until then.')
     elif job.get('kind') == 'math-schema':
         print('Schema upgraded on live. The website behaves exactly as before. Next: publish the retirement-aware '
               'website code with option 15 if not done yet, then run option 8.')

@@ -10,6 +10,7 @@ import uuid
 from download_live_database import verify
 import diagram_home
 import math_schema
+import merge_sync
 import photo_home
 
 # File-backed content needs a separate download/reconciliation workflow.
@@ -104,21 +105,24 @@ def assess(base, local, live, by_content=()):
 
 
 @contextmanager
-def schema_upgraded_copies(baseline, local, live, folder, files):
-    """Return the three connections to compare, allowing for the known math schema upgrade.
+def schema_upgraded_copies(baseline, local, live, folder, files, change_sets=()):
+    """Return the three connections to compare, allowing for the known math schema upgrade and published merges.
 
     When live has the retirement schema upgrade and the baseline and working
-    copy have none of it, return upgraded temporary copies of those two in
-    folder, so the comparison sees only content differences. files are the
-    baseline and working database paths; they are copied through separate
-    read-only connections because the refresh holds the working copy's write
-    lock. The originals are
-    never changed; the new copies are later made from live, which already has
-    the upgrade. In every other case return the connections as given, and a
-    schema difference stops the refresh as before.
+    copy have none of it, the upgrade is applied to temporary copies of those
+    two in folder. change_sets are merges, retirements or undos published
+    since the last refresh (already confirmed against live): each is replayed
+    onto the same copies, so the comparison sees them on all three sides and
+    still catches every other local difference. files are the baseline and
+    working database paths; they are copied through separate read-only
+    connections because the refresh holds the working copy's write lock. The
+    originals are never changed; the new copies are later made from live. In
+    every other case return the connections as given, and a schema difference
+    stops the refresh as before.
     """
-    if not (math_schema.state(live) == 'current' and math_schema.state(baseline) == 'absent'
-            and math_schema.state(local) == 'absent'):
+    upgrade = (math_schema.state(live) == 'current' and math_schema.state(baseline) == 'absent'
+               and math_schema.state(local) == 'absent')
+    if not upgrade and not change_sets:
         yield baseline, local, live
         return
     paths = [folder / 'baseline-upgraded.db', folder / 'working-upgraded.db']
@@ -130,7 +134,14 @@ def schema_upgraded_copies(baseline, local, live, folder, files):
             with closing(sqlite3.connect(Path(source).resolve().as_uri() + '?mode=ro', uri=True)) as reader:
                 reader.backup(copy)
             copy.execute('BEGIN')
-            math_schema.upgrade(copy)
+            if upgrade:
+                math_schema.upgrade(copy)
+            for change_set in change_sets:
+                try:
+                    merge_sync.replay(copy, change_set)
+                except ValueError as error:
+                    raise ValueError(f'The published {change_set["action"]} does not fit your local copy '
+                                     f'({path.name}): {error} Saved paths and databases are unchanged.') from None
             copy.commit()
         yield copies[0], copies[1], live
     finally:
@@ -138,6 +149,18 @@ def schema_upgraded_copies(baseline, local, live, folder, files):
             copy.close()
         for path in paths:
             path.unlink(missing_ok=True)
+
+
+def published_change_sets(state, live):
+    """The change sets of option 21 publishes awaiting this refresh, each confirmed against the live snapshot."""
+    change_sets = [item['change_set'] for item in state.get('merge_pending_sync') or []]
+    for change_set in change_sets:
+        try:
+            merge_sync.verify(live, change_set)
+        except ValueError as error:
+            raise ValueError(f'The published {change_set["action"]} of {change_set.get("absorbed") or change_set["merge"]["absorbed"]} '
+                             f'does not match the live database: {error} Nothing was refreshed; review live first.') from None
+    return change_sets
 
 
 def refresh(state, snapshot, destination, save_state, frontend=None, diagrams=None):
@@ -166,7 +189,8 @@ def refresh(state, snapshot, destination, save_state, frontend=None, diagrams=No
         # No SQL writes are issued, and closing rolls this transaction back.
         local.execute('BEGIN IMMEDIATE')
         by_content = DIAGRAM_TABLES + MATH_TABLES if diagrams is not None else ()
-        with schema_upgraded_copies(baseline, local, live, folder, (base, working)) as compared:
+        change_sets = published_change_sets(state, live)
+        with schema_upgraded_copies(baseline, local, live, folder, (base, working), change_sets) as compared:
             inventories = [inventory(db, by_content) for db in compared]
         photo_plan = None
         if frontend is not None:
@@ -220,7 +244,7 @@ def refresh(state, snapshot, destination, save_state, frontend=None, diagrams=No
         (folder/'previous-workflow.json').write_text(json.dumps(state, indent=2), encoding='utf-8')
         updated = dict(state, base=str((folder/'base.db').resolve()),
                        working=str((folder/'working.db').resolve()),
-                       base_sha256=metadata['sha256'], job=None)
+                       base_sha256=metadata['sha256'], job=None, merge_pending_sync=[])
         save_state(updated)
         state.clear()
         state.update(updated)

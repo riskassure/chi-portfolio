@@ -128,6 +128,14 @@ stage, live-check and publish steps, records your check of the live pages, and
 offers option 8. Edits to existing entries stay with option 2. Details and
 recovery: [Publish a batch of new entries](administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries).
 
+To merge two entries that are really the same page, or retire one, use option
+**21** and follow [Merging and retiring entries](features/math/MERGING_ENTRIES.md):
+start the session before editing, publish the survivor's text with 2/3/4/5, then
+publish the merge with 3/4/5, verify live and run **8** before the next one. Nothing
+is deleted, and an undo is available while the recorded state holds. A PR that
+touches math readers merges only with `backend/tests/test_retirement_readers.py`
+passing.
+
 Option **1** marks any math change that option 2 would refuse as `[unsupported]`
 and explains why. Some existing entries cannot be patched through the helper at
 all; see [Entries the helper cannot publish](administration/deployment/CONTENT_SYNC.md#entries-the-helper-cannot-publish).

@@ -24,6 +24,7 @@ import photo_removal_sync
 import frontend_sync
 import diagram_sync
 import math_schema
+import merge_sync
 
 
 def fetch_verified(settings, remote, local):
@@ -122,6 +123,11 @@ def preview(data, snapshot=None, *, live=False):
         report += [math_schema.review(payload)]
         if snapshot:
             status = math_schema.status(snapshot)
+    elif payload.get('kind') == merge_sync.KIND:
+        report += [merge_sync.review(payload)]
+        if snapshot:
+            status = merge_sync.status(snapshot, payload, hashlib.sha256(data).hexdigest(),
+                                       Path(snapshot).resolve().parent/'src' if live else None)
     elif payload.get('kind') == diagram_sync.KIND:
         payload, files = diagram_sync.unpack(data)
         source = Path(snapshot).resolve().parent/'src' if live else None

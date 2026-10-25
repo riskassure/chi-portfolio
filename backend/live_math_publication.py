@@ -16,6 +16,7 @@ import photo_removal_sync
 import frontend_sync
 import diagram_sync
 import math_schema
+import merge_sync
 
 
 def publish(data, database, backups, source):
@@ -31,6 +32,8 @@ def publish(data, database, backups, source):
         return frontend_sync.apply(payload, source.parent.parent, backups, database)
     if payload.get('kind') == math_schema.KIND:
         return math_schema.apply(database, payload, backups)
+    if payload.get('kind') == merge_sync.KIND:
+        return merge_sync.apply(database, merge_sync.unpack(data), backups, source, hashlib.sha256(data).hexdigest())
     if payload.get('kind') == 'frontend-files':
         return frontend_sync.apply(payload, source.parent.parent/'frontend', backups)
     if payload.get('kind') == 'photo-remove':
