@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 import shutil
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -55,7 +56,10 @@ class MergeTrio(unittest.TestCase):
         self.state = dict(base=str(self.base), working=str(self.local), base_sha256=digest(self.base),
                           username='cwoo', job=None)
         self.save = Mock()
-        (self.root / 'src').symlink_to(SOURCE)  # The live check reads the code beside the database.
+        # The live check reads the website code's contract beside the database (no symlink: Windows).
+        contract = self.root / 'src' / 'services' / 'math' / 'retirement.py'
+        contract.parent.mkdir(parents=True)
+        shutil.copyfile(SOURCE / 'services' / 'math' / 'retirement.py', contract)
 
     # The helper's steps, with SSH replaced by the functions the server runs.
     def view(self, username, names):
@@ -148,6 +152,28 @@ class MergeTests(MergeTrio):
                 self.live, self.root / 'backups', SOURCE)
         self.synced()
 
+    def test_a_local_edit_to_a_value_the_receipt_sets_stops_option_8(self):
+        self.merge()
+        # A's retirement fields are what the receipt overwrites; a local value there must not vanish.
+        edit(self.local, "UPDATE math_concepts SET retirement_reason = 'Local note.' WHERE canonical_name = ?", A)
+        working = digest(self.local)
+        with self.assertRaisesRegex(ValueError, "does not fit your local copy.*Local note"):
+            self.option_8()
+        self.assertEqual(digest(self.local), working)
+        self.assertEqual(len(self.state['merge_pending_sync']), 1)
+
+    def test_a_local_edit_beside_a_repointed_redirect_stops_option_8(self):
+        edit(self.base, "UPDATE math_concepts SET retired_at = '2026-10-01', retired_into_id = ?, "
+                        "retirement_reason = 'older' WHERE canonical_name = 'OldStub'", self.ids['monoid with inverses'])
+        for path in (self.local, self.live):
+            shutil.copyfile(self.base, path)
+        self.state['base_sha256'] = digest(self.base)
+        self.merge()
+        edit(self.local, "UPDATE math_concepts SET retirement_reason = 'Local note.' WHERE canonical_name = 'OldStub'")
+        result = self.option_8()
+        self.assertFalse(result['safe'])
+        self.assertIn('math_concepts', result['blocked'])
+
     def test_live_altered_after_the_merge_fails_the_receipt_check(self):
         self.merge()
         edit(self.live, 'DELETE FROM math_synonyms WHERE synonym_text = ?', 'monoid with inverses')
@@ -189,6 +215,21 @@ class MergeTests(MergeTrio):
 
 
 class SessionTests(MergeTrio):
+    def test_the_live_reading_runs_in_an_isolated_interpreter_as_over_ssh(self):
+        # The same bootstrap and module list SSH sends, run with -I so nothing comes from this checkout's path.
+        site = self.root / 'site' / 'backend'
+        (site / 'src' / 'services' / 'math').mkdir(parents=True)
+        shutil.copyfile(SOURCE / 'services' / 'math' / 'retirement.py', site / 'src' / 'services' / 'math' / 'retirement.py')
+        shutil.copyfile(self.live, site / 'portfolio.db')
+        request = dict(merge_sync.view_request('cwoo', [A, S]), database=str(site / 'portfolio.db'))
+        result = subprocess.run([sys.executable, '-I', '-B', '-c', merge_sync.VIEW_BOOTSTRAP], cwd=self.root,
+                                input=json.dumps(request), capture_output=True, text=True, encoding='utf-8', timeout=120)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        view = merge_sync.read_view(result.stdout)
+        self.assertEqual((view['schema'], view['code_contract']), ('current', 1))
+        self.assertEqual(view['entries'][A]['entry'], self.view('cwoo', [A])['entries'][A]['entry'])
+
+
     def test_session_refuses_unpublished_local_edits_to_either_entry(self):
         edit(self.local, "UPDATE math_concepts SET cleaned_tex = 'Local.' WHERE canonical_name = ?", S)
         with self.assertRaisesRegex(ValueError, 'differs from live'):

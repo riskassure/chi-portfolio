@@ -374,6 +374,16 @@ def replay(db, change_set):
     survivor_id = _require_active(db, change_set['survivor']) if change_set['survivor'] else None
     if log_row(db, change_set['package_sha256']):
         raise Conflict('This package is already recorded.')
+    # Every value replay overwrites must hold what it held before the publish, so
+    # a local edit to one of them is reported, never silently replaced.
+    fields = db.execute('SELECT retired_at, retired_into_id, retirement_reason FROM math_concepts WHERE id = ?',
+                        (absorbed_id,)).fetchone()
+    if tuple(fields) != (None, None, None):
+        raise Conflict(f"{change_set['absorbed']} has retirement fields set here ({fields[0]!r}, "
+                       f"{name_of(db, fields[1]) if fields[1] is not None else None!r}, {fields[2]!r}); expected none.")
+    contract = db.execute('SELECT value FROM math_schema_meta WHERE key = ?', (math_schema.CONTRACT_KEY,)).fetchone()
+    if contract is None or not contract[0].isdigit():
+        raise Conflict(f'{math_schema.CONTRACT_KEY} is missing or not a whole number here.')
     if survivor_id is not None:
         _add_rows(db, survivor_id, change_set['added'])
     for name in change_set['repointed']:
@@ -625,8 +635,6 @@ def view(database, canonicals, source_dir):
                     code_contract=code_contract(source_dir), entries=entries)
 
 
-# The helper modules view() needs, in load order. Only these local, reviewed modules are sent.
-VIEW_MODULES = ('preview_math_sync', 'diagram_sync', 'frontend_sync', 'math_schema', 'merge_sync')
 VIEW_BOOTSTRAP = '''
 import sys, json, types
 from pathlib import Path
@@ -642,21 +650,33 @@ print('MERGE_VIEW_RESULT=' + json.dumps(view(database, config['canonicals'], dat
 '''
 
 
-def live_view(username, canonicals):
-    """Read view() from the live site over SSH, without changing anything."""
+def view_modules():
+    """The modules sent to read live: the live check's reviewed list, which loads in isolation, in order."""
+    from preflight_live_package import MODULES
+    return [(name, Path(__file__).with_name(name + '.py').read_text(encoding='utf-8')) for name in MODULES]
+
+
+def view_request(username, canonicals):
     if not re.fullmatch(r'[A-Za-z0-9_]+', username):
         raise ValueError('Invalid username.')
+    return dict(database=f'/home/{username}/chi-portfolio/backend/portfolio.db', canonicals=list(canonicals),
+                modules=view_modules())
+
+
+def read_view(stdout):
+    lines = [line[len('MERGE_VIEW_RESULT='):] for line in stdout.splitlines() if line.startswith('MERGE_VIEW_RESULT=')]
+    if len(lines) != 1:
+        raise ValueError('No unambiguous reading of live received; nothing prepared.')
+    return json.loads(lines[0])
+
+
+def live_view(username, canonicals):
+    """Read view() from the live site over SSH, without changing anything."""
+    request = view_request(username, canonicals)
     if not shutil.which('ssh'):
         raise ValueError('Windows OpenSSH Client is required.')
-    request = dict(database=f'/home/{username}/chi-portfolio/backend/portfolio.db', canonicals=list(canonicals),
-                   modules=[(name, Path(__file__).with_name(name + '.py').read_text(encoding='utf-8'))
-                            for name in VIEW_MODULES])
     print('Reading the two entries from live, read-only. SSH may ask for your PythonAnywhere password.', flush=True)
     result = subprocess.run(['ssh', username + '@ssh.pythonanywhere.com',
                              'python3.13 -I -B -c ' + shlex.quote(VIEW_BOOTSTRAP)],
                             input=json.dumps(request), stdout=subprocess.PIPE, text=True, encoding='utf-8', check=True)
-    lines = [line[len('MERGE_VIEW_RESULT='):] for line in result.stdout.splitlines()
-             if line.startswith('MERGE_VIEW_RESULT=')]
-    if len(lines) != 1:
-        raise ValueError('No unambiguous reading of live received; nothing prepared.')
-    return json.loads(lines[0])
+    return read_view(result.stdout)

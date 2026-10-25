@@ -239,13 +239,13 @@ class CodeContractGuardTests(TempFolder):
         self.ids = make_catalog(self.database)
         self.contract = self.site / frontend_sync.CONTRACT_FILE
         self.contract.parent.mkdir(parents=True)
-        self.contract.write_text('RETIREMENT_CONTRACT = 1\n')
+        self.contract.write_bytes(b'RETIREMENT_CONTRACT = 1\n')  # Exact bytes, also on Windows.
         self.reader = self.site / 'backend/src/services/math/reader.py'
-        self.reader.write_text('VERSION = 1\n')
+        self.reader.write_bytes(b'VERSION = 1\n')
 
     def payload(self, files):
         return dict(kind='website-code', files=[
-            dict(path=path, expected=(self.site / path).read_text() if (self.site / path).exists() else None,
+            dict(path=path, expected=(self.site / path).read_bytes().decode('utf-8') if (self.site / path).exists() else None,
                  replacement=text) for path, text in files.items()])
 
     def verdict(self, files):
@@ -274,7 +274,7 @@ class CodeContractGuardTests(TempFolder):
         data = zipped('website-code.json', payload)
         with self.assertRaisesRegex(ValueError, 'retirement contract 1'):
             publish(data, self.database, self.root / 'backups', self.database.parent / 'src')
-        self.assertEqual(self.contract.read_text(), 'RETIREMENT_CONTRACT = 1\n')
+        self.assertEqual(self.contract.read_bytes(), b'RETIREMENT_CONTRACT = 1\n')
 
     def test_this_checkout_declares_a_contract_the_guard_can_read(self):
         text = (SOURCE / 'services/math/retirement.py').read_text(encoding='utf-8')
