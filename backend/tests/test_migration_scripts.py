@@ -60,7 +60,7 @@ class ScriptCommandLineTests(unittest.TestCase):
             self.assertEqual(digest(self.legacy), self.legacy_digest)
 
     def test_every_script_requires_db(self):
-        self.assertEqual(len(SCRIPTS), 39)
+        self.assertEqual(len(SCRIPTS), 40)
         for script in SCRIPTS:
             with self.subTest(script=script.name):
                 result = run(script, cwd=self.folder)

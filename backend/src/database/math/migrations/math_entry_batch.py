@@ -35,14 +35,18 @@ def links(html):
 
 def add_entries(c, entries):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # Check every title, synonym and defined term before writing anything.
+    # Check every title, synonym and defined term before writing anything. A synonym may
+    # repeat another entry's defined term (synonyms win the autolink); nothing else may repeat.
     for e in entries:
         for term in [e["title"], *e["synonyms"], *e["definitions"]]:
             hit = c.execute("""SELECT title FROM math_concepts WHERE lower(title)=lower(?)
-                UNION SELECT synonym_text FROM math_synonyms WHERE lower(synonym_text)=lower(?)
-                UNION SELECT defined_term FROM math_definitions WHERE lower(defined_term)=lower(?)""",
-                            (term, term, term)).fetchone()
+                UNION SELECT synonym_text FROM math_synonyms WHERE lower(synonym_text)=lower(?)""",
+                            (term, term)).fetchone()
             assert not hit, (e["slug"], term, "already used")
+        for term in [e["title"], *e["definitions"]]:
+            hit = c.execute("SELECT 1 FROM math_definitions WHERE lower(defined_term)=lower(?)",
+                            (term,)).fetchone()
+            assert not hit, (e["slug"], term, "already a defined term")
     for e in entries:
         canonical, slug = new_entry_names(c.cursor(), e["title"], e["slug"])
         create_math_concept(c.cursor(), canonical, slug, e["title"], now, "CWoo", source(e), 1,
@@ -74,11 +78,13 @@ def verify(c, entries):
     assert c.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
 
-def run_batch(entries, extra_escapes, description, entry_escapes=None):
+def run_batch(entries, extra_escapes, description, entry_escapes=None, keep_linked=()):
+    """keep_linked: words of the standard escape list that this batch wants autolinked."""
     from migration_db import migration_target
     for e in entries:
         own = (entry_escapes or {}).get(e["slug"], [])
-        e["escapes"] = list(dict.fromkeys(ESCAPES + extra_escapes + own))
+        standard = [w for w in ESCAPES + extra_escapes if w not in keep_linked]
+        e["escapes"] = list(dict.fromkeys(standard + own))
     with migration_target(argparse.ArgumentParser(description=description)) as db:
         with sqlite3.connect(db) as c:
             c.row_factory = sqlite3.Row
