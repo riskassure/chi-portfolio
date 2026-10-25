@@ -29,6 +29,31 @@ Rendering transformations must also retain their order within the orchestrator,
 especially protection/restoration pairs. Folder grouping does not determine
 execution order.
 
+## Public math search
+
+The directory's quick-search dropdown and `search.html` both use
+`/api/math/search`, implemented in
+`backend/src/services/math/public_search_service.py` (repository-relative path).
+
+- Words can appear in any order: `theorem Sylow` finds `Sylow theorems`.
+- Matching ignores case, extra spaces, accents, and punctuation. Apostrophes
+  are removed, so `Euler's` and `Eulers` match. Partial words still work.
+- Every query word must occur in one searchable name. Titles rank first:
+  exact title, phrase at the start, phrase elsewhere, then words in any order.
+  Slug/canonical-name matches follow, then synonyms and defined terms.
+- Each concept appears once, using its best match, before result limits apply.
+  MSC codes, names, and descriptions also support words in any order;
+  classification results retain their separate section and limits.
+- This searches names and defined terms, not article bodies. Spelling correction
+  and automatic stemming are not implemented. A punctuation-only query returns
+  no results.
+
+No database migration or index rebuild is needed. Restart the local server to
+test backend changes. To enable them in production, publish the changed Python
+file through helper option 15 and the reviewed staging/check/publication steps;
+Git push alone does not update the site. Verify both the dropdown and the full
+results page after publication.
+
 ## TeX commands and proof style
 
 The site supports two kinds of macro-like commands:

@@ -504,6 +504,104 @@ prepare --base <base.db> --local <working.db> --canonical <name> --output <zip>`
 
 After publishing, option 8 brings the entry home and checks or downloads its SVGs.
 
+### Publish a batch of new entries
+
+Option **20** publishes several **new** entries from the working copy with one
+approval. It keeps the single-entry standards. Nothing in the working copy, the
+baseline or the live site changes before you type `PUBLISH ALL`; only review
+files under `dist/math-batches/<batch id>/` are written. Each entry is published
+from the package you reviewed, through the same stage, live check and publish
+code as options 3, 4 and 5. Authored links are never moved, removed or added to
+make an order work. Edits to existing entries, deletions and new kinds of media
+stay out of a batch; publish existing-entry edits one at a time with option 2.
+
+1. **Select and name.** Option 20 lists the new entries (those in the working
+   copy but not the baseline), with any that option 2 would refuse and why. It
+   also lists other local changes, which are not published and may later stop
+   option 8. Choose entries (`1,3-5` or `ALL`) and give the batch a name.
+2. **Check before anything is written.** It first reads the names of the live
+   entries over SSH (read-only), so related concepts and link targets outside
+   the batch are checked against the live site as it is now, not against an
+   older baseline. It then reports every blocker at once:
+   - an entry option 1 marks `[unsupported]`, including missing diagram SVGs
+     (render them first with **19**);
+   - two entries in the batch with the same canonical name, slug or title, or a
+     title that is another batch entry's synonym or defined term;
+   - a related concept that is not live and not in the batch;
+   - an explicit link (`\PMlinkname{text}{target}`) whose target matches no
+     canonical name, or more than one, among live entries and the batch. Links
+     are resolved the way the site resolves them: the entry is rendered with the
+     site's renderer and each target is matched to a canonical name ignoring case;
+   - a loop: entries that need each other through related concepts or explicit
+     links. Both directions are kept, so no order works and the batch can't be
+     approved. The message names the loop and every entry that depends on it;
+     remove those from the selection to go ahead with the rest. Two passes are
+     not a workaround yet, because adding a relationship to a live entry needs a
+     metadata publisher the helper does not have.
+3. **Freeze and review.** Each entry gets a package (as option 2 builds it)
+   under `packages/NN-<slug>/`, in publish order: every entry comes after the
+   related concepts and link targets it needs. `review.txt` lists the order,
+   each entry's title, slug, canonical name, related concepts and resolved links,
+   the SHA-256 of every package, and each package's full review. SVGs of new
+   diagrams are copied to `previews/`. Read it, and the local pages it lists,
+   before approving.
+4. **Batch check, then approve.** A read-only check over SSH runs the whole
+   batch, in order, against a private in-memory copy of the live database: each
+   eligible entry is added to the copy before the next is checked, so an entry
+   may depend on one scheduled earlier. Any duplicate, conflict or unresolved
+   link stops the batch here. If it passes, `PUBLISH ALL` approves exactly
+   these package files. Anything else cancels; the batch and its review are kept.
+5. **Publish one at a time.** For each entry, in order, it stages the package,
+   then runs a live check of that staged copy against the live database as it
+   is. Every related concept and link target must really exist on the site at
+   that moment: an entry whose dependency failed to publish is never published.
+   It then publishes with the usual backup and repeated conflict checks, and
+   waits 20 seconds before the next entry. To change the pause, add
+   `"batch_pause_seconds": <seconds>` to `dist/math-workflow.json`.
+6. **Check the live pages.** It shows totals, receipts and the live address of
+   every page with diagrams plus some text pages; `pages-to-check.txt` lists
+   them all. Type `VERIFIED` once they look right. Verification is recorded, not
+   assumed from a successful request.
+7. **Bring the changes home.** It then offers option 8 (stop the local server,
+   type `STOPPED`). If option 8 refuses, for example because of an unrelated
+   unpublished local edit, the batch reports "publication complete;
+   synchronization blocked" and keeps your working copy. Choose 20 again after
+   resolving it; nothing is republished.
+
+**Already present.** An entry counts as already on the site only when the live
+entry matches the complete reviewed entry and all its metadata, and, for an
+entry with diagrams, its diagram rows match and every SVG is in place and
+acceptable under the same-name policy above. A matching title or canonical name
+is not enough: a partial match is a conflict, and the batch stops.
+
+**When it stops.** Progress, staging paths and receipts are saved in
+`manifest.json` after every step, and a lock file stops two helper windows from
+running the same batch: option 20 takes it before showing or changing anything
+about a saved batch, including `SET ASIDE`, and rereads the manifest once it has it. Choose **20** again and type `RESUME`; it carries on
+from the saved state and never re-prepares packages from the working copy.
+- A connection failure while staging or checking is retried after 30, 60 and
+  120 seconds, then the batch stops.
+- A conflict or validation failure stops before that entry. Entries already
+  published stay published; a batch is not all-or-nothing, and is never undone
+  by restoring a whole database.
+- An unconfirmed publish is never repeated blindly. After a wait, a live check
+  decides: `ALREADY PRESENT` means it went through; `NO DUPLICATE FOUND` (the
+  expected earlier state) allows a retry; anything else stops. If it is still
+  unconfirmed after the retries, choosing 20 later runs the same check first.
+- If a frozen package changes or goes missing, the approval no longer holds and
+  nothing more is published. Type `SET ASIDE` at option 20 (the batch's history
+  is kept) and start a new batch; entries already live show as already present.
+- If you edit a batch entry in the working copy after freezing, the edit is not
+  in its package. Before publishing, option 20 names those entries and explains
+  the choice: `PUBLISH REVIEWED` publishes the older, reviewed version (option 8
+  will later show the difference); anything else stops, and you can set the
+  batch aside and start a new one so the newer version is reviewed.
+- If the lock file is left behind after a crash, option 20 names it; delete it
+  only when no other helper window is running the batch.
+
+Git is separate: a batch publishes database content and commits nothing.
+Tracked records of a batch (such as migration files) are a separate step.
+
 ## Upload a reviewed package through the API
 
 After configuring `backend/pythonanywhere_api.py setup` and passing its `check`,

@@ -1,8 +1,9 @@
 """Add a batch of new math entries (title, slug, metadata, body) and verify them.
 
-Shared by the add_*_entries_20261023.py migrations. Each entry dict carries title,
+Shared by the add_*_entries_2026102*.py migrations. Each entry dict carries title,
 slug, classifications, synonyms, definitions (defined terms), related slugs, body
-and reference; entries are created in list order with fresh ids. Run a migration
+and reference, and optionally extra types beyond those its environments imply;
+entries are created in list order with fresh ids. Run a migration
 with --db PATH to preview on a temporary copy, and add --apply to back up and write.
 """
 import argparse
@@ -22,7 +23,8 @@ TYPE = {"definition": "Definition", "theorem": "Theorem", "proof": "Proof", "exa
 
 
 def document_types(entry):
-    return sorted({TYPE[n] for n in re.findall(r"\\begin\{(\w+)\}", entry["body"]) if n in TYPE})
+    found = {TYPE[n] for n in re.findall(r"\\begin\{(\w+)\}", entry["body"]) if n in TYPE}
+    return sorted(found | set(entry.get("types") or []))
 
 
 def links(html):
@@ -72,10 +74,11 @@ def verify(c, entries):
     assert c.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
 
-def run_batch(entries, extra_escapes, description):
+def run_batch(entries, extra_escapes, description, entry_escapes=None):
     from migration_db import migration_target
     for e in entries:
-        e["escapes"] = list(dict.fromkeys(ESCAPES + extra_escapes))
+        own = (entry_escapes or {}).get(e["slug"], [])
+        e["escapes"] = list(dict.fromkeys(ESCAPES + extra_escapes + own))
     with migration_target(argparse.ArgumentParser(description=description)) as db:
         with sqlite3.connect(db) as c:
             c.row_factory = sqlite3.Row

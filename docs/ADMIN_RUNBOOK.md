@@ -62,6 +62,7 @@ preview: the helper explicitly selects a working copy.
 | Change | Preparation option |
 | --- | --- |
 | Supported math changes | **1** lists math changes; **2** prepares one |
+| Several new math entries at once | **20** publishes a reviewed batch of new entries; see [Publish a batch of new entries](administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries) |
 | Math entry with new, changed or missing PSTricks diagrams | **19** renders missing SVGs on this computer, then **1** and **2**; see [Publish a diagram change](administration/deployment/CONTENT_SYNC.md#publish-a-diagram-change) |
 | Biography or resume text | **9** |
 | Import Google Photos locally | **10** opens the local import screen; import alone does not publish |
@@ -118,6 +119,14 @@ refresh can switch working copies. Option 8 is not a general two-way merge. It
 downloads missing math diagram SVGs but not source code. Production-first is not
 a route for new or changed diagrams or images, because the live editor would
 render diagrams on the server. Use the diagram route instead.
+
+To publish several new entries together, choose **20**. You select the new
+entries and name the batch; it checks them, orders them so each entry follows
+the entries it relates or links to, writes one review, and asks for
+`PUBLISH ALL` once. It then publishes each reviewed package through the same
+stage, live-check and publish steps, records your check of the live pages, and
+offers option 8. Edits to existing entries stay with option 2. Details and
+recovery: [Publish a batch of new entries](administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries).
 
 Option **1** marks any math change that option 2 would refuse as `[unsupported]`
 and explains why. Some existing entries cannot be patched through the helper at

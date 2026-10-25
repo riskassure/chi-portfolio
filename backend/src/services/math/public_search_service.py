@@ -1,4 +1,7 @@
-# backend/src/services/math/public_search_service.py
+"""Search public math names and classifications with normalized, order-independent words."""
+
+import re
+import unicodedata
 
 
 def clamp_int(
@@ -13,16 +16,6 @@ def clamp_int(
         parsed = default
 
     return max(min_value, min(parsed, max_value))
-
-
-def escape_like_term(term: str) -> str:
-    """Escape SQLite LIKE wildcards so user text is treated literally."""
-    return (
-        term
-        .replace("\\", "\\\\")
-        .replace("%", "\\%")
-        .replace("_", "\\_")
-    )
 
 
 def parse_csv_list(value) -> list[str]:
@@ -138,166 +131,81 @@ def _combine_search_results(
     )[:overall_limit]
 
 
-def _fetch_title_matches(
-    cursor,
-    like_param: str,
-    query_param: str,
-    prefix_param: str,
-    limit: int,
-):
-    cursor.execute("""
-        SELECT
-            mc.id,
-            mc.title,
-            mc.slug,
-            GROUP_CONCAT(DISTINCT mcl.code) AS classification_codes
+def normalize_search_text(value):
+    """Ignore case, accents and punctuation; apostrophes do not split possessives."""
+    value = unicodedata.normalize("NFKD", value or "").casefold()
+    value = "".join(char for char in value if not unicodedata.combining(char))
+    value = value.replace("'", "").replace("\u2019", "")
+    return " ".join(re.findall(r"[^\W_]+", value))
+
+
+def match_rank(value, query, words):
+    """Lower is better; require every query word in the same searchable field.
+
+    Substring matching keeps incomplete words useful in the quick-search dropdown.
+    No stemming or spelling guesses are made, since similar math terms can differ.
+    """
+    text = normalize_search_text(value)
+    if not query or not all(word in text for word in words):
+        return None
+    if text == query:
+        return 0
+    if text.startswith(query):
+        return 1
+    if query in text:
+        return 2
+    return 3
+
+
+def _fetch_concept_matches(cursor, query, words):
+    # Read only name metadata, never full article bodies. Rank before limiting so
+    # multiple matching aliases cannot consume another concept's result slot.
+    rows = cursor.execute("""
+        SELECT mc.id, mc.title, mc.slug, mc.canonical_name,
+               GROUP_CONCAT(DISTINCT mcl.code) AS classification_codes
         FROM math_concepts mc
-        LEFT JOIN math_concept_classifications mcc
-            ON mc.id = mcc.concept_id
-        LEFT JOIN math_classifications mcl
-            ON mcc.classification_id = mcl.id
-        WHERE mc.title LIKE ? ESCAPE '\\'
-           OR mc.slug LIKE ? ESCAPE '\\'
-           OR mc.canonical_name LIKE ? ESCAPE '\\'
+        LEFT JOIN math_concept_classifications mcc ON mc.id = mcc.concept_id
+        LEFT JOIN math_classifications mcl ON mcc.classification_id = mcl.id
         GROUP BY mc.id
-        ORDER BY
-            CASE
-                WHEN LOWER(mc.title) = LOWER(?) THEN 0
-                WHEN LOWER(mc.title) LIKE LOWER(?) ESCAPE '\\' THEN 1
-                ELSE 2
-            END,
-            mc.title ASC
-        LIMIT ?;
-    """, (
-        like_param,
-        like_param,
-        like_param,
-        query_param,
-        prefix_param,
-        limit,
+    """).fetchall()
+    by_id = {row["id"]: row for row in rows}
+    best = {}
+
+    def consider(row, value, family, priority):
+        rank = match_rank(value, query, words)
+        if rank is None:
+            return
+        key = (priority, rank, normalize_search_text(value), value or "")
+        ident = row["id"]
+        if ident not in best or key < best[ident][0]:
+            best[ident] = (key, row, family, value if family != "title" else None)
+
+    for row in rows:
+        consider(row, row["title"], "title", 0)
+        consider(row, row["slug"], "title", 1)
+        consider(row, row["canonical_name"], "title", 1)
+    for table, column, family, priority in (
+        ("math_synonyms", "synonym_text", "synonym", 2),
+        ("math_definitions", "defined_term", "definition", 3),
+    ):
+        for alias in cursor.execute(f"SELECT concept_id, {column} FROM {table}").fetchall():
+            row = by_id.get(alias["concept_id"])
+            if row is not None:
+                consider(row, alias[column], family, priority)
+    return sorted(best.values(), key=lambda item: (
+        item[0][:2], normalize_search_text(item[1]["title"]), item[1]["slug"] or "", item[1]["id"]
     ))
 
-    return cursor.fetchall()
 
-
-def _fetch_synonym_matches(
-    cursor,
-    like_param: str,
-    query_param: str,
-    prefix_param: str,
-    limit: int,
-):
-    cursor.execute("""
-        SELECT
-            mc.id,
-            mc.title,
-            mc.slug,
-            ms.synonym_text AS matched_text,
-            GROUP_CONCAT(DISTINCT mcl.code) AS classification_codes
-        FROM math_synonyms ms
-        JOIN math_concepts mc
-            ON ms.concept_id = mc.id
-        LEFT JOIN math_concept_classifications mcc
-            ON mc.id = mcc.concept_id
-        LEFT JOIN math_classifications mcl
-            ON mcc.classification_id = mcl.id
-        WHERE ms.synonym_text LIKE ? ESCAPE '\\'
-        GROUP BY ms.id
-        ORDER BY
-            CASE
-                WHEN LOWER(ms.synonym_text) = LOWER(?) THEN 0
-                WHEN LOWER(ms.synonym_text) LIKE LOWER(?) ESCAPE '\\' THEN 1
-                ELSE 2
-            END,
-            ms.synonym_text ASC
-        LIMIT ?;
-    """, (
-        like_param,
-        query_param,
-        prefix_param,
-        limit,
-    ))
-
-    return cursor.fetchall()
-
-
-def _fetch_definition_matches(
-    cursor,
-    like_param: str,
-    query_param: str,
-    prefix_param: str,
-    limit: int,
-):
-    cursor.execute("""
-        SELECT
-            mc.id,
-            mc.title,
-            mc.slug,
-            md.defined_term AS matched_text,
-            GROUP_CONCAT(DISTINCT mcl.code) AS classification_codes
-        FROM math_definitions md
-        JOIN math_concepts mc
-            ON md.concept_id = mc.id
-        LEFT JOIN math_concept_classifications mcc
-            ON mc.id = mcc.concept_id
-        LEFT JOIN math_classifications mcl
-            ON mcc.classification_id = mcl.id
-        WHERE md.defined_term LIKE ? ESCAPE '\\'
-        GROUP BY md.id
-        ORDER BY
-            CASE
-                WHEN LOWER(md.defined_term) = LOWER(?) THEN 0
-                WHEN LOWER(md.defined_term) LIKE LOWER(?) ESCAPE '\\' THEN 1
-                ELSE 2
-            END,
-            md.defined_term ASC
-        LIMIT ?;
-    """, (
-        like_param,
-        query_param,
-        prefix_param,
-        limit,
-    ))
-
-    return cursor.fetchall()
-
-
-def _fetch_classification_matches(
-    cursor,
-    like_param: str,
-    query_param: str,
-    prefix_param: str,
-    limit: int,
-):
-    cursor.execute("""
-        SELECT
-            code,
-            text,
-            description
-        FROM math_classifications
-        WHERE code LIKE ? ESCAPE '\\'
-           OR text LIKE ? ESCAPE '\\'
-           OR COALESCE(description, '') LIKE ? ESCAPE '\\'
-        ORDER BY
-            CASE
-                WHEN LOWER(code) = LOWER(?) THEN 0
-                WHEN LOWER(code) LIKE LOWER(?) ESCAPE '\\' THEN 1
-                WHEN LOWER(text) LIKE LOWER(?) ESCAPE '\\' THEN 2
-                ELSE 3
-            END,
-            code ASC
-        LIMIT ?;
-    """, (
-        like_param,
-        like_param,
-        like_param,
-        query_param,
-        prefix_param,
-        prefix_param,
-        limit,
-    ))
-
-    return cursor.fetchall()
+def _fetch_classification_matches(cursor, query, words, limit):
+    matches = []
+    for row in cursor.execute("SELECT code, text, description FROM math_classifications").fetchall():
+        ranks = [(priority, rank) for priority, field in enumerate(("code", "text", "description"))
+                 if (rank := match_rank(row[field], query, words)) is not None]
+        if ranks:
+            matches.append((min(ranks), row))
+    matches.sort(key=lambda item: (item[0], item[1]["code"]))
+    return [row for _, row in matches[:limit]]
 
 
 def search_public_math_library(
@@ -319,85 +227,21 @@ def search_public_math_library(
     concept_limit = limits["concept_limit"]
     classification_limit = limits["classification_limit"]
 
-    safe_query = escape_like_term(query_param)
-    like_param = f"%{safe_query}%"
-    prefix_param = f"{safe_query}%"
-
+    query = normalize_search_text(query_param)
+    words = tuple(dict.fromkeys(query.split()))
     concept_results = []
     classification_results = []
-
     seen_concept_slugs = set()
     seen_class_codes = set()
 
-    title_rows = _fetch_title_matches(
-        cursor=cursor,
-        like_param=like_param,
-        query_param=query_param,
-        prefix_param=prefix_param,
-        limit=concept_limit,
-    )
-
-    for row in title_rows:
-        _append_concept_result(
-            concept_results=concept_results,
-            seen_concept_slugs=seen_concept_slugs,
-            row=row,
-            match_type="title",
-        )
-
-    remaining_concept_slots = max(
-        0,
-        concept_limit - len(seen_concept_slugs),
-    )
-
-    if remaining_concept_slots > 0:
-        synonym_rows = _fetch_synonym_matches(
-            cursor=cursor,
-            like_param=like_param,
-            query_param=query_param,
-            prefix_param=prefix_param,
-            limit=remaining_concept_slots,
-        )
-
-        for row in synonym_rows:
-            _append_concept_result(
-                concept_results=concept_results,
-                seen_concept_slugs=seen_concept_slugs,
-                row=row,
-                match_type="synonym",
-                matched_text=row["matched_text"],
-            )
-
-    remaining_concept_slots = max(
-        0,
-        concept_limit - len(seen_concept_slugs),
-    )
-
-    if remaining_concept_slots > 0:
-        definition_rows = _fetch_definition_matches(
-            cursor=cursor,
-            like_param=like_param,
-            query_param=query_param,
-            prefix_param=prefix_param,
-            limit=remaining_concept_slots,
-        )
-
-        for row in definition_rows:
-            _append_concept_result(
-                concept_results=concept_results,
-                seen_concept_slugs=seen_concept_slugs,
-                row=row,
-                match_type="definition",
-                matched_text=row["matched_text"],
-            )
-
-    classification_rows = _fetch_classification_matches(
-        cursor=cursor,
-        like_param=like_param,
-        query_param=query_param,
-        prefix_param=prefix_param,
-        limit=classification_limit,
-    )
+    if query:
+        for _, row, family, matched_text in _fetch_concept_matches(cursor, query, words):
+            _append_concept_result(concept_results, seen_concept_slugs, row, family, matched_text)
+            if len(concept_results) >= concept_limit:
+                break
+        classification_rows = _fetch_classification_matches(cursor, query, words, classification_limit)
+    else:
+        classification_rows = []
 
     for row in classification_rows:
         code = row["code"]
