@@ -36,6 +36,10 @@ MERGE_JACCARD = 0.4
 # Sibling definitions ("full functor", "faithful functor") share templated wording.
 # Without a title link between them, only a near-subset counts as a possible duplicate.
 NEAR_SUBSET = 0.85
+# A same-title entry this much shorter than the other, sharing some of its wording,
+# may be an unfinished stub of it. Length alone is never enough.
+STUB_LENGTH = 0.25
+STUB_CONTAINMENT = 0.2
 
 STATEMENT_TYPES = {'Theorem', 'Result', 'Corollary', 'Conjecture', 'Axiom'}
 TITLE_ROLES = [
@@ -180,7 +184,17 @@ def suggest(a, b, signals, overlap):
         if area in ('different', 'same field') and not strong_text:
             return 'rename', 'same title in different subjects; disambiguate the titles'
         if area == 'same area' and roles:
-            return 'merge', 'same title, same subject area and comparable content roles'
+            # A matching title, subject and role is not enough: the content must overlap too.
+            shorter, longer = sorted((a['length'], b['length']))
+            if strong_text:
+                return 'merge', (f'same title, subject area and role, and strong text overlap '
+                                 f'({containment:.0%} of the shorter entry)')
+            if longer and shorter / longer <= STUB_LENGTH and containment >= STUB_CONTAINMENT:
+                return 'merge', (f'same title, subject area and role; the shorter entry is {shorter / longer:.0%} '
+                                 f'as long and shares {containment:.0%} of its wording, so it may be a stub. '
+                                 'Read both before deciding')
+            return 'rename', ('same title, subject area and role but little shared text; read both: '
+                              'two different entries need distinct titles, a duplicate needs a merge')
         return 'rename', 'same title but different content roles or unclassified; disambiguate'
     if strong_text and area == 'same area' and roles and (containment >= NEAR_SUBSET or 'title is alias' in signals):
         return 'merge', 'strong text overlap, same subject area and comparable content roles'
@@ -224,6 +238,13 @@ def find_candidates(entries):
     overlaps = text_overlaps(entries)
     for pair in overlaps:
         pairs[pair].add('text overlap')
+    for pair, signals in pairs.items():
+        if 'same title' in signals and pair not in overlaps:
+            # Below the general thresholds, but a same-title pair still needs its real overlap.
+            first, second = (shingles(entries[i]['tex']) for i in pair)
+            common = len(first & second)
+            if first and second:
+                overlaps[pair] = (common, common / len(first | second), common / min(len(first), len(second)))
     rows = []
     for (x, y), signals in pairs.items():
         a, b = entries[x], entries[y]
@@ -281,7 +302,8 @@ def write_report(rows, folder, database, entry_count):
             lines.append(f"{number}. {_describe(r['a'])}  \n   {_describe(r['b'])}  \n"
                          f"   Why: {r['reason']}. Signals: {', '.join(r['signals'])}"
                          + (f"; overlap {r['containment']:.0%} of the shorter entry" if r['shared_shingles'] else '')
-                         + (f".  \n   Suggested survivor: {r['survivor']}." if r['survivor'] else '.'))
+                         + (f".  \n   Suggested survivor: {r['survivor']} (more incoming links, then longer text). "
+                            'Check both texts and which URL should stay.' if r['survivor'] else '.'))
     (folder / 'candidates.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     return counts
 

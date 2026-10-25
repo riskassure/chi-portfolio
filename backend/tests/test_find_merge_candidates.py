@@ -92,13 +92,30 @@ class CandidateTests(unittest.TestCase):
         b = self.catalog.add('filtration', 'A filtration in modal logic.', msc=('03B45',))
         self.assertEqual(pair(self.catalog.rows(), a, b)['action'], 'rename')
 
-    def test_same_title_in_same_area_is_a_merge_and_the_linked_entry_survives(self):
-        a = self.catalog.add('Burnside lemma', 'Short.', msc=('20B05',))
-        b = self.catalog.add('Burnside lemma', 'Longer text about counting orbits.', msc=('20B99',))
+    def test_same_title_and_area_without_shared_text_is_not_a_merge(self):
+        a = self.catalog.add('Burnside lemma', 'Short text about orbits.', msc=('20B05',))
+        b = self.catalog.add('Burnside lemma', 'Entirely different words describing another idea.', msc=('20B99',))
+        row = pair(self.catalog.rows(), a, b)
+        self.assertEqual(row['action'], 'rename')
+        self.assertIn('read both', row['reason'])
+
+    def test_same_title_with_strong_overlap_is_a_merge_and_the_linked_entry_survives(self):
+        a = self.catalog.add('Burnside lemma', SHARED + FULL, msc=('20B05',))
+        b = self.catalog.add('Burnside lemma', SHARED + FAITHFUL, msc=('20B99',))
         self.catalog.add('group action', 'Groups act.', related=(a,))
         row = pair(self.catalog.rows(), a, b)
         self.assertEqual(row['action'], 'merge')
+        self.assertIn('strong text overlap', row['reason'])
         self.assertTrue(row['survivor'].endswith(f'({a})'))
+
+    def test_a_short_same_title_entry_sharing_some_wording_is_a_possible_stub(self):
+        unfinished = ' '.join(SHARED.split()[:20]) + ' ' + ' '.join(f'draft{i}' for i in range(20))
+        complete = SHARED + ' ' + ' '.join(f'step{i}' for i in range(300))
+        a = self.catalog.add('Burnside lemma', unfinished, msc=('20B05',))
+        b = self.catalog.add('Burnside lemma', complete, msc=('20B05',))
+        row = pair(self.catalog.rows(), a, b)
+        self.assertEqual(row['action'], 'merge')
+        self.assertIn('stub', row['reason'])
 
     def test_shared_terminology_alone_never_suggests_a_merge(self):
         a = self.catalog.add('order ideal', 'One text.', synonyms=('ideal',), definitions=('down set',))
