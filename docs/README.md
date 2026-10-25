@@ -16,6 +16,7 @@ Committing code does not publish it to the website.
 | [Math authoring](features/math/AUTHORING_STANDARDS.md) | Mathematics content conventions |
 | [Adding a math entry](features/math/ADDING_ENTRIES.md) | Local create/preview/save steps and reviewed publication |
 | [Math frontend](features/math/FRONTEND.md) | Mathematics frontend implementation notes |
+| [Merge candidates](features/math/MERGE_CANDIDATES.md) | Read-only report of entries to merge, cross-link or rename |
 
 ## Backup administration
 
