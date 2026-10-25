@@ -235,10 +235,17 @@ name, text, metadata and diagrams. Row ids, `created_at`/`updated_at` and the
 generated page HTML are ignored, so an entry you published matches the local
 copy it came from. An unpublished local edit still stops the refresh. Local
 diagram-failure diagnostics are not carried into the new copies.
-Photos are compared individually by filename and editable metadata, including
-visibility. Gallery IDs, rotation counters and rotation timestamps may differ.
-Unpublished or conflicting local photos still stop the refresh. Unrecognized
-schemas and changes to other media-related tables also stop for review.
+Photos are compared individually by filename and editable metadata (title,
+location and coordinates). Gallery IDs and rotation state (which photos are
+currently shown, rotation counters and timestamps) may differ, because the live
+gallery rotates on its own. Unpublished or conflicting local photos still stop
+the refresh; publish them with option 12 first. The Spotify ranking
+(`music_publication` and its metadata) is regenerated separately by each
+website's own daily job and is never published from the laptop, so the live
+ranking replaces the local one without stopping the refresh. Rerun
+`backend/install_music_schedule.ps1` afterwards if you use the local schedule.
+Unrecognized schemas and changes to other media-related tables (catalog,
+overrides, imports) also stop for review.
 
 All gallery WebP files referenced by the live snapshot are checksum-verified
 against a read-only SSH manifest. Missing images are downloaded using SCP into

@@ -31,7 +31,7 @@ by running the web server or deploying this code.
 
 For local automation, run `backend/install_music_schedule.ps1` after connecting.
 It replaces the previous task of the same name and targets the current working
-copy recorded by the helper. Reinstall after switching working database copies.
+copy recorded by the helper. Reinstall after switching working database copies (option 8 reminds you when it replaced the local ranking with the live one).
 It checks every 15 minutes while logged in, refreshing only when 24 hours are due.
 
 For PythonAnywhere, first install the authorized token securely outside the
