@@ -19,6 +19,8 @@ Committing code does not publish it to the website.
 | [Math frontend](features/math/FRONTEND.md) | Mathematics frontend implementation notes |
 | [Merge candidates](features/math/MERGE_CANDIDATES.md) | Read-only report of entries to merge, cross-link or rename |
 | [Merging and retiring entries](features/math/MERGING_ENTRIES.md) | Option 21: merge an entry into another, retire one, undo; rollout and rules |
+| [Batch publishing design](features/math/BATCH_PUBLISHING_DESIGN.md) | Agreed design behind option 20 (implemented); why it works as it does |
+| [Merging design](features/math/MERGING_DESIGN.md) | Approved design v3 behind option 21 (implemented); why it works as it does |
 
 ## Backup administration
 

@@ -515,7 +515,8 @@ After publishing, option 8 brings the entry home and checks or downloads its SVG
 ### Publish a batch of new entries
 
 Option **20** publishes several **new** entries from the working copy with one
-approval. It keeps the single-entry standards. Nothing in the working copy, the
+approval. Its agreed design, with the reasons for these rules, is
+[Batch publishing design](../../features/math/BATCH_PUBLISHING_DESIGN.md). It keeps the single-entry standards. Nothing in the working copy, the
 baseline or the live site changes before you type `PUBLISH ALL`; only review
 files under `dist/math-batches/<batch id>/` are written. Each entry is published
 from the package you reviewed, through the same stage, live check and publish
