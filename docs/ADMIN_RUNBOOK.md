@@ -331,9 +331,9 @@ fails: [How the site's logins and API keys work](administration/API_AUTHENTICATI
 Spotify token location can be overridden by `SPOTIFY_TOKEN_PATH`. Keep tokens out
 of screenshots, command arguments, deployment packages and logs. Esri's browser
 key is intentionally delivered to the map: it is sent to every visitor's browser,
-so anyone can read it. It is safe only because Esri limits it to map privileges and
-to requests whose *referrer* (the page address the browser reports) is this site;
-keep those restrictions. Its recorded expiration is **October 13, 2027**; rotate before then.
+so anyone can read it. Esri's limits (map privileges only, and only requests whose
+*referrer*, the page address the browser reports, is this site) reduce what a copied
+key could be used for, but don't make misuse impossible; keep those restrictions. Its recorded expiration is **October 13, 2027**; rotate before then.
 Changing Esri referrers can require regenerating its key. Do not reset working
 credentials without understanding which environment uses them.
 
