@@ -662,7 +662,8 @@ function createRelatedConceptChipPicker(config) {
 
                 const main = document.createElement("div");
                 main.className = "chip-suggestion-main";
-                main.textContent = item.title || item.canonical_name || "Untitled concept";
+                main.textContent = (item.title || item.canonical_name || "Untitled concept")
+                    + (item.retired ? " (retired)" : "");
 
                 const sub = document.createElement("div");
                 sub.className = "chip-suggestion-sub";
@@ -939,6 +940,15 @@ async function hydrateConceptForEdit(id) {
         }
 
         showStatus("", "clear");
+
+        if (concept.retirement) {
+            // The server refuses saves to retired entries; say why before anyone edits.
+            showStatus("This entry is retired" + (concept.retirement.retirement_reason
+                ? ` (${concept.retirement.retirement_reason})` : "")
+                + ". It cannot be edited; undo the retirement with helper option 21 first.", "error");
+            const saveBtn = document.getElementById("saveEditorBtn");
+            if (saveBtn) saveBtn.disabled = true;
+        }
 
     } catch (err) {
         console.error(err);

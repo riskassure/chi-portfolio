@@ -1,10 +1,14 @@
 # backend/src/services/math/public_catalog_service.py
 
+from services.math.retirement import active_condition
+
 
 def build_public_catalog_query(
     classification_filter=None,
     search_query=None,
+    active_sql="1 = 1",
 ) -> tuple[str, list]:
+    """active_sql is the retirement filter for alias mc (see retirement.active_condition)."""
     query = """
         SELECT
             mc.id,
@@ -27,7 +31,7 @@ def build_public_catalog_query(
             ON mcc.classification_id = mcl.id
     """
 
-    conditions = []
+    conditions = [active_sql]
     params = []
 
     if classification_filter:
@@ -107,6 +111,7 @@ def fetch_public_math_catalog(
     query, params = build_public_catalog_query(
         classification_filter=classification_filter,
         search_query=search_query,
+        active_sql=active_condition(cursor, "mc"),
     )
 
     cursor.execute(query, params)

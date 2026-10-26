@@ -3,6 +3,8 @@
 import re
 from urllib.parse import quote, unquote
 
+from services.math.retirement import active_condition, retired_slug_targets
+
 
 # These words are grammatical connective tissue in ordinary prose. Even if a
 # concept, synonym, or defined term uses one of them, context-free matching is
@@ -19,17 +21,20 @@ def resolve_explicit_math_link_targets(tex_content, db_cursor):
     Convert explicit PlanetMath links whose href target is a legacy
     canonical_name into links using the concept's stored CMS slug.
 
-    If the target concept does not exist locally, keep only the visible
-    link text and remove the broken anchor.
+    A target that was merged into another entry links to that survivor; the
+    authored TeX is never rewritten. If the target concept does not exist
+    locally, or was retired without a survivor, keep only the visible link
+    text and remove the broken anchor.
     """
     if not tex_content or "math-explicit-link" not in tex_content:
         return tex_content or ""
 
-    db_cursor.execute("""
-        SELECT canonical_name, slug
-        FROM math_concepts
-        WHERE canonical_name IS NOT NULL
-          AND slug IS NOT NULL;
+    db_cursor.execute(f"""
+        SELECT mc.canonical_name, mc.slug
+        FROM math_concepts mc
+        WHERE mc.canonical_name IS NOT NULL
+          AND mc.slug IS NOT NULL
+          AND {active_condition(db_cursor, "mc")};
     """)
 
     canonical_to_slug = {
@@ -37,6 +42,7 @@ def resolve_explicit_math_link_targets(tex_content, db_cursor):
         for row in db_cursor.fetchall()
         if row[0] and row[1]
     }
+    canonical_to_slug.update(retired_slug_targets(db_cursor))
 
     pattern = re.compile(
         r'<a\b[^>]*\bclass="[^"]*\bmath-explicit-link\b[^"]*"'
@@ -109,13 +115,17 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
     )
 
     # 3. Harvest all available global cross-linking destination keys.
+    # Retired entries are skipped: a merged entry's title and terms were
+    # copied onto its survivor, which therefore receives those links.
     targets = {}
+    active = active_condition(db_cursor, "mc")
 
     # Base concept titles.
-    db_cursor.execute("""
-        SELECT id, title, slug
-        FROM math_concepts
-        WHERE id != ?;
+    db_cursor.execute(f"""
+        SELECT mc.id, mc.title, mc.slug
+        FROM math_concepts mc
+        WHERE mc.id != ?
+          AND {active};
     """, (concept_id,))
 
     for row in db_cursor.fetchall():
@@ -123,12 +133,13 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
             targets[row[1].lower().strip()] = row[2]
 
     # Platform synonyms.
-    db_cursor.execute("""
+    db_cursor.execute(f"""
         SELECT ms.synonym_text, mc.slug
         FROM math_synonyms ms
         JOIN math_concepts mc
             ON ms.concept_id = mc.id
-        WHERE ms.concept_id != ?;
+        WHERE ms.concept_id != ?
+          AND {active};
     """, (concept_id,))
 
     for row in db_cursor.fetchall():
@@ -138,12 +149,13 @@ def apply_math_autolinker(concept_id, tex_content, db_cursor):
             targets.setdefault(row[0].lower().strip(), row[1])
 
     # Platform defined terms.
-    db_cursor.execute("""
+    db_cursor.execute(f"""
         SELECT md.defined_term, mc.slug
         FROM math_definitions md
         JOIN math_concepts mc
             ON md.concept_id = mc.id
-        WHERE md.concept_id != ?;
+        WHERE md.concept_id != ?
+          AND {active};
     """, (concept_id,))
 
     for row in db_cursor.fetchall():

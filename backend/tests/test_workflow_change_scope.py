@@ -46,7 +46,8 @@ class ChangeScopeTests(unittest.TestCase):
             local = self.working_db(temp, svgs or {})
             state = dict(base=str(base), base_sha256=helper.digest(base), working=local)
             snapshots = {str(base): baseline, local: working}
-            with patch.object(helper, 'read_snapshot', side_effect=lambda path: snapshots[str(path)]):
+            with patch.object(helper, 'read_snapshot', side_effect=lambda path: snapshots[str(path)]), \
+                    patch.object(helper, 'read_status', return_value={}):
                 return {item['canonical']: item for item in helper.changed_entries(state)}
 
     def test_plain_text_and_new_entries_stay_supported(self):

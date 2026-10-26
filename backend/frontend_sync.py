@@ -1,4 +1,6 @@
 """Review and publish selected UTF-8 frontend files with conflict checks and backups."""
+import ast
+from contextlib import closing
 import difflib
 import hashlib
 import io
@@ -7,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import sqlite3
 import stat
 import subprocess
 import tempfile
@@ -122,8 +125,65 @@ def review(payload):
     return '\n'.join(lines)
 
 
-def status(payload, frontend):
+# Declares the retirement reader contract of the website code (see that file).
+CONTRACT_FILE = 'backend/src/services/math/retirement.py'
+
+
+def declared_contract(text):
+    """Return the RETIREMENT_CONTRACT integer a retirement.py text declares, or None; nothing is run."""
+    if text is None:
+        return None
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return None
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name) and node.targets[0].id == 'RETIREMENT_CONTRACT'
+                and isinstance(node.value, ast.Constant) and type(node.value.value) is int):
+            return node.value.value
+    return None
+
+
+def required_contract(database):
+    """The reader contract the live retirements need; 0 before the schema upgrade or any retirement."""
+    if not Path(database).is_file():
+        return 0  # No database beside the code (a code-only site): nothing is retired.
+    with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True)) as db:
+        if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='math_schema_meta'").fetchone():
+            return 0
+        row = db.execute("SELECT value FROM math_schema_meta WHERE key='retirement_contract_required'").fetchone()
+    return int(row[0]) if row and row[0].isdigit() else 0
+
+
+def contract_problem(payload, root, database):
+    """Why this code package would leave the site below the live retirement contract, or None.
+
+    Compares two declared numbers: the contract the live database records and
+    the one retirement.py declares after publication (the package's version
+    if it carries one, otherwise the live file). The reader tests guarantee
+    that code declaring a contract implements it.
+    """
+    required = required_contract(database)
+    if not required:
+        return None
+    replacement = {item['path']: item['replacement'] for item in payload['files']}
+    text = replacement[CONTRACT_FILE] if CONTRACT_FILE in replacement else read_text(root, CONTRACT_FILE, True)
+    declared = declared_contract(text)
+    if declared is None or declared < required:
+        return (f'BLOCKED - the live database has retired entries that need retirement contract {required}, '
+                f'but this code would declare {declared if declared is not None else "none"}; '
+                'publish code from an up-to-date checkout')
+    return None
+
+
+def status(payload, frontend, database=None):
+    """One-line verdict on publishing payload; database, for code packages, enables the contract check."""
     validate(payload)
+    if payload['kind'] == 'website-code' and database is not None:
+        problem = contract_problem(payload, frontend, database)
+        if problem:
+            return problem
     matches = []
     for item in payload['files']:
         current = read_text(frontend, item['path'], payload['kind'] == 'website-code')
@@ -191,7 +251,7 @@ def temporary_file(target, text, mode):
         raise
 
 
-def apply(payload, frontend, backups):
+def apply(payload, frontend, backups, database=None):
     validate(payload)
     code = payload['kind'] == 'website-code'
     canonical = 'Website code (reload required)' if code else 'Frontend files'
@@ -206,7 +266,7 @@ def apply(payload, frontend, backups):
     backup = None
     journal = None
     try:
-        outcome = status(payload, frontend)
+        outcome = status(payload, frontend, database)
         if outcome.startswith('ALREADY PRESENT'):
             return dict(status='ALREADY_PRESENT', canonical=canonical, backup=None)
         if not outcome.startswith('EXPECTED TEXT MATCHES'):

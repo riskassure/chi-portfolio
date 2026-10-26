@@ -193,6 +193,11 @@ synchronization are complete.
 - **Files:** option 8 verifies gallery photos, but does not synchronize source
   code, all media, or math diagram assets. New diagram/file-backed changes may
   require a separate transfer and reconciliation plan.
+- **Retired entries:** an entry merged into another or retired with option 21
+  keeps its canonical name and slug reserved; a new entry cannot reuse them, but
+  may reuse its title. A retired entry cannot be edited or used as a related
+  concept (the message names its survivor). See
+  [Merging and retiring entries](MERGING_ENTRIES.md).
 - **No database swapping:** never upload the entire laptop database to make the
   sites match. It could overwrite newer music, photo, profile or math content.
 

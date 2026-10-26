@@ -269,6 +269,14 @@ images stay in their existing local folder. The baseline stays an exact live
 snapshot. Remote-only private drafts require review because their private image
 files are not part of the gallery download.
 
+Two option 21 changes are allowed for. If live has the one-time retirement schema
+upgrade and your copies have none of it, temporary upgraded copies are compared
+instead. A merge, retirement or undo published with option 21 is first confirmed
+against the live snapshot from its saved receipt, then applied exactly to those
+temporary copies, so only other differences are compared; a mismatch stops the
+refresh and says what differs. Your original databases are never edited. See
+[Merging and retiring entries](../../features/math/MERGING_ENTRIES.md).
+
 On success it creates verified `base.db` and `working.db` in a new ignored
 `dist/home-sync/<unique-id>/` folder and remembers those paths. The original
 databases, downloaded snapshot, and previous workflow settings are preserved.
@@ -601,6 +609,13 @@ from the saved state and never re-prepares packages from the working copy.
 
 Git is separate: a batch publishes database content and commits nothing.
 Tracked records of a batch (such as migration files) are a separate step.
+
+### Merge or retire entries (option 21)
+
+Option **21** merges an entry into another, retires one with no survivor, or undoes
+either, through reviewed packages published with 3, 4 and 5. Each publish must be
+brought home with option 8 before option 21 prepares the next. The full procedure,
+checks and rollout are in [Merging and retiring entries](../../features/math/MERGING_ENTRIES.md).
 
 ## Upload a reviewed package through the API
 

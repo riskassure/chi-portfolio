@@ -30,7 +30,7 @@ from batch_links import entry_links, name_index
 # The single-entry preflight's modules plus these two. Only these local, reviewed modules are sent.
 MODULES = ('pythonanywhere_api', 'stage_pythonanywhere_package', 'preview_math_sync', 'publish_math_entry',
            'apply_math_text_patch', 'profile_sync', 'photo_sync', 'photo_metadata_sync', 'photo_removal_sync',
-           'frontend_sync', 'diagram_sync', 'inspect_staged_package', 'batch_links', 'batch_check')
+           'frontend_sync', 'diagram_sync', 'math_schema', 'merge_sync', 'inspect_staged_package', 'batch_links', 'batch_check')
 READY = ('NO DUPLICATE FOUND', 'ALREADY PRESENT')
 LOADER = '''
 import sys, json, types, hashlib, base64

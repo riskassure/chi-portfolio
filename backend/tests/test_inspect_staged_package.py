@@ -39,7 +39,8 @@ class InspectTests(unittest.TestCase):
         for current, status in [(entry, 'EXPECTED TEXT MATCHES'),
                                 (dict(entry, cleaned_tex='Other edit.'), 'CONFLICT'),
                                 (dict(entry, cleaned_tex='Revised definition.'), 'ALREADY PRESENT')]:
-            with patch('inspect_staged_package.read_snapshot', return_value={canonical: current}):
+            with patch('inspect_staged_package.read_snapshot', return_value={canonical: current}), \
+                    patch('inspect_staged_package.read_status', return_value={}):
                 report = preview(data, Path('snapshot.db'))
             self.assertIn(status, report)
             self.assertIn('-Original definition.', report)

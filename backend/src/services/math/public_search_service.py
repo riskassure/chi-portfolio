@@ -3,6 +3,8 @@
 import re
 import unicodedata
 
+from services.math.retirement import active_condition
+
 
 def clamp_int(
     value,
@@ -160,12 +162,14 @@ def match_rank(value, query, words):
 def _fetch_concept_matches(cursor, query, words):
     # Read only name metadata, never full article bodies. Rank before limiting so
     # multiple matching aliases cannot consume another concept's result slot.
-    rows = cursor.execute("""
+    # Retired entries are not offered; their aliases live on in their survivor's rows.
+    rows = cursor.execute(f"""
         SELECT mc.id, mc.title, mc.slug, mc.canonical_name,
                GROUP_CONCAT(DISTINCT mcl.code) AS classification_codes
         FROM math_concepts mc
         LEFT JOIN math_concept_classifications mcc ON mc.id = mcc.concept_id
         LEFT JOIN math_classifications mcl ON mcc.classification_id = mcl.id
+        WHERE {active_condition(cursor, "mc")}
         GROUP BY mc.id
     """).fetchall()
     by_id = {row["id"]: row for row in rows}

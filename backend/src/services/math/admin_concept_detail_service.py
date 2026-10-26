@@ -1,5 +1,7 @@
 # backend/src/services/math/admin_concept_detail_service.py
 
+from services.math.retirement import retirement_info
+
 
 def _fetch_admin_concept_row(
     cursor,
@@ -237,5 +239,8 @@ def fetch_admin_math_concept_detail(
             concept_id,
         )
     )
+
+    # None for an active entry; the editor refuses to save a retired one.
+    concept_data["retirement"] = retirement_info(cursor, concept_id)
 
     return concept_data

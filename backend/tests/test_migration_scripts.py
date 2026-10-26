@@ -16,7 +16,7 @@ sys.path.insert(0, str(MIGRATIONS))
 import add_autolink_inflection_synonyms
 import migration_db
 
-SCRIPTS = sorted(p for p in MIGRATIONS.glob('*.py') if p.name not in {'__init__.py', 'migration_db.py', 'math_entry_batch.py'})
+SCRIPTS = sorted(p for p in MIGRATIONS.glob('*.py') if p.name not in {'__init__.py', 'migration_db.py', 'math_entry_batch.py', 'math_entry_merge.py'})
 
 SCHEMA = '''
 CREATE TABLE math_concepts (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, canonical_name TEXT,
@@ -60,7 +60,7 @@ class ScriptCommandLineTests(unittest.TestCase):
             self.assertEqual(digest(self.legacy), self.legacy_digest)
 
     def test_every_script_requires_db(self):
-        self.assertEqual(len(SCRIPTS), 40)
+        self.assertEqual(len(SCRIPTS), 41)
         for script in SCRIPTS:
             with self.subTest(script=script.name):
                 result = run(script, cwd=self.folder)

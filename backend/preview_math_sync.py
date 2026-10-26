@@ -23,18 +23,63 @@ def read_snapshot(path, connection=None):
             key = item.pop('canonical_name')
             if not key or key in result:
                 raise ValueError('Missing or duplicate canonical name.')
-            queries = {
-                'classifications': 'SELECT c.code FROM math_classifications c JOIN math_concept_classifications m ON c.id=m.classification_id WHERE m.concept_id=?',
-                'types': 'SELECT t.type_name FROM math_types t JOIN math_concept_types m ON t.id=m.type_id WHERE m.concept_id=?',
-                'synonyms': 'SELECT synonym_text FROM math_synonyms WHERE concept_id=?',
-                'definitions': 'SELECT defined_term FROM math_definitions WHERE concept_id=?',
-                'link_exclusions': 'SELECT word FROM math_link_exclusions WHERE concept_id=?',
-                'related_concepts': 'SELECT related_canonical_name FROM math_related_concepts WHERE concept_id=?',
-            }
-            for name, query in queries.items():
-                item[name] = sorted((r[0] for r in db.execute(query,(ident,))), key=lambda v: (v is not None, v or ''))
-            result[key] = item
+            result[key] = _with_lists(db, ident, item)
     return result
+
+
+# Each entry's metadata lists, as read_snapshot returns them.
+LIST_QUERIES = {
+    'classifications': 'SELECT c.code FROM math_classifications c JOIN math_concept_classifications m ON c.id=m.classification_id WHERE m.concept_id=?',
+    'types': 'SELECT t.type_name FROM math_types t JOIN math_concept_types m ON t.id=m.type_id WHERE m.concept_id=?',
+    'synonyms': 'SELECT synonym_text FROM math_synonyms WHERE concept_id=?',
+    'definitions': 'SELECT defined_term FROM math_definitions WHERE concept_id=?',
+    'link_exclusions': 'SELECT word FROM math_link_exclusions WHERE concept_id=?',
+    'related_concepts': 'SELECT related_canonical_name FROM math_related_concepts WHERE concept_id=?',
+}
+
+
+def _with_lists(db, ident, item):
+    for name, query in LIST_QUERIES.items():
+        item[name] = sorted((r[0] for r in db.execute(query,(ident,))), key=lambda v: (v is not None, v or ''))
+    return item
+
+
+def read_entry(db, canonical):
+    """Return one entry exactly as read_snapshot would, from the open database db, or None."""
+    row = db.execute('SELECT id, slug, title, owner, cleaned_tex, is_cleaned FROM math_concepts WHERE canonical_name=?',
+                     (canonical,)).fetchone()
+    if row is None:
+        return None
+    ident, slug, title, owner, cleaned_tex, is_cleaned = row
+    return _with_lists(db, ident, dict(slug=slug, title=title, owner=owner, cleaned_tex=cleaned_tex, is_cleaned=is_cleaned))
+
+
+def has_retirement(db):
+    """Whether the open database has the retirement columns (after the schema upgrade)."""
+    return any(row[1] == 'retired_at' for row in db.execute('PRAGMA table_info(math_concepts)'))
+
+
+def active_sql(db, alias='mc'):
+    """SQL condition true for active entries of alias; always true before the schema upgrade."""
+    return f'{alias}.retired_at IS NULL' if has_retirement(db) else '1 = 1'
+
+
+def read_status(path, connection=None):
+    """Return {canonical: {'retired', 'retired_into', 'reason'}} for every entry.
+
+    read_snapshot deliberately leaves retirement out: its exact shape is part of
+    every existing package and check. retired_into is the survivor's canonical
+    name (None without one). Before the schema upgrade every entry is active.
+    """
+    with (nullcontext(connection) if connection is not None else
+          closing(sqlite3.connect(Path(path).resolve().as_uri()+'?mode=ro', uri=True))) as db:
+        if not has_retirement(db):
+            return {name: dict(retired=False, retired_into=None, reason=None)
+                    for name, in db.execute('SELECT canonical_name FROM math_concepts')}
+        names = dict(db.execute('SELECT id, canonical_name FROM math_concepts'))
+        return {name: dict(retired=retired is not None, retired_into=names.get(into), reason=reason)
+                for name, retired, into, reason in db.execute(
+                    'SELECT canonical_name, retired_at, retired_into_id, retirement_reason FROM math_concepts')}
 
 
 def compare(base, local, live):

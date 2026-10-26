@@ -3,6 +3,8 @@
 import re
 import unicodedata
 
+from services.math.retirement import active_condition
+
 
 def generate_slug(
     canonical_name: str | None,
@@ -58,12 +60,16 @@ def new_entry_names(cursor, title: str, requested_slug: str | None = None) -> tu
     """
     if requested_slug is not None and not isinstance(requested_slug, str):
         raise ValueError("The slug must be text, such as 'metric-space', or left blank to use the title.")
+    # Titles and aliases are compared with active entries only: a retired
+    # entry's title and terms were copied to its survivor. Its canonical name
+    # and slug, checked below against every entry, stay reserved.
+    active = active_condition(cursor, "mc")
     checks = (
-        ("the title of", "SELECT title FROM math_concepts WHERE lower(trim(title)) = lower(trim(?))"),
+        ("the title of", f"SELECT mc.title FROM math_concepts mc WHERE lower(trim(mc.title)) = lower(trim(?)) AND {active}"),
         ("a synonym of", "SELECT mc.title FROM math_synonyms s LEFT JOIN math_concepts mc ON mc.id = s.concept_id "
-                         "WHERE lower(trim(s.synonym_text)) = lower(trim(?))"),
+                         f"WHERE lower(trim(s.synonym_text)) = lower(trim(?)) AND {active}"),
         ("a term defined in", "SELECT mc.title FROM math_definitions d LEFT JOIN math_concepts mc ON mc.id = d.concept_id "
-                              "WHERE lower(trim(d.defined_term)) = lower(trim(?))"),
+                              f"WHERE lower(trim(d.defined_term)) = lower(trim(?)) AND {active}"),
     )
     for kind, query in checks:
         row = cursor.execute(query, (title,)).fetchone()
