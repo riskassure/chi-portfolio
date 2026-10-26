@@ -8,9 +8,13 @@ WSGI and local start scripts and the math concept page on 2026-10-26.
 
 ## The big picture
 
-The whole site is **one Flask application** (`backend/src/app.py`) and **one SQLite
-database** (`portfolio.db`). A visitor's browser talks only to that application. It
-makes two kinds of requests:
+The whole site is **one Flask application** (`backend/src/app.py`) and **one main
+content database** (`portfolio.db`, SQLite). Small side databases next to the Spotify token
+file keep Spotify bookkeeping (`spotify-top-jobs.db` on the server;
+`spotify-history.db` on the laptop) and no site content. The site's
+own requests go to Flask; pages also load a few outside libraries straight from
+their providers (MathJax from `cdn.jsdelivr.net`, Esri's map library from
+`js.arcgis.com`). The requests to Flask are of two kinds:
 
 | Request | Example | Who answers | What comes back |
 | --- | --- | --- | --- |
@@ -106,6 +110,7 @@ protected. Being signed in can change what a page shows, so check pages logged o
 (a private window) before calling a publication verified.
 
 Local and live logins are separate: each has its own password and its own cookie.
+More on this and every other credential: [Logins and API keys](API_AUTHENTICATION.md).
 
 ## Seeing what the browser sees (developer tools)
 

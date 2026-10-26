@@ -10,6 +10,7 @@ Committing code does not publish it to the website.
 | --- | --- |
 | [Admin runbook](ADMIN_RUNBOOK.md) | Current operating procedures and recorded deployment status |
 | [How the website works](administration/HOW_THE_SITE_WORKS.md) | Browser vs server, reloads, caching, logins, developer tools and where errors appear |
+| [Logins and API keys](administration/API_AUTHENTICATION.md) | Admin login, PythonAnywhere token and SSH, Spotify and Google OAuth, Esri key: how each works, renews and fails |
 | [Content synchronization](administration/deployment/CONTENT_SYNC.md) | Detailed helper preparation, checks and publication |
 | [Travel map](features/travel/TRAVEL_MAP.md) | Map editing, reference data, photo bindings and gallery settings |
 | [Spotify](features/music/SPOTIFY.md) | Current top-track workflow; older export workflow is labeled separately |
@@ -55,7 +56,7 @@ further changes. File size alone is not a reason to refactor it again.
 
 ## Folder organization
 
-- `administration/`: [How the website works](administration/HOW_THE_SITE_WORKS.md).
+- `administration/`: [How the website works](administration/HOW_THE_SITE_WORKS.md) and [Logins and API keys](administration/API_AUTHENTICATION.md).
 - `administration/deployment/`: publishing, synchronization and hosting references.
 - `administration/backups/`: backup inventories and recovery results.
 - `features/`: math, music, photography and travel guides.

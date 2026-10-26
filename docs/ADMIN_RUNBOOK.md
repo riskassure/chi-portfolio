@@ -69,6 +69,7 @@ preview: the helper explicitly selects a working copy.
 | --- | --- |
 | Supported math changes | **1** lists math changes; **2** prepares one |
 | Several new math entries at once | **20** publishes a reviewed batch of new entries; see [Publish a batch of new entries](administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries) |
+| Merge two math entries, retire one, or undo either | **21**, then 3/4/5 for its package; see [Merge two entries](#merge-two-entries-option-21) |
 | Math entry with new, changed or missing PSTricks diagrams | **19** renders missing SVGs on this computer, then **1** and **2**; see [Publish a diagram change](administration/deployment/CONTENT_SYNC.md#publish-a-diagram-change) |
 | Biography or resume text | **9** |
 | Import Google Photos locally | **10** opens the local import screen; import alone does not publish |
@@ -177,9 +178,21 @@ Every step is on the laptop, in the project folder. Details, stops and resuming:
    every blocker it reports and choose 20 again. Read
    `dist/math-batches/<batch id>/review.txt`. The publish order is option 20's
    own, so live ids follow that order, not the order you wrote the entries in.
-5. **`PUBLISH ALL`.** It publishes one entry at a time with a backup each. If it
-   stops, fix the cause and choose 20 again, then `RESUME`. Nothing that is already
-   live is published twice.
+5. **`PUBLISH ALL`.** It publishes one entry at a time with a backup each. Nothing
+   that is already live is published twice. If it stops, what to do depends on why:
+   - **Connection failure or an unconfirmed publish:** choose 20 again and type
+     `RESUME`. A live check first finds out whether an unconfirmed publish went
+     through.
+   - **An entry blocked by a conflict on the live site** (for example a name another
+     entry took meanwhile): if the cause is on the live side and you resolve it
+     there, `RESUME` checks that entry again.
+   - **An entry whose content must change** (a fix to its text or metadata): the
+     packages are frozen, so `RESUME` would publish the old reviewed version. Edit
+     the entry in the working copy, choose 20, type `SET ASIDE`, and start a new
+     batch with the unpublished entries so the new version is reviewed. Entries
+     already live show as already present.
+   - **A frozen package changed or went missing:** the approval no longer holds;
+     `SET ASIDE` and start a new batch.
 6. **Check the live pages** listed in `pages-to-check.txt`, logged out, then type
    `VERIFIED`.
 7. **Option 8.** Stop the local server, type `STOPPED`. If it reports
@@ -230,9 +243,17 @@ Option **1** marks any math change that option 2 would refuse as `[unsupported]`
 and explains why. Some existing entries cannot be patched through the helper at
 all; see [Entries the helper cannot publish](administration/deployment/CONTENT_SYNC.md#entries-the-helper-cannot-publish).
 
-Database-only entry changes do not require a Git commit. Commit/push any related
-tracked code or documentation separately; deploy required code before content
-that depends on it. The entry guide includes a Git-versus-content checklist.
+Publishing and recording in git are separate steps. Publishing a database change
+(options 2-5, 20, 21) needs no commit, and committing never publishes. Afterwards:
+
+- **A single new entry or a text edit to an existing entry:** no git record is needed.
+- **A batch of new entries (option 20) or a merge or retirement (option 21):** record
+  it afterwards as a migration in a PR (step 8 of the batch checklist, step 9 of the
+  merge checklist), so the repository can rebuild what was published.
+- **Code or documentation:** commit and push it separately; deploy required code
+  before content that depends on it.
+
+The entry guide includes a Git-versus-content checklist.
 
 ## Travel and photography
 
@@ -291,7 +312,9 @@ Esri-only. See [Spotify implementation and setup](features/music/SPOTIFY.md).
 
 ## Credentials and renewals
 
-Record locations, never credential values, in documentation or Git.
+Record locations, never credential values, in documentation or Git. What each
+credential is, how it was obtained, how it renews and what to check when access
+fails: [How the site's logins and API keys work](administration/API_AUTHENTICATION.md).
 
 | Credential | Location |
 | --- | --- |
@@ -301,6 +324,9 @@ Record locations, never credential values, in documentation or Git.
 | Esri key | `.config/chi-portfolio/esri-api-key.txt` under each account's home |
 | Local Spotify tokens by default | `%LOCALAPPDATA%\chi-portfolio\spotify-tokens.json` |
 | Production Spotify tokens | `/home/cwoo/.config/chi-portfolio/spotify-tokens.json` |
+| Google Photos app credentials (client ID and secret) | `%USERPROFILE%\.config\chi-portfolio\google-oauth.json` (override: `GOOGLE_PHOTOS_CREDENTIALS`); laptop only |
+| Google Photos tokens | `%LOCALAPPDATA%\chi-portfolio\google-photos-tokens.json`; laptop only |
+| SSH key for `ssh.pythonanywhere.com` | Private key in `%USERPROFILE%\.config\chi-portfolio\` (`C:\Users\riska\.config\chi-portfolio`), not OpenSSH's default `.ssh` folder; its public half is in `/home/cwoo/.ssh/authorized_keys` |
 
 Spotify token location can be overridden by `SPOTIFY_TOKEN_PATH`. Keep tokens out
 of screenshots, command arguments, deployment packages and logs. Esri's browser
