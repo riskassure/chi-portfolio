@@ -4,7 +4,7 @@ An orientation for someone who knows Python and SQLite well but hasn't done much
 web programming. It explains what runs where, why the helper's steps are shaped as
 they are, and where to look when something breaks. The procedures themselves are in
 the [admin runbook](../ADMIN_RUNBOOK.md). Checked against `backend/src/app.py`, the
-WSGI and local start scripts and the math concept page on 2026-10-26.
+WSGI and local start scripts and the math concept page on 2026-10-25.
 
 ## The big picture
 

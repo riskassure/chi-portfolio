@@ -3,7 +3,7 @@
 A plain-language guide to every credential the website and its helper use: what
 each one is for, how it was obtained, where it lives, how it renews, and what to
 check when access fails. It assumes no background in web authentication. Checked
-against the code on 2026-10-26 (`backend/src/app.py`, `start_local.py`,
+against the code on 2026-10-25 (`backend/src/app.py`, `start_local.py`,
 `local_admin_password.py`, `pythonanywhere_wsgi.py`, `pythonanywhere_api.py`,
 `site_deployment.py`, the SSH callers in `backend/`, `services/music/spotify_auth.py`,
 `routes/music_spotify.py`, `services/photography/google_photos_auth.py`,
@@ -17,13 +17,17 @@ a credential's value in documentation, git, a screenshot or a command line.
 
 **1. Proving who you are vs. being allowed to do something.** *Authentication* is
 proving identity (a password, a key). *Authorization* is what that identity may do
-(read your top tracks, but not change playlists). Most credentials here do both: a
-token both identifies the program and carries a list of what it may do, called its
-**scope**.
+(read your top tracks, but not change playlists). With OAuth (Spotify, Google), you
+approve a specific set of permissions, called the **scope**, and the program receives
+a token that stands for that granted access. The token itself may be an opaque random
+string: the provider looks up what it allows on its side, so you can't read the
+permissions out of the token.
 
-**2. Secrets that travel with each request.** A web server doesn't remember you
-between requests. So after you prove who you are once, the program keeps a token
-and sends it with every later request, in a request header such as
+**2. Secrets that travel with each request.** HTTP requests don't inherently carry
+login state: each one arrives on its own. A server can keep session state, but it
+needs something in each request to tell whose it is. So after you prove who you are
+once, the program or browser keeps a token and sends it with every later request
+(this site's Flask app uses a signed cookie for that), in a request header such as
 `Authorization: Token ...` or as a browser cookie. Anyone who copies the token can
 act as you until it expires or is revoked, which is why the files that hold them
 stay private and outside the repository.
@@ -31,8 +35,9 @@ stay private and outside the repository.
 **3. Short-lived access, long-lived renewal.** OAuth services (Spotify, Google) hand
 out two tokens: an **access token** that works for about an hour, and a **refresh
 token** that lasts much longer and is used only to get a new access token. The
-program renews quietly in the background. You only go through the browser approval
-again if the refresh token is refused (revoked, expired, or replaced).
+program refreshes automatically when it needs access and finds the access token
+expired or about to expire; nothing is renewed while the program isn't running. You
+only go through the browser approval again if the refresh token is refused (revoked, expired, or replaced).
 
 ## At a glance
 
@@ -106,13 +111,17 @@ connection). The helper runs `ssh cwoo@ssh.pythonanywhere.com ...` for live chec
 the Esri key upload (option 17). SSH can log in with your PythonAnywhere password,
 but you use a **key pair** instead:
 
-- The *private key* stays on the laptop, in `%USERPROFILE%\.config\chi-portfolio\`
-  (`C:\Users\riska\.config\chi-portfolio`, beside the helper's other private files), protected by a passphrase you type when it is used.
+- The *private key* stays on the laptop. Recorded setup (from Chi, 2026-10-25; the
+  key file and its passphrase protection were not inspected for this guide): it is in
+  `%USERPROFILE%\.config\chi-portfolio\` (`C:\Users\riska\.config\chi-portfolio`,
+  beside the helper's other private files) and protected by a passphrase you type
+  when it is used.
   That isn't OpenSSH's default folder (`%USERPROFILE%\.ssh\`), so the laptop's SSH
   setup has to point to it, for example with an `IdentityFile` line in
   `%USERPROFILE%\.ssh\config` or by loading it into the ssh-agent. If the key
   ever seems to be ignored, check that pointer first.
-- The *public key* was added to `/home/cwoo/.ssh/authorized_keys` on the server.
+- The *public key* is on the server, in `/home/cwoo/.ssh/authorized_keys` (the
+  standard place; also recorded setup, not inspected).
   It's fine for anyone to see; it can only check signatures, not make them.
 
 At each connection the server sends a challenge, the laptop signs it with the
@@ -202,24 +211,32 @@ These setup pages refuse to run on the live site.
   live site never talks to Google Photos; imported photos are published with options 11-13.
 - **Renewal:** automatic refresh. The program asks for offline access so Google issues a
   refresh token. While the Google Cloud app is in *Testing* status, Google limits how
-  long that authorization lasts (Google documents seven days), so expect to connect
-  again before an import after a gap.
+  long that authorization lasts: Google documents that refresh tokens for such apps
+  expire after seven days (see "Refresh token expiration" in
+  [Google's OAuth 2.0 documentation](https://developers.google.com/identity/protocols/oauth2/)).
+  Expect to connect again before an import after a gap.
 - **When it fails:** connect again. If the error names `google-oauth.json`, the file is
   missing, unreadable, or doesn't list the redirect URI above; download it again from
   Google Cloud after checking the URI.
 
-## Esri map key (a public key, on purpose)
+## Esri map key (browser-exposed, on purpose)
 
 The travel map draws its base map from Esri. Esri needs a key, and the visitor's
 **browser** fetches the map tiles, so the key has to be in the browser. The page gets
 it from `/api/travel/config`, which reads `esri-api-key.txt` from the server account's
 home folder (or the `ESRI_BASEMAP_API_KEY` environment variable). Anyone can see it.
+It is a browser-exposed API key, an ordinary secret string, not a cryptographic
+public key like SSH's.
 
-It's safe because of two limits set in the ArcGIS dashboard: it is allowed only map
-basemap access, and only for requests whose **referrer** (the page address the browser
-reports when it asks Esri for tiles) is this site, plus the local addresses. Someone
-copying the key onto their own site would be refused. Keep those limits, and never put
-a more powerful ArcGIS credential in that file.
+Two limits set in the ArcGIS dashboard reduce what a copied key could be used for:
+it is allowed only map basemap access, and only for requests whose **referrer** (the
+page address the browser reports when it asks Esri for tiles) is this site, plus the
+local addresses. A browser on another site sends that site's address and is refused.
+Referrers are reported by the client, so a determined person can fake one outside a
+browser: the limits make misuse harder and confine it to basemap use (which counts
+against this account's usage), rather than making it impossible. Keep those limits,
+watch usage in the ArcGIS dashboard if anything looks odd, and never put a more
+powerful ArcGIS credential in that file.
 
 - **Renewal:** it expires on **2027-10-13**. Create a new key with the same limits, save it
   to the laptop file, and upload it with option 17. Changing referrers can mean
