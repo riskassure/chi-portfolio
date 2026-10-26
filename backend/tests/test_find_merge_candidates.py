@@ -173,10 +173,13 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(counts['rename'], 1)
             text = (output / 'candidates.md').read_text(encoding='utf-8')
             self.assertIn('Heuristic', text)
+            # Option 21 asks for canonical names, which older slugs don't always give.
+            self.assertIn('filtration1, Filtration1;', text)
             with (output / 'candidates.csv').open(encoding='utf-8') as stream:
                 rows = list(csv.DictReader(stream))
             self.assertEqual(rows[0]['suggested_action (heuristic)'], 'rename')
             self.assertEqual(rows[0]['chi_decision'], '')
+            self.assertEqual({rows[0]['canonical_a'], rows[0]['canonical_b']}, {'Filtration1', 'Filtration2'})
             with self.assertRaises(FileExistsError):
                 finder.run(catalog.path, output)
 

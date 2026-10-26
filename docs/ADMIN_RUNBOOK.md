@@ -120,21 +120,78 @@ downloads missing math diagram SVGs but not source code. Production-first is not
 a route for new or changed diagrams or images, because the live editor would
 render diagrams on the server. Use the diagram route instead.
 
-To publish several new entries together, choose **20**. You select the new
-entries and name the batch; it checks them, orders them so each entry follows
-the entries it relates or links to, writes one review, and asks for
-`PUBLISH ALL` once. It then publishes each reviewed package through the same
-stage, live-check and publish steps, records your check of the live pages, and
-offers option 8. Edits to existing entries stay with option 2. Details and
-recovery: [Publish a batch of new entries](administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries).
+## Add many new entries at once (option 20)
 
-To merge two entries that are really the same page, or retire one, use option
-**21** and follow [Merging and retiring entries](features/math/MERGING_ENTRIES.md):
-start the session before editing, publish the survivor's text with 2/3/4/5, then
-publish the merge with 3/4/5, verify live and run **8** before the next one. Nothing
-is deleted, and an undo is available while the recorded state holds. A PR that
+This is the route used for the K_1 and naive set theory batches.
+Every step is on the laptop, in the project folder. Details, stops and resuming:
+[Publish a batch of new entries](administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries).
+
+1. **Start clean.** `git pull`. Stop the local server, run **8** and make sure it
+   switches to a fresh working copy. Then **1** should list nothing: anything it
+   lists now is an unpublished edit that will later stop option 8.
+2. **Write the entries in the working copy**, either one at a time in the local
+   editor (**6**, then `http://127.0.0.1:5001/math/create.html`), or with a script
+   run against the working copy while the local server is stopped (preview first,
+   then apply with its backup). Follow the [entry guide](features/math/ADDING_ENTRIES.md)
+   and the [authoring standards](features/math/AUTHORING_STANDARDS.md). Related
+   concepts and `\PMlinkname` targets must be live entries or entries in the same
+   batch, and must not form a loop.
+3. **Review locally.** Start **6** and read every new page: equations, proofs,
+   diagrams, and automatic links that point at the wrong entry. Fix them in the
+   working copy. **1** must now list exactly the batch's new entries, none marked
+   `[unsupported]` (render missing diagram SVGs with **19**).
+4. **Option 20.** Select the entries (`ALL` or `1,3-5`) and name the batch. Fix
+   every blocker it reports and choose 20 again. Read
+   `dist/math-batches/<batch id>/review.txt`. The publish order is option 20's
+   own, so live ids follow that order, not the order you wrote the entries in.
+5. **`PUBLISH ALL`.** It publishes one entry at a time with a backup each. If it
+   stops, fix the cause and choose 20 again, then `RESUME`. Nothing that is already
+   live is published twice.
+6. **Check the live pages** listed in `pages-to-check.txt`, logged out, then type
+   `VERIFIED`.
+7. **Option 8.** Stop the local server, type `STOPPED`. If it reports
+   "synchronization blocked", the batch is still published: resolve the named
+   difference and choose 20 again (nothing is republished).
+8. **Record it in git:** a migration `add_<topic>_entries_<date>.py` built on
+   `math_entry_batch.run_batch`, with its `ORDER` list in live id order, checked to
+   reproduce the live rows. Open a PR, merge it, then `git pull` on the laptop. See
+   [Record a batch in git](administration/deployment/CONTENT_SYNC.md#record-a-batch-in-git).
+
+Edits to existing entries are not part of a batch: publish them one at a time with
+**1**, **2**, then 3/4/5, and run **8** once at the end.
+
+## Merge two entries (option 21)
+
+Use this when two entries are really the same page. The absorbed entry **A** is
+retired into the survivor **S**; nothing is deleted. One merge at a time, and each
+one is brought home with **8** before the next. Full procedure, checks and undo:
+[Merging and retiring entries](features/math/MERGING_ENTRIES.md).
+
+1. **Start clean.** `git pull`; stop the local server, run **8**; **1** lists nothing.
+   Decide which entry survives (the URL to keep) and find both canonical names (the
+   [candidate report](features/math/MERGE_CANDIDATES.md) lists them).
+2. **Freeze:** **21 → 2**, `merge`, A's canonical name, S's canonical name, a reason
+   (it is shown on A's old page). Do this before editing either entry.
+3. **Edit S's text** in the local editor (**6**, `math/edit.html?id=<S's id>`): fold
+   in A's content. Change only the body and synonyms; leave A untouched. Check S's
+   local page.
+4. **Publish S:** **1** shows S; **2** prepares it; then 3, 4, 5. Check S's live page.
+   No option 8 is needed yet.
+5. **Prepare the merge:** **21 → 3**, pick the session. Title as synonym: `Y`
+   (normally). Metadata-only: `N` (you changed S's text). Read the review.
+6. **Publish the merge:** 3, 4, 5.
+7. **Verify live:** S's page, A's old URL (`math/concept.html?slug=<A's slug>`)
+   shows S with the merge note, and a search for A's title shows one entry.
+8. **Option 8:** stop the local server, type `STOPPED`. It confirms the merge
+   receipt and replays it before comparing.
+9. **Record it in git:** a migration from `dist/merge-sessions/<id>/receipt.json`
+   (step 8 of the merge guide), then a PR, merge, `git pull`.
+
+Keep `dist/merge-sessions/`: undo (**21 → 4**) needs the session folder. A PR that
 touches math readers merges only with `backend/tests/test_retirement_readers.py`
 passing.
+
+## Other math entry notes
 
 Option **1** marks any math change that option 2 would refuse as `[unsupported]`
 and explains why. Some existing entries cannot be patched through the helper at

@@ -46,20 +46,46 @@ upgrade.
 
 ## Merging two entries
 
-1. **Start the session first**, before editing anything: option **21 → 2**, choose
-   `merge`, then the canonical names of A and S (as option 1 shows them in brackets)
-   and a reason. The helper reads both entries from live over SSH (read-only) and
-   checks that your working copy has the same versions. It stops if either has
-   unpublished local edits. It then freezes both in
-   `dist/merge-sessions/<id>/session.json`.
-2. **Edit S** in your working copy: fold in A's content (render any diagrams with
-   option 19). Leave A as it is.
-3. **Publish S's text** with options 2, 3, 4, 5 as usual and check its page. Stopping
-   here is safe: both entries are active and S is already improved.
-4. **Prepare the merge:** option **21 → 3**, pick the session. Answer whether A's title
-   becomes S's synonym (normally yes) and whether this is a metadata-only merge (S's
-   text unchanged; normally no). The review shows S's text change, what will be
-   copied, the entries linking to A, and a check against your working copy.
+This is the procedure as run for the first merge on 2026-10-26 (entry 20 into
+entry 19). Do one merge at a time; option 21 prepares nothing new until the last
+one has been brought home with option 8.
+
+0. **Before you start.**
+   - `git pull` on the laptop, stop the local server, run option **8**, and check
+     that option **1** lists no math changes. The session refuses an entry whose
+     working copy differs from live, and any other unpublished edit would stop the
+     option 8 at the end.
+   - Decide which entry survives. S keeps its URL, title, slug, document types and
+     owner; A's URL will lead to S. Read both texts.
+   - Find both **canonical names**: the candidate report lists them (title, id,
+     slug, canonical name). They are not always the slug's words capitalised
+     (`modal-logic-gl` is `ModalLogicGL`), so copy them, don't derive them.
+1. **Start the session first**, before editing anything: option **21 → 2**, type
+   `merge`, then A's canonical name (the entry to retire), S's canonical name, and a
+   reason. The reason is shown on A's old page and kept in the log. The helper reads
+   both entries from live over SSH (read-only) and checks that your working copy has
+   the same versions. It then freezes both in `dist/merge-sessions/<id>/session.json`.
+2. **Edit S** in your working copy: start option **6**, sign in, open
+   `http://127.0.0.1:5001/math/edit.html?id=<S's id>`, fold in A's content and save.
+   Change only the **body** and, if needed, the **synonyms**: those are the only
+   fields options 2 to 5 can publish for an existing entry (option 1 marks anything
+   else `[unsupported]`). Render any changed diagrams with option **19**. Leave A as
+   it is. Check S's local page.
+3. **Publish S's text:** option **1** lists S; **2** prepares it (pick its number);
+   then **3**, **4**, **5** and `PUBLISH`. Check S's live page. Stopping here is
+   safe: both entries are active and S is already improved. Option 8 is not needed
+   between this step and the merge.
+4. **Prepare the merge:** option **21 → 3**, pick the session. Two questions:
+   - *Keep the title of A as a synonym of the survivor?* Normally **Y**. When both
+     entries have the same title nothing is added, because S already has it.
+   - *Is this a metadata-only merge, with the survivor text unchanged?* **N**, since
+     you published new text in step 3. Answer Y only if you deliberately left S's
+     text alone; otherwise the helper refuses an unchanged survivor.
+
+   The review shows S's text change, what will be copied, the entries linking to
+   A, and a check against your working copy. Only A's title, synonyms, defined
+   terms, MSC classifications and related links are copied. **Document types are
+   not copied**: if S needs one of A's types, that is a separate change.
 5. **Stage, check live, publish:** 3, 4, 5. The live check (and the publish again,
    under the database write lock) requires that:
    - the live website code declares retirement contract 1;
@@ -68,24 +94,34 @@ upgrade.
    - no copied term would newly clash with another active entry's title, synonym
      or defined term (overlaps A already had are kept and listed).
 
-   Anything else stops it with `CONFLICT` or `BLOCKED`, and nothing changes.
-6. **Verify live:** S's page, A's old URL, a search for A's title, and one page that
-   linked to A.
-7. **Option 8.** The publish saved a receipt in the session folder and marked it
-   *waiting for option 8*. Option 21 prepares nothing more until then. Option 8 first
-   confirms the receipt against the live snapshot (the log row, A's retirement, the
-   copied rows and repointed redirects). It then applies exactly that change to
-   temporary copies of your baseline and working copy before comparing. Any other
-   unpublished local edit still stops the refresh, as always. If live no longer
-   matches the receipt, option 8 refuses and says what differs.
+   Anything else stops it with `CONFLICT` or `BLOCKED`, and nothing changes. A
+   conflict on S usually means step 3 was not published, or S was edited again
+   after it; publish S and choose 21 → 3 again.
+6. **Verify live**, logged out: S's page; A's old URL
+   (`https://www.cwoo.me/math/concept.html?slug=<A's slug>`) shows S with the
+   note that A was merged into it; a search for A's title shows one entry; and one
+   page that linked to A, if any (the review lists them).
+7. **Option 8.** Stop the local server and type `STOPPED`. The publish saved a
+   receipt in the session folder and marked it *waiting for option 8*. Option 8
+   first confirms the receipt against the live snapshot (the log row, A's
+   retirement, the copied rows and repointed redirects). It then applies exactly
+   that change to temporary copies of your baseline and working copy before
+   comparing. Any other unpublished local edit still stops the refresh, as always.
+   If live no longer matches the receipt, option 8 refuses and says what differs.
 8. **Record it in git:** write a migration from the receipt and open a PR:
 
    ```powershell
    .\.venv313\Scripts\python.exe backend/src/database/math/migrations/math_entry_merge.py --write backend/src/database/math/migrations/merge_entries_<date>.py dist/merge-sessions/<id>/receipt.json
    ```
 
-   The migration gives S its approved text and synonyms, then replays the same change
-   with the publisher's own code. It skips anything already recorded.
+   `--write` never overwrites a file, so give a second merge on the same day its
+   own name (for example `merge_entries_<date>_2.py`). Several receipts can go in
+   one file, listed in the order they were published. The migration gives S its
+   approved text and synonyms, then replays the same change with the publisher's
+   own code. It skips anything already recorded. Merge the PR, then `git pull` on
+   the laptop.
+
+Keep the session folder: undo needs its `session.json` and `receipt.json`.
 
 ## Retiring an entry with no survivor
 
