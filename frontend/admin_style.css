@@ -121,6 +121,29 @@ body {
     line-height: 1.6;
 }
 
+.admin-docs-links {
+    margin-top: 25px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+}
+
+.admin-docs-links a {
+    padding: 10px 20px;
+    border: 1px solid #3b82f6;
+    border-radius: 6px;
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.admin-docs-links a:hover {
+    background: #3b82f6;
+    color: #ffffff;
+}
+
 .btn-logout {
     margin-top: 25px;
     padding: 10px 20px;

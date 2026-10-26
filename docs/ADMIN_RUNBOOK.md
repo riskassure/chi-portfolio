@@ -9,6 +9,9 @@ are recorded from the deployment in this session, not a new live audit.
 - Public website: https://www.cwoo.me/
 - Local project: `C:\Development\chi-portfolio`
 - Local preview: http://127.0.0.1:5001/admin_dashboard.html
+- Docs on the road: sign in at https://www.cwoo.me/admin_dashboard.html and use the
+  **Admin docs** or **Admin runbook** link. They open these docs on GitHub, which always
+  shows what is on `main`. The repository is public, so no GitHub login is needed.
 - Hosting: PythonAnywhere account `cwoo`, Python 3.13.
 - Git saves code history. **Committing and pushing does not deploy the site.**
 - Local saves do not generally publish content. Follow the matching workflow below.
