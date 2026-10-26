@@ -15,6 +15,10 @@ are recorded from the deployment in this session, not a new live audit.
 - Hosting: PythonAnywhere account `cwoo`, Python 3.13.
 - Git saves code history. **Committing and pushing does not deploy the site.**
 - Local saves do not generally publish content. Follow the matching workflow below.
+- On the road or at home? [Making a change](administration/CHANGE_STEPS.md) says what
+  you can edit on the live site from anywhere (data only), what waits for the laptop
+  (code, files, map, batches, merges), and the order of steps for each kind of change:
+  edit, publish, git, then option 8.
 - New to web programming? Read [How the website works](administration/HOW_THE_SITE_WORKS.md)
   first: what runs in the browser and what on the server, when a reload is needed,
   browser caching, logins, and where errors show up.
