@@ -5,6 +5,8 @@ is retired into the other (the **survivor S**). An entry that should simply go a
 such as a test leftover, can be retired with no survivor. Nothing is ever deleted.
 The approved design is design v3 of 2026-10-25 (`/mnt/project-files/entry-merging/`).
 Use [Merge candidates](MERGE_CANDIDATES.md) to find pairs; you decide every pair.
+Terms such as *survivor*, *retire*, *session* and *receipt* are defined in the runbook's
+[Terms used for math entries](../../ADMIN_RUNBOOK.md#terms-used-for-math-entries).
 
 ## What a merge does
 

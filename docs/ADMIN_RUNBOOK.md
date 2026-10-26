@@ -120,6 +120,33 @@ downloads missing math diagram SVGs but not source code. Production-first is not
 a route for new or changed diagrams or images, because the live editor would
 render diagrams on the server. Use the diagram route instead.
 
+## Terms used for math entries
+
+These words have a fixed meaning in the bulk-add and merge procedures below and in
+the guides they link to.
+
+| Term | Meaning |
+| --- | --- |
+| Live | The public site's database on PythonAnywhere. "Publish" means changing live through the helper. |
+| Working copy | The laptop database the helper and the local server (option **6**) use. Your local edits go here. |
+| Baseline | The unchanged copy of live that option **8** last brought home. Option **1** lists the differences between the working copy and the baseline. Never edit it. |
+| Bring home | Option **8**: download a fresh copy of live and install it as the new baseline and working copy, after checking that no unpublished local edit would be lost. |
+| Canonical name | An entry's fixed internal name, such as `CompletenessTheoremForPropositionalLogic`. The helper asks for it by this name. It can't be changed after saving and is not always the slug's words capitalised. |
+| Slug | The entry's address on the site, such as `completeness-theorem-for-propositional-logic` in `math/concept.html?slug=...`. Fixed after saving. |
+| Package | The reviewed file the helper prepares for one change. Options 3, 4 and 5 stage it, check it against live and publish it. |
+| Receipt | The record the helper saves after a publish: what changed and which server backup was taken. |
+| Batch | A group of new entries published together with option **20**, under a name you give it. |
+| Merge | Making two entries that are really the same page into one, with option **21**. Nothing is deleted. |
+| Survivor (S) | The entry that stays. It keeps its title, slug, canonical name and URL, and gains the other entry's content. |
+| Absorbed entry (A) | The entry merged into the survivor. It is retired, and its old URL shows the survivor with a note. |
+| Retire | Mark an entry as no longer active, without deleting it. It disappears from search and lists, and its name and slug stay reserved. A retirement with no survivor shows "This entry has been retired" at its old URL. |
+| Merge session | Option **21 → 2**: the helper freezes the live versions of A and S in `dist/merge-sessions/<id>/` before you edit anything, so later checks can prove nothing else changed. |
+| Metadata-only merge | A merge in which the survivor's text is left unchanged and only A's names, MSC codes and related links are added to it. |
+| Synonym | Another name for the same concept. Synonyms appear in search and are linked automatically in other entries' text. |
+| Defined term | A further term defined inside an entry ("Other Concepts Defined Here"). It is also linked automatically. |
+| Alias clash | Two active entries sharing a title, synonym or defined term, which makes automatic links ambiguous. A merge refuses to create a new one. |
+| Migration | A script in `backend/src/database/math/migrations/` that records in git what was published, so the repository can rebuild it. It does not publish anything. |
+
 ## Add many new entries at once (option 20)
 
 This is the route used for the K_1 and naive set theory batches.
