@@ -262,7 +262,7 @@ def find_candidates(entries):
 
 
 def _describe(entry):
-    return (f"{entry['title']} ({entry['id']}, {entry['slug']}; {','.join(sorted(entry['msc'])) or 'no MSC'}; "
+    return (f"{entry['title']} ({entry['id']}, {entry['slug']}, {entry['canonical']}; {','.join(sorted(entry['msc'])) or 'no MSC'}; "
             f"{entry['role']}; {entry['length']} chars; {entry['incoming']} in)")
 
 
@@ -270,23 +270,25 @@ def write_report(rows, folder, database, entry_count):
     counts = Counter(r['action'] for r in rows)
     with (folder / 'candidates.csv').open('x', encoding='utf-8', newline='') as stream:
         writer = csv.writer(stream)
-        writer.writerow(['suggested_action (heuristic)', 'reason', 'signals', 'id_a', 'title_a', 'slug_a', 'msc_a',
-                         'role_a', 'length_a', 'incoming_a', 'id_b', 'title_b', 'slug_b', 'msc_b', 'role_b',
+        writer.writerow(['suggested_action (heuristic)', 'reason', 'signals', 'id_a', 'title_a', 'slug_a',
+                         'canonical_a', 'msc_a', 'role_a', 'length_a', 'incoming_a', 'id_b', 'title_b', 'slug_b',
+                         'canonical_b', 'msc_b', 'role_b',
                          'length_b', 'incoming_b', 'msc_relation', 'shared_shingles', 'jaccard', 'containment',
                          'suggested_survivor', 'chi_decision'])
         for r in rows:
             a, b = r['a'], r['b']
             writer.writerow([r['action'], r['reason'], '; '.join(r['signals']),
-                             a['id'], a['title'], a['slug'], ' '.join(sorted(a['msc'])), a['role'], a['length'],
-                             a['incoming'], b['id'], b['title'], b['slug'], ' '.join(sorted(b['msc'])), b['role'],
+                             a['id'], a['title'], a['slug'], a['canonical'], ' '.join(sorted(a['msc'])), a['role'],
+                             a['length'], a['incoming'], b['id'], b['title'], b['slug'], b['canonical'],
+                             ' '.join(sorted(b['msc'])), b['role'],
                              b['length'], b['incoming'], r['msc'], r['shared_shingles'], r['jaccard'],
                              r['containment'], r['survivor'], ''])
     lines = ['# Merge candidates (heuristic)', '',
              f'Database: `{database}` (read-only), {entry_count} active entries. '
              f'Generated {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")}.', '',
              f'**{HEURISTIC}** Shared terminology alone never produces a merge suggestion.', '',
-             'Each entry: title (id, slug; MSC codes; content role; text length; entries linking to it by '
-             'related concept or \\PMlinkname).', '',
+             'Each entry: title (id, slug, canonical name; MSC codes; content role; text length; entries linking '
+             'to it by related concept or \\PMlinkname).', '',
              '| Suggested action | Pairs |', '|---|---|']
     lines += [f'| {action} | {counts[action]} |' for action in ACTIONS]
     for action in ACTIONS:

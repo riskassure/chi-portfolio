@@ -12,6 +12,9 @@ are recorded from the deployment in this session, not a new live audit.
 - Hosting: PythonAnywhere account `cwoo`, Python 3.13.
 - Git saves code history. **Committing and pushing does not deploy the site.**
 - Local saves do not generally publish content. Follow the matching workflow below.
+- New to web programming? Read [How the website works](administration/HOW_THE_SITE_WORKS.md)
+  first: what runs in the browser and what on the server, when a reload is needed,
+  browser caching, logins, and where errors show up.
 
 Open PowerShell in the project directory and start the helper:
 
@@ -29,6 +32,9 @@ that terminal open. Use another terminal for the helper while previewing. Sign i
 with the local website admin password, which is separate from hosting and Spotify
 passwords. Stop the server with Ctrl+C. Run only one local preview server.
 After helper code changes, exit and reopen the helper to load the new version.
+The same goes for the local server: after a `git pull` or an edit that changes
+Python under `backend/src`, stop it and start **6** again. Frontend files (HTML, CSS,
+JavaScript) are read fresh on each page load, so Ctrl+F5 in the browser is enough.
 
 ## Where information lives
 
@@ -120,21 +126,105 @@ downloads missing math diagram SVGs but not source code. Production-first is not
 a route for new or changed diagrams or images, because the live editor would
 render diagrams on the server. Use the diagram route instead.
 
-To publish several new entries together, choose **20**. You select the new
-entries and name the batch; it checks them, orders them so each entry follows
-the entries it relates or links to, writes one review, and asks for
-`PUBLISH ALL` once. It then publishes each reviewed package through the same
-stage, live-check and publish steps, records your check of the live pages, and
-offers option 8. Edits to existing entries stay with option 2. Details and
-recovery: [Publish a batch of new entries](administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries).
+## Terms used for math entries
 
-To merge two entries that are really the same page, or retire one, use option
-**21** and follow [Merging and retiring entries](features/math/MERGING_ENTRIES.md):
-start the session before editing, publish the survivor's text with 2/3/4/5, then
-publish the merge with 3/4/5, verify live and run **8** before the next one. Nothing
-is deleted, and an undo is available while the recorded state holds. A PR that
+These words have a fixed meaning in the bulk-add and merge procedures below and in
+the guides they link to.
+
+| Term | Meaning |
+| --- | --- |
+| Live | The public site's database on PythonAnywhere. "Publish" means changing live through the helper. |
+| Working copy | The laptop database the helper and the local server (option **6**) use. Your local edits go here. |
+| Baseline | The unchanged copy of live that option **8** last brought home. Option **1** lists the differences between the working copy and the baseline. Never edit it. |
+| Bring home | Option **8**: download a fresh copy of live and install it as the new baseline and working copy, after checking that no unpublished local edit would be lost. |
+| Canonical name | An entry's fixed internal name, such as `CompletenessTheoremForPropositionalLogic`. The helper asks for it by this name. It can't be changed after saving and is not always the slug's words capitalised. |
+| Slug | The entry's address on the site, such as `completeness-theorem-for-propositional-logic` in `math/concept.html?slug=...`. Fixed after saving. |
+| Package | The reviewed file the helper prepares for one change. Options 3, 4 and 5 stage it, check it against live and publish it. |
+| Receipt | The record the helper saves after a publish: what changed and which server backup was taken. |
+| Batch | A group of new entries published together with option **20**, under a name you give it. |
+| Merge | Making two entries that are really the same page into one, with option **21**. Nothing is deleted. |
+| Survivor (S) | The entry that stays. It keeps its title, slug, canonical name and URL, and gains the other entry's content. |
+| Absorbed entry (A) | The entry merged into the survivor. It is retired, and its old URL shows the survivor with a note. |
+| Retire | Mark an entry as no longer active, without deleting it. It disappears from search and lists, and its name and slug stay reserved. A retirement with no survivor shows "This entry has been retired" at its old URL. |
+| Merge session | Option **21 → 2**: the helper freezes the live versions of A and S in `dist/merge-sessions/<id>/` before you edit anything, so later checks can prove nothing else changed. |
+| Metadata-only merge | A merge in which the survivor's text is left unchanged and only A's names, MSC codes and related links are added to it. |
+| Synonym | Another name for the same concept. Synonyms appear in search and are linked automatically in other entries' text. |
+| Defined term | A further term defined inside an entry ("Other Concepts Defined Here"). It is also linked automatically. |
+| Alias clash | Two active entries sharing a title, synonym or defined term, which makes automatic links ambiguous. A merge refuses to create a new one. |
+| Migration | A script in `backend/src/database/math/migrations/` that records in git what was published, so the repository can rebuild it. It does not publish anything. |
+
+## Add many new entries at once (option 20)
+
+This is the route used for the K_1 and naive set theory batches.
+Every step is on the laptop, in the project folder. Details, stops and resuming:
+[Publish a batch of new entries](administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries).
+
+1. **Start clean.** `git pull`. Stop the local server, run **8** and make sure it
+   switches to a fresh working copy. Then **1** should list nothing: anything it
+   lists now is an unpublished edit that will later stop option 8.
+2. **Write the entries in the working copy**, either one at a time in the local
+   editor (**6**, then `http://127.0.0.1:5001/math/create.html`), or with a script
+   run against the working copy while the local server is stopped (preview first,
+   then apply with its backup). Follow the [entry guide](features/math/ADDING_ENTRIES.md)
+   and the [authoring standards](features/math/AUTHORING_STANDARDS.md). Related
+   concepts and `\PMlinkname` targets must be live entries or entries in the same
+   batch, and must not form a loop.
+3. **Review locally.** Start **6** and read every new page: equations, proofs,
+   diagrams, and automatic links that point at the wrong entry. Fix them in the
+   working copy. **1** must now list exactly the batch's new entries, none marked
+   `[unsupported]` (render missing diagram SVGs with **19**).
+4. **Option 20.** Select the entries (`ALL` or `1,3-5`) and name the batch. Fix
+   every blocker it reports and choose 20 again. Read
+   `dist/math-batches/<batch id>/review.txt`. The publish order is option 20's
+   own, so live ids follow that order, not the order you wrote the entries in.
+5. **`PUBLISH ALL`.** It publishes one entry at a time with a backup each. If it
+   stops, fix the cause and choose 20 again, then `RESUME`. Nothing that is already
+   live is published twice.
+6. **Check the live pages** listed in `pages-to-check.txt`, logged out, then type
+   `VERIFIED`.
+7. **Option 8.** Stop the local server, type `STOPPED`. If it reports
+   "synchronization blocked", the batch is still published: resolve the named
+   difference and choose 20 again (nothing is republished).
+8. **Record it in git:** a migration `add_<topic>_entries_<date>.py` built on
+   `math_entry_batch.run_batch`, with its `ORDER` list in live id order, checked to
+   reproduce the live rows. Open a PR, merge it, then `git pull` on the laptop. See
+   [Record a batch in git](administration/deployment/CONTENT_SYNC.md#record-a-batch-in-git).
+
+Edits to existing entries are not part of a batch: publish them one at a time with
+**1**, **2**, then 3/4/5, and run **8** once at the end.
+
+## Merge two entries (option 21)
+
+Use this when two entries are really the same page. The absorbed entry **A** is
+retired into the survivor **S**; nothing is deleted. One merge at a time, and each
+one is brought home with **8** before the next. Full procedure, checks and undo:
+[Merging and retiring entries](features/math/MERGING_ENTRIES.md).
+
+1. **Start clean.** `git pull`; stop the local server, run **8**; **1** lists nothing.
+   Decide which entry survives (the URL to keep) and find both canonical names (the
+   [candidate report](features/math/MERGE_CANDIDATES.md) lists them).
+2. **Freeze:** **21 → 2**, `merge`, A's canonical name, S's canonical name, a reason
+   (it is shown on A's old page). Do this before editing either entry.
+3. **Edit S's text** in the local editor (**6**, `math/edit.html?id=<S's id>`): fold
+   in A's content. Change only the body and synonyms; leave A untouched. Check S's
+   local page.
+4. **Publish S:** **1** shows S; **2** prepares it; then 3, 4, 5. Check S's live page.
+   No option 8 is needed yet.
+5. **Prepare the merge:** **21 → 3**, pick the session. Title as synonym: `Y`
+   (normally). Metadata-only: `N` (you changed S's text). Read the review.
+6. **Publish the merge:** 3, 4, 5.
+7. **Verify live:** S's page, A's old URL (`math/concept.html?slug=<A's slug>`)
+   shows S with the merge note, and a search for A's title shows one entry.
+8. **Option 8:** stop the local server, type `STOPPED`. It confirms the merge
+   receipt and replays it before comparing.
+9. **Record it in git:** a migration from `dist/merge-sessions/<id>/receipt.json`
+   (step 8 of the merge guide), then a PR, merge, `git pull`.
+
+Keep `dist/merge-sessions/`: undo (**21 → 4**) needs the session folder. A PR that
 touches math readers merges only with `backend/tests/test_retirement_readers.py`
 passing.
+
+## Other math entry notes
 
 Option **1** marks any math change that option 2 would refuse as `[unsupported]`
 and explains why. Some existing entries cannot be patched through the helper at
@@ -214,8 +304,10 @@ Record locations, never credential values, in documentation or Git.
 
 Spotify token location can be overridden by `SPOTIFY_TOKEN_PATH`. Keep tokens out
 of screenshots, command arguments, deployment packages and logs. Esri's browser
-key is intentionally delivered to the map but must retain restricted privileges
-and referrers. Its recorded expiration is **October 13, 2027**; rotate before then.
+key is intentionally delivered to the map: it is sent to every visitor's browser,
+so anyone can read it. It is safe only because Esri limits it to map privileges and
+to requests whose *referrer* (the page address the browser reports) is this site;
+keep those restrictions. Its recorded expiration is **October 13, 2027**; rotate before then.
 Changing Esri referrers can require regenerating its key. Do not reset working
 credentials without understanding which environment uses them.
 

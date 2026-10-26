@@ -11,7 +11,7 @@ python backend/find_merge_candidates.py --db PATH-TO-WORKING-DB
 The report goes to `dist/merge-candidates/<UTC time>/` (or `--output NEW-FOLDER`):
 
 - `candidates.md`: suggested merges, renames and cross-links, each with both entries' ids, slugs,
-  MSC codes, content role, text length and how many entries link to them;
+  canonical names (what option 21 asks for), MSC codes, content role, text length and how many entries link to them;
 - `candidates.csv`: every pair found, including the ones to leave alone, with an empty
   `chi_decision` column to fill in.
 
@@ -32,5 +32,5 @@ The content role comes from the title ("proof of", "examples of", "characterizat
 of") and otherwise from the document types (definition, statement or mixed). The suggested survivor
 is the entry more pages link to (related concepts or `\PMlinkname`), then the longer one. It is only a starting point: read both texts, and decide which URL should stay, before choosing.
 
-Merging itself isn't built yet. The design (retire, don't delete) is being agreed separately, and
-nothing in this report changes any entry.
+Nothing in this report changes any entry. To carry out a merge you have decided on, follow
+[Merging and retiring entries](MERGING_ENTRIES.md) (helper option 21).

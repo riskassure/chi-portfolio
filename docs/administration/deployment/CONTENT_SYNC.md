@@ -608,7 +608,32 @@ from the saved state and never re-prepares packages from the working copy.
   only when no other helper window is running the batch.
 
 Git is separate: a batch publishes database content and commits nothing.
-Tracked records of a batch (such as migration files) are a separate step.
+
+#### Record a batch in git
+
+After `VERIFIED` and a successful option 8, record the batch as a migration so the
+repository can rebuild the same entries. This is how the field theory, real
+analysis, averages, K_1 and naive set theory batches were recorded
+(`add_*_entries_2026102*.py`, PRs #14, #17 and #19).
+
+1. Write `backend/src/database/math/migrations/add_<topic>_entries_<date>.py`.
+   It lists each entry (title, slug, classifications, synonyms, defined terms,
+   related slugs, body, reference) and calls `math_entry_batch.run_batch`, with
+   any autolink escapes the batch needed. Its docstring names the batch and the
+   date it was published.
+2. Put the entries in **live id order**, the order option 20 published them
+   (`review.txt` and the receipts show it), with an `ORDER` list and an
+   assertion that it covers every entry. Option 20 chooses its own dependency
+   order, so this is usually not the order the entries were written in.
+3. Check it on a copy of a database from just before the batch: for example the
+   live snapshot that option 8 brought home with the batch's entries removed, or
+   a pre-batch live snapshot. Run it with `--db` (a preview), then `--apply` on
+   that copy, and compare the new rows with the live snapshot. Ids, text and
+   metadata should match exactly. Never run it on the working copy or on live.
+4. Open a PR, merge it, then `git pull` on the laptop.
+
+The migration is a record. It does not publish anything, and option 20 remains the
+way to publish new entries.
 
 ### Merge or retire entries (option 21)
 

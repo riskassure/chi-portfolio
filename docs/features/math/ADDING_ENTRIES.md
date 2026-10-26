@@ -129,6 +129,9 @@ each other in a loop can't go in the same batch: both links are kept, so leave
 those entries out (with anything that depends on them) until a supported route
 exists. Details, stops and resuming:
 [Publish a batch of new entries](../../administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries).
+The whole route, from a clean working copy to the git record, is the checklist
+[Add many new entries at once](../../ADMIN_RUNBOOK.md#add-many-new-entries-at-once-option-20)
+in the runbook.
 
 **Scope limit:** the helper publishes new entries with text, equations and PSTricks
 diagrams. Diagrams go through the diagram route, with SVGs rendered on your laptop,
@@ -246,15 +249,19 @@ September 2026 entries, before the helper existed. Treat them as a record of
 what was done, not as a way to add entries. Use the helper instead. Do not
 run them in bulk or in order. Many of them check the content as it was then.
 
-The three `add_*_entries_20261023.py` scripts (field theory, real analysis,
-averages) are records of entries written locally and then published one at a
-time through the helper. They only add their own new entries, and their
-related links are the published ones: a related link to an entry published
-later in the batch was dropped, because the live publisher accepts only
-related entries that are already live. Their shared code is in
-`math_entry_batch.py`.
+The `add_*_entries_2026102*.py` scripts are records of entries written locally
+and then published through the helper: field theory, real analysis and averages
+(20261023, published one at a time), K_1 (20261024) and naive set theory
+(20261025), both published with option 20. They only add their own new entries,
+in live id order, and their related links are the published ones. In the three
+20261023 scripts a related link to an entry published later was dropped, because
+the live publisher accepts only related entries that are already live. Their
+shared code is in `math_entry_batch.py`. How to write one for a new batch:
+[Record a batch in git](../../administration/deployment/CONTENT_SYNC.md#record-a-batch-in-git).
+`merge_entries_*.py` are the records of option 21 merges; see
+[Merging and retiring entries](MERGING_ENTRIES.md).
 
-Most of them also change existing entries: they edit text and add related
+Most of the older scripts also change existing entries: they edit text and add related
 links, synonyms and defined terms. The helper can't publish those changes, so
 re-running a script leaves the working copy different from the live site in a
 way options 2 to 5 can't fix. The [migration scripts review](../../maintenance/history/MIGRATION_SCRIPTS_REVIEW.md)
