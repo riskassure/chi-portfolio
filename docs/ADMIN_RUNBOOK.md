@@ -12,6 +12,9 @@ are recorded from the deployment in this session, not a new live audit.
 - Hosting: PythonAnywhere account `cwoo`, Python 3.13.
 - Git saves code history. **Committing and pushing does not deploy the site.**
 - Local saves do not generally publish content. Follow the matching workflow below.
+- New to web programming? Read [How the website works](administration/HOW_THE_SITE_WORKS.md)
+  first: what runs in the browser and what on the server, when a reload is needed,
+  browser caching, logins, and where errors show up.
 
 Open PowerShell in the project directory and start the helper:
 
@@ -29,6 +32,9 @@ that terminal open. Use another terminal for the helper while previewing. Sign i
 with the local website admin password, which is separate from hosting and Spotify
 passwords. Stop the server with Ctrl+C. Run only one local preview server.
 After helper code changes, exit and reopen the helper to load the new version.
+The same goes for the local server: after a `git pull` or an edit that changes
+Python under `backend/src`, stop it and start **6** again. Frontend files (HTML, CSS,
+JavaScript) are read fresh on each page load, so Ctrl+F5 in the browser is enough.
 
 ## Where information lives
 
@@ -298,8 +304,10 @@ Record locations, never credential values, in documentation or Git.
 
 Spotify token location can be overridden by `SPOTIFY_TOKEN_PATH`. Keep tokens out
 of screenshots, command arguments, deployment packages and logs. Esri's browser
-key is intentionally delivered to the map but must retain restricted privileges
-and referrers. Its recorded expiration is **October 13, 2027**; rotate before then.
+key is intentionally delivered to the map: it is sent to every visitor's browser,
+so anyone can read it. It is safe only because Esri limits it to map privileges and
+to requests whose *referrer* (the page address the browser reports) is this site;
+keep those restrictions. Its recorded expiration is **October 13, 2027**; rotate before then.
 Changing Esri referrers can require regenerating its key. Do not reset working
 credentials without understanding which environment uses them.
 
