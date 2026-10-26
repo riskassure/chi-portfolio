@@ -42,7 +42,7 @@ again if the refresh token is refused (revoked, expired, or replaced).
 | Website admin password (local) | Signing in on `127.0.0.1:5001` | Chosen on first local start | Laptop: `local-admin-password.dpapi` (encrypted for your Windows account) | `start_local.py --reset-password` | "Cannot read saved local password" |
 | Session cookie | Staying signed in after login | Given by Flask at login | Your browser | Lasts 8 hours; sign in again | 403 on edit buttons |
 | PythonAnywhere API token | Helper uploads packages and reloads the site | PythonAnywhere Account page, API token tab | Laptop: `pythonanywhere-api.json` | Regenerate there, run setup again | "Authentication failed. Check or regenerate your API token." |
-| SSH key | Helper runs checks and publishes on the server; option 8 downloads | Created on the laptop; public half added to PythonAnywhere | Laptop: under `%USERPROFILE%\.config`; server: `~/.ssh/authorized_keys` | Doesn't expire | "Permission denied (publickey...)" or a password prompt |
+| SSH key | Helper runs checks and publishes on the server; option 8 downloads | Created on the laptop; public half added to PythonAnywhere | Laptop: `%USERPROFILE%\.config\chi-portfolio\`; server: `~/.ssh/authorized_keys` | Doesn't expire | "Permission denied (publickey...)" or a password prompt |
 | Spotify tokens | Reading your top tracks for the music page | Browser approval (OAuth with PKCE), on the laptop | Laptop and server: `spotify-tokens.json` | Automatic refresh | "Spotify rejected the authorization. Please connect again." |
 | Google Photos app credentials | Identifying this app to Google | Downloaded from Google Cloud Console | Laptop: `google-oauth.json` | Only if you change the app | "Check the private google-oauth.json file..." |
 | Google Photos tokens | Letting the local import screen read photos you pick | Browser approval (OAuth with PKCE), on the laptop | Laptop: `google-photos-tokens.json` | Automatic refresh | Connect again |
@@ -106,8 +106,8 @@ connection). The helper runs `ssh cwoo@ssh.pythonanywhere.com ...` for live chec
 the Esri key upload (option 17). SSH can log in with your PythonAnywhere password,
 but you use a **key pair** instead:
 
-- The *private key* stays on the laptop, under `%USERPROFILE%\.config`
-  (`C:\Users\riska\.config`), protected by a passphrase you type when it is used.
+- The *private key* stays on the laptop, in `%USERPROFILE%\.config\chi-portfolio\`
+  (`C:\Users\riska\.config\chi-portfolio`, beside the helper's other private files), protected by a passphrase you type when it is used.
   That isn't OpenSSH's default folder (`%USERPROFILE%\.ssh\`), so the laptop's SSH
   setup has to point to it, for example with an `IdentityFile` line in
   `%USERPROFILE%\.ssh\config` or by loading it into the ssh-agent. If the key

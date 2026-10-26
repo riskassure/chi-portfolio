@@ -326,7 +326,7 @@ fails: [How the site's logins and API keys work](administration/API_AUTHENTICATI
 | Production Spotify tokens | `/home/cwoo/.config/chi-portfolio/spotify-tokens.json` |
 | Google Photos app credentials (client ID and secret) | `%USERPROFILE%\.config\chi-portfolio\google-oauth.json` (override: `GOOGLE_PHOTOS_CREDENTIALS`); laptop only |
 | Google Photos tokens | `%LOCALAPPDATA%\chi-portfolio\google-photos-tokens.json`; laptop only |
-| SSH key for `ssh.pythonanywhere.com` | Private key under `%USERPROFILE%\.config` (`C:\Users\riska\.config`), not OpenSSH's default `.ssh` folder; its public half is in `/home/cwoo/.ssh/authorized_keys` |
+| SSH key for `ssh.pythonanywhere.com` | Private key in `%USERPROFILE%\.config\chi-portfolio\` (`C:\Users\riska\.config\chi-portfolio`), not OpenSSH's default `.ssh` folder; its public half is in `/home/cwoo/.ssh/authorized_keys` |
 
 Spotify token location can be overridden by `SPOTIFY_TOKEN_PATH`. Keep tokens out
 of screenshots, command arguments, deployment packages and logs. Esri's browser
