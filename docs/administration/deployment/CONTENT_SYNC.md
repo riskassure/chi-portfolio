@@ -825,7 +825,8 @@ retains the snapshot in `/home/cwoo/backups/`, and checks its integrity. Locally
 the downloader verifies its SHA-256 and database integrity before marking it
 complete. Failed downloads remain `.partial` and must not be used. Server
 snapshots consume hosting quota; periodically remove older ones through Files
-after confirming your retained backups. The script never deletes them itself.
+after confirming your retained backups. The script never deletes them itself
+(the [nightly backups](../backups/NIGHTLY_BACKUPS.md) rotate only their own folder).
 
 This downloads database content only, not media files. Keep snapshots private.
 The downloaded database is a base for the NEXT local editing session; it cannot

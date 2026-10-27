@@ -230,9 +230,11 @@ repository rebuild the entries.
 
 ## Backups for live edits
 
-The live Save buttons don't take a backup, while the helper does. Before a math edit
-on the road, take one from a PythonAnywhere Bash console (log in at
-pythonanywhere.com in any browser; Consoles tab), using a new file name each time:
+The live Save buttons don't take a backup, while the helper does. The
+[nightly backup](backups/NIGHTLY_BACKUPS.md) limits the loss to one day's edits, but
+before a big math edit on the road it's still worth taking one from a PythonAnywhere
+Bash console (log in at pythonanywhere.com in any browser; Consoles tab), using a new
+file name each time:
 
 ```bash
 /home/cwoo/.virtualenvs/chi-portfolio/bin/python /home/cwoo/chi-portfolio/backend/backup_database.py /home/cwoo/backups/before-live-edit-UNIQUE-NAME.db --source /home/cwoo/chi-portfolio/backend/portfolio.db

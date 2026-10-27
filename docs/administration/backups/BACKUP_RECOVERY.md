@@ -1,5 +1,9 @@
 # Backup and recovery review
 
+> Update 2026-10-27: nightly live database backups with automatic retention now
+> exist; see [NIGHTLY_BACKUPS.md](NIGHTLY_BACKUPS.md). The statements below that no
+> schedule or retention policy is installed describe October 18.
+
 Reviewed October 18, 2026. Production backup inventory and recovery-source access
 were read-only. No existing backup, live database, schedule or website file was
 modified. Private test details are in ignored `dist/backup-*-inventory.json` and
