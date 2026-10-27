@@ -15,6 +15,10 @@ are recorded from the deployment in this session, not a new live audit.
 - Hosting: PythonAnywhere account `cwoo`, Python 3.13.
 - Git saves code history. **Committing and pushing does not deploy the site.**
 - Local saves do not generally publish content. Follow the matching workflow below.
+- On the road or at home? [Making a change](administration/CHANGE_STEPS.md) says what
+  you can edit on the live site from anywhere (data only), what waits for the laptop
+  (code, files, map, batches, merges), and the order of steps for each kind of change:
+  edit, publish, git, then option 8.
 - New to web programming? Read [How the website works](administration/HOW_THE_SITE_WORKS.md)
   first: what runs in the browser and what on the server, when a reload is needed,
   browser caching, logins, and where errors show up.
@@ -82,6 +86,7 @@ preview: the helper explicitly selects a working copy.
 | Frontend HTML, CSS or JavaScript | **14**; paths relative to `frontend` |
 | Backend Python plus matching frontend files | **15**; repository-relative paths |
 | Saved gallery display count | **18** |
+| Music details (genre, composer, performer, ...) | None: edit them on the live music page, then **8** brings them home |
 
 Option **1** is not a comprehensive list of all website changes. Option **15**
 reloads the app and verifies the homepage, but that does not replace checking the
@@ -110,7 +115,8 @@ option 8. Never replace the entire live database with a laptop copy.
 Music-detail edits made only on production also come home with option 8, provided
 the corresponding local tables still match the baseline. Identical edits on both
 sides are accepted. Unpublished or divergent local music edits stop the refresh
-for review; option 8 does not publish or discard them. This differs from the
+for review; option 8 does not publish or discard them, and no helper option
+publishes them, so make music edits on the live site. This differs from the
 automatically generated Spotify ranking, which is replaced by the live ranking.
 
 ## Add a mathematics entry
