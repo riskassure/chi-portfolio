@@ -27,6 +27,7 @@ Committing code does not publish it to the website.
 ## Backup administration
 
 - [Tracked backup review](administration/backups/HISTORICAL_BACKUP_REVIEW.md): provenance, integrity checks and preservation history.
+- [Nightly backups](administration/backups/NIGHTLY_BACKUPS.md): the daily live database backup, its scheduled task, checking it, and restoring the live site from it.
 - [Backup and recovery review](administration/backups/BACKUP_RECOVERY.md): inventory, isolated restore results and proposed retention; not a complete disaster-recovery procedure.
 
 ## Maintenance

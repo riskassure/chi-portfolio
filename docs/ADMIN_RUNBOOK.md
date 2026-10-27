@@ -354,6 +354,11 @@ credentials without understanding which environment uses them.
 
 ## Backups, failures and recovery
 
+**Nightly backups.** A daily PythonAnywhere task backs up the live database to
+`/home/cwoo/backups/nightly/` (compressed, verified, keeps 7 daily, 4 weekly and 6
+monthly). Setup, checking, and how to restore the live site from one:
+[Nightly backups](administration/backups/NIGHTLY_BACKUPS.md).
+
 See the [October 18 backup review](administration/backups/BACKUP_RECOVERY.md) for inventory and an isolated
 database recovery exercise: integrity and five application queries passed on a
 temporary copy of the pre-Spotify snapshot. A subsequent full-site archive restore also passed: 18 photos, 76 diagram
@@ -378,10 +383,13 @@ The initial Spotify refresh backup was
   then reload and verify; preserve current database content.
 - Database recovery: preserve the current state and plan the restore first.
   Restoring a full database discards subsequent edits. Never replace an open
-  SQLite database or blindly copy an entire old site over production.
+  SQLite database or blindly copy an entire old site over production. For the
+  live database, `nightly_backup.py restore-live` does both safely; see
+  [Nightly backups](administration/backups/NIGHTLY_BACKUPS.md#restore).
 
-No retention policy is agreed yet. Inventory and choose retention before deleting
-old databases, media, staging packages, reports or credentials. Some `dist` files
+Retention is automatic only for the nightly folder. For everything else, inventory
+and choose retention before deleting old databases, media, staging packages, reports
+or credentials. Some `dist` files
 are active workflow state, not disposable build output.
 
 The July 28 pre-macro-backfill snapshot is preserved under
