@@ -217,9 +217,9 @@ class PhotoHomeTests(unittest.TestCase):
 
     def test_other_media_changes_still_block(self):
         for database in (self.base, self.local, self.live):
-            self.sql(database, 'CREATE TABLE music_catalog(id INTEGER, path TEXT)')
+            self.sql(database, 'CREATE TABLE stg_spotify_import(id INTEGER, path TEXT)')
         self.state['base_sha256'] = self.hash(self.base)
-        self.sql(self.live, "INSERT INTO music_catalog VALUES(1,'song.mp3')")
+        self.sql(self.live, "INSERT INTO stg_spotify_import VALUES(1,'song.mp3')")
         self.assertFalse(self.run_refresh()['safe'])
         self.remote.assert_not_called()
 

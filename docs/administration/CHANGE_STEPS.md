@@ -59,7 +59,7 @@ into the live database.
 | Math: `math/create.html`, `math/edit.html?id=<id>` | Create an entry; edit an entry's title, body (TeX), classifications, document types, synonyms, defined terms and related concepts | Slug and canonical name (fixed once saved); deleting; anything about a retired entry; merges and retirements (option 21); diagrams and images (see below) |
 | Photography gallery | An existing photo's title, location and coordinates (**Save Details**) | New photos, removing photos, gallery display count, Google Photos import |
 | Biography and resume | The page's text fields | Layout, links, PDFs, photos |
-| Music | Genre, composition, track name, composer, performer | **Don't use it for now:** see [Known gap: music edits](#known-gap-music-edits) |
+| Music | Genre, composition, track name, composer, performer | Nothing else; see [Music details](#music-details) for why these are edited live only |
 
 Math diagrams: the live editor accepts an edit that changes a PSTricks block
 (`pspicture`, `\pstree`), but it would render the diagram on the server, which gives
@@ -96,7 +96,7 @@ only there.
    copy differs from the baseline anywhere in a table, and that isn't already on the
    live site, it refuses for that whole table, not just for the edited entry. So
    option **1** must list nothing before option 8 can switch. Live edits made on the
-   road never block it on their own (except music, below); they just come home.
+   road never block it on their own; they just come home.
 
 ## Before you leave, and when you get home
 
@@ -133,6 +133,7 @@ first, then redo the local edit on top of the road version.
 | Photo title, location, coordinates, at home | Local gallery, **Save Details** | **12**, then 3/4/5 | None | Yes |
 | Photo title, location, coordinates, on the road | Live gallery, **Save Details** | Saving publishes it | None | When you're home |
 | Biography or resume text, at home | Local page editor | **9**, then 3/4/5 | None | Yes |
+| Music details (live only) | Live music page | Saving publishes it | None | When you're home |
 | Biography or resume text, on the road | Live page editor | Saving publishes it | None | When you're home |
 | Travel map, cities, regions (home only) | Local map editor | **14** with `geography/places-data.js`, then 3/4/5 | Commit and push the changed file | Not needed (it's a file) |
 | Gallery display count (home only) | Local gallery | **18** | Commit and push `gallery-settings.js` | Not needed |
@@ -198,7 +199,7 @@ changed: your old working copy is still the one in use. Open the report:
 | --- | --- | --- |
 | `blocked` | Tables where the working copy has changes that aren't on live | Option **1** lists unpublished math edits: publish them (2, then 3/4/5), or decide you don't want them. Then run 8 again |
 | `photo_conflicts` | Photos edited locally and not published | Option **12**, then 3/4/5 |
-| `media_review` | File-backed tables changed on live (for example `music_catalog`) | See [Known gap: music edits](#known-gap-music-edits) |
+| `media_review` | File-backed tables changed on live (for example the Spotify import staging table `stg_spotify_import`) | Rare; review the named table before retrying. Music details no longer appear here |
 | `live_changed` | Tables that differ from live | Information only |
 | A schema message | The database structure differs | Usually a code rollout step was missed: check the guide for that change |
 
@@ -241,12 +242,13 @@ Wait for `Database snapshot created.` Biography and resume saves keep every earl
 revision in the database, so an old version can be recovered without a backup. For a
 photo detail edit, note the old title and location before saving.
 
-## Known gap: music edits
+## Music details
 
-Option 8 treats the music catalog tables (`music_catalog`, `music_overrides`) as
-content that needs a separate synchronization, and that synchronization doesn't exist
-yet. So after any music detail edit, on the live site or on the laptop, option 8
-refuses with "File-backed content changed; media synchronization needs review", and
-keeps refusing. There is also no helper option to publish a local music edit. Until
-this is fixed in code, don't edit music details. (The daily Spotify ranking is
-separate and doesn't cause this.)
+Edit music details (genre, composition, track name, composer, performer) on the
+**live** music page, at home or on the road. Option 8 brings them home, as long as
+the laptop's music tables still match the baseline (fixed on 2026-10-26).
+
+Don't edit music details in the local preview: there is no helper option to publish
+them, and an unpublished local music edit makes option 8 refuse for review. If that
+happens, make the same edit on the live site; option 8 accepts it once both sides
+match. The daily Spotify ranking is separate: option 8 always takes the live one.
