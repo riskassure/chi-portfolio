@@ -14,9 +14,12 @@ import merge_sync
 import photo_home
 
 # File-backed content needs a separate download/reconciliation workflow.
-FILE_TABLES = {'music_catalog', 'stg_spotify_import', 'photography_catalog',
-               'music_publication', 'music_publication_meta', 'music_overrides',
+FILE_TABLES = {'stg_spotify_import', 'photography_catalog',
+               'music_publication', 'music_publication_meta',
                'google_photo_drafts', 'math_concept_diagrams', 'math_concept_diagram_failures'}
+# Music catalog details and editorial overrides are database-only content. Compare
+# their complete rows normally: live-only edits may come home, but divergent local
+# edits must still block. They are not disposable regenerated Spotify rankings.
 # Each website regenerates its own Spotify ranking on a timer and the ranking is
 # never published from the laptop, so the live copy simply replaces the local one.
 REGENERATED_TABLES = ('music_publication', 'music_publication_meta')

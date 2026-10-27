@@ -128,6 +128,56 @@ class BringHomeTests(unittest.TestCase):
         self.edit(self.local, "INSERT INTO music_overrides VALUES('a','genre','Local')")
         self.assertFalse(self.run_refresh()['safe'])
 
+    def prepare_music_details(self):
+        for path in (self.base, self.local, self.live):
+            with closing(sqlite3.connect(path)) as db:
+                db.executescript("""
+                    CREATE TABLE music_catalog(track_id TEXT PRIMARY KEY, composer TEXT);
+                    CREATE TABLE music_overrides(track_id TEXT, field TEXT, value TEXT,
+                                                 PRIMARY KEY(track_id, field));
+                    INSERT INTO music_catalog VALUES('track', 'Original');
+                """)
+        self.state['base_sha256'] = self.hash(self.base)
+
+    def edit_music_details(self, path, value):
+        with closing(sqlite3.connect(path)) as db:
+            db.execute('UPDATE music_catalog SET composer=? WHERE track_id=?', (value, 'track'))
+            db.execute('INSERT OR REPLACE INTO music_overrides VALUES(?,?,?)', ('track', 'composer', value))
+            db.commit()
+
+    def test_live_music_details_come_home_and_next_refresh_still_works(self):
+        self.prepare_music_details()
+        before = self.hash(self.local)
+        self.edit_music_details(self.live, 'Corrected')
+        result = self.run_refresh()
+        self.assertTrue(result['safe'], result)
+        self.assertEqual(self.hash(self.local), before)
+        with closing(sqlite3.connect(self.state['working'])) as db:
+            self.assertEqual(db.execute('SELECT composer FROM music_catalog').fetchone(), ('Corrected',))
+            self.assertEqual(db.execute('SELECT value FROM music_overrides').fetchone(), ('Corrected',))
+        self.assertTrue(self.run_refresh()['safe'])
+
+    def test_unpublished_music_details_are_preserved_on_local_or_both_side_edits(self):
+        self.prepare_music_details()
+        self.edit_music_details(self.local, 'Local draft')
+        for live_value in (None, 'Different live edit'):
+            if live_value:
+                self.edit_music_details(self.live, live_value)
+            before = self.hash(self.local)
+            state = dict(self.state)
+            result = self.run_refresh()
+            self.assertFalse(result['safe'])
+            self.assertEqual(set(result['blocked']), {'music_catalog', 'music_overrides'})
+            self.assertEqual(self.hash(self.local), before)
+            self.assertEqual(self.state, state)
+            self.save.assert_not_called()
+
+    def test_identical_music_edits_on_both_sides_allow_refresh(self):
+        self.prepare_music_details()
+        for path in (self.local, self.live):
+            self.edit_music_details(path, 'Published correction')
+        self.assertTrue(self.run_refresh()['safe'])
+
     def test_schema_change_blocks(self):
         self.edit(self.live, 'ALTER TABLE math_concepts ADD COLUMN extra TEXT')
         self.assertFalse(self.run_refresh()['safe'])
