@@ -107,6 +107,12 @@ and downloads missing photos. It does not synchronize website code, private
 credentials, or all other media. File-only travel or styling changes do not require
 option 8. Never replace the entire live database with a laptop copy.
 
+Music-detail edits made only on production also come home with option 8, provided
+the corresponding local tables still match the baseline. Identical edits on both
+sides are accepted. Unpublished or divergent local music edits stop the refresh
+for review; option 8 does not publish or discard them. This differs from the
+automatically generated Spotify ranking, which is replaced by the live ranking.
+
 ## Add a mathematics entry
 
 Follow [Adding a math entry](features/math/ADDING_ENTRIES.md) for field guidance,

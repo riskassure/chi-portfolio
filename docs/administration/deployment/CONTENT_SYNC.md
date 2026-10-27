@@ -244,8 +244,14 @@ the refresh; publish them with option 12 first. The Spotify ranking
 website's own daily job and is never published from the laptop, so the live
 ranking replaces the local one without stopping the refresh. Rerun
 `backend/install_music_schedule.ps1` afterwards if you use the local schedule.
-Unrecognized schemas and changes to other media-related tables (catalog,
-overrides, imports) also stop for review.
+Music details (`music_catalog` and `music_overrides`) use the normal complete-row
+comparison: production-only edits come home when the local table still matches
+the baseline, and identical local/live tables are also accepted. Unpublished or
+divergent local music edits stop the refresh; they are never discarded like the
+generated ranking. Comparison is per table, not a field-level merge. Preserve
+the working copy and review differences if it stops; option 8 does not publish
+local music edits. Unrecognized schemas and changed import-staging tables still
+stop for review.
 
 All gallery WebP files referenced by the live snapshot are checksum-verified
 against a read-only SSH manifest. Missing images are downloaded using SCP into
