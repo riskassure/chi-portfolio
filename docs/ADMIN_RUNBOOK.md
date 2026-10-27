@@ -86,6 +86,7 @@ preview: the helper explicitly selects a working copy.
 | Frontend HTML, CSS or JavaScript | **14**; paths relative to `frontend` |
 | Backend Python plus matching frontend files | **15**; repository-relative paths |
 | Saved gallery display count | **18** |
+| Music details (genre, composer, performer, ...) | None: edit them on the live music page, then **8** brings them home |
 
 Option **1** is not a comprehensive list of all website changes. Option **15**
 reloads the app and verifies the homepage, but that does not replace checking the
@@ -114,7 +115,8 @@ option 8. Never replace the entire live database with a laptop copy.
 Music-detail edits made only on production also come home with option 8, provided
 the corresponding local tables still match the baseline. Identical edits on both
 sides are accepted. Unpublished or divergent local music edits stop the refresh
-for review; option 8 does not publish or discard them. This differs from the
+for review; option 8 does not publish or discard them, and no helper option
+publishes them, so make music edits on the live site. This differs from the
 automatically generated Spotify ranking, which is replaced by the live ranking.
 
 ## Add a mathematics entry
