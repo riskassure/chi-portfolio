@@ -1,0 +1,47 @@
+# Runs the Python test suite on GitHub's computers for every pull request and
+# every push to main. Nothing here deploys or touches the live site.
+# Plain-language guide: docs/administration/CI_TESTS.md
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Read-only: the tests never need to write to the repository.
+permissions:
+  contents: read
+
+# A new push to the same branch cancels the older, now-outdated run.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: pytest (${{ matrix.os }})
+    strategy:
+      # Report both systems even when one fails.
+      fail-fast: false
+      matrix:
+        # Linux matches PythonAnywhere; Windows matches the laptop that runs the helper.
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt pytest==9.2.0
+
+      - name: Run tests
+        run: python -m pytest backend/tests -ra

@@ -12,6 +12,7 @@ Committing code does not publish it to the website.
 | [Making a change](administration/CHANGE_STEPS.md) | On the road vs at home, the order of steps for each kind of change, and where each self-service checklist is |
 | [How the website works](administration/HOW_THE_SITE_WORKS.md) | Browser vs server, reloads, caching, logins, developer tools and where errors appear |
 | [Logins and API keys](administration/API_AUTHENTICATION.md) | Admin login, PythonAnywhere token and SSH, Spotify and Google OAuth, Esri key: how each works, renews and fails |
+| [Automatic tests on GitHub (CI)](administration/CI_TESTS.md) | What runs on every PR, reading the green tick or red cross, fixing a failure |
 | [Content synchronization](administration/deployment/CONTENT_SYNC.md) | Detailed helper preparation, checks and publication |
 | [Travel map](features/travel/TRAVEL_MAP.md) | Map editing, reference data, photo bindings and gallery settings |
 | [Spotify](features/music/SPOTIFY.md) | Current top-track workflow; older export workflow is labeled separately |

@@ -179,7 +179,8 @@ version. A code change goes: branch, commit, pull request (PR), merge, pull, pub
    (if pytest isn't installed: `-m unittest discover -s backend/tests -q`).
 4. `git add <files>`, `git commit -m "What changed and why"`,
    `git push -u origin <short-name>`.
-5. On GitHub, open the PR it offers, read the diff, and merge it.
+5. On GitHub, open the PR it offers and read the diff. Wait for the test checks
+   at the bottom of the PR to turn green ([CI](CI_TESTS.md)), then merge it.
 6. On the laptop: `git checkout main`, `git pull`.
 7. Publish: option **14** (frontend files only, paths relative to `frontend`) or
    **15** (Python plus matching frontend files, paths relative to the repository),
