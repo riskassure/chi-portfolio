@@ -36,6 +36,7 @@ own small temporary databases, so this is fine.
 | --- | --- | --- |
 | `test_diagram_sync.py` (one render test) | both runners | Needs LaTeX and `dvisvgm`, which only the laptop has |
 | `test_local_admin_password.py` (two DPAPI tests) | Linux | Windows-only password storage; they do run on the Windows runner |
+| `test_probe_server_diagrams.py` (four tests) | Windows | They use Linux shell scripts as stand-ins for the TeX tools; they run on the Linux runner |
 
 A skip is not a failure. A new test that needs something only the laptop has
 should skip the same way (`unittest.skipUnless(...)` or `pytest.mark.skipif`), with
