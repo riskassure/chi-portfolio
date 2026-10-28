@@ -48,7 +48,9 @@ def run(script, *args, cwd):
 
 class ScriptCommandLineTests(unittest.TestCase):
     def setUp(self):
-        self.folder = Path(tempfile.mkdtemp())
+        # resolve(): Windows temp paths can be 8.3 short names (RUNNER~1), but the
+        # scripts print the long form, which the assertions compare against.
+        self.folder = Path(tempfile.mkdtemp()).resolve()
         self.legacy = BACKEND / 'portfolio.db'
         self.legacy_existed = self.legacy.exists()
         self.legacy_digest = digest(self.legacy) if self.legacy_existed else None
@@ -120,7 +122,7 @@ class ScriptCommandLineTests(unittest.TestCase):
 
 class DatabaseArgumentTests(unittest.TestCase):
     def setUp(self):
-        self.folder = Path(tempfile.mkdtemp())
+        self.folder = Path(tempfile.mkdtemp()).resolve()
 
     def test_rejects_files_that_are_not_the_catalog(self):
         text = self.folder / 'notes.db'

@@ -250,7 +250,7 @@ one is brought home with **8** before the next. Full procedure, checks and undo:
 
 Keep `dist/merge-sessions/`: undo (**21 → 4**) needs the session folder. A PR that
 touches math readers merges only with `backend/tests/test_retirement_readers.py`
-passing.
+passing (GitHub runs it on every PR; see [CI](administration/CI_TESTS.md)).
 
 ## Other math entry notes
 
@@ -408,6 +408,7 @@ for context, but do not use first-install instructions on an existing deployment
 Further references:
 
 - [Documentation index](README.md)
+- [Automatic tests on GitHub (CI)](administration/CI_TESTS.md): every PR and push to `main` runs `pytest backend/tests`; merge only on green checks
 - [Maintenance assessment plan](maintenance/MAINTENANCE_PLAN.md)
 - [Math synchronization](administration/deployment/CONTENT_SYNC.md)
 - [Broader deployment and recovery details](administration/deployment/MANUAL_UPDATES.md) (older manual package workflow)
