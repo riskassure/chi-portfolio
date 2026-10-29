@@ -411,6 +411,7 @@ Further references:
 - [Automatic tests on GitHub (CI)](administration/CI_TESTS.md): every PR and push to `main` runs `pytest backend/tests`; merge only on green checks
 - [Maintenance assessment plan](maintenance/MAINTENANCE_PLAN.md)
 - [Math synchronization](administration/deployment/CONTENT_SYNC.md)
+- [Live files vs main](administration/deployment/LIVE_DRIFT_CHECK.md): `python backend\check_live_drift.py` lists live files that differ from `main` (Files-tab edits, publishes from a branch, merges never published); read-only
 - [Broader deployment and recovery details](administration/deployment/MANUAL_UPDATES.md) (older manual package workflow)
 - [First hosting installation](administration/deployment/PYTHONANYWHERE.md) (not a routine update procedure)
 
