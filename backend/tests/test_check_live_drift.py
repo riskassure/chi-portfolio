@@ -34,6 +34,7 @@ class LiveDriftTests(unittest.TestCase):
             'backend/src/new_feature.py': 'NEW = 1\n',
             'docs/README.md': 'docs\n',
             'backend/tests/test_x.py': 'pass\n',
+            'backend/src/database/math/migrations/add_x.py': 'DB = "--db"\n',
         }
         for path, text in files.items():
             target = self.repo/path
@@ -49,6 +50,8 @@ class LiveDriftTests(unittest.TestCase):
             'frontend/geography/places-data.js': 'window.PLACES = [1];\n',  # content
             'docs/README.md': 'old docs\n',                               # other
             'backend/src/hotfix.py': 'X = 1\n',                           # only on live
+            'backend/src/database/math/migrations/add_x.py': 'DB = None\n',  # laptop script, not site code
+            'manifest.json': '{}',                                        # first-deployment leftover
             'backend/portfolio.db': 'SQLite',                             # ignored, not hashed
             'backend/data/math/diagrams/a.svg': '<svg/>',                 # ignored
             'backend/src/__pycache__/app.cpython-313.pyc': 'x',           # pruned
@@ -66,9 +69,10 @@ class LiveDriftTests(unittest.TestCase):
                                    reader=run_reader_locally(self.live))
         self.assertEqual(buckets['same'], ['backend/src/app.py'])
         self.assertEqual(buckets['line endings'], ['frontend/index.html'])
-        self.assertEqual(buckets['differs'], ['backend/src/routes/math.py', 'docs/README.md',
+        self.assertEqual(buckets['differs'], ['backend/src/database/math/migrations/add_x.py',
+                                              'backend/src/routes/math.py', 'docs/README.md',
                                               'frontend/geography/places-data.js'])
-        self.assertEqual(buckets['only on live'], ['backend/src/hotfix.py'])
+        self.assertEqual(buckets['only on live'], ['backend/src/hotfix.py', 'manifest.json'])
         self.assertEqual(buckets['only on live (ignored)'], ['backend/data/math/diagrams/a.svg', 'backend/portfolio.db'])
         self.assertIn('backend/src/new_feature.py', buckets['missing on live'])
         self.assertEqual(drift.needs_decision(buckets), ['backend/src/routes/math.py', 'backend/src/hotfix.py'])
