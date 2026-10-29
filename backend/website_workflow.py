@@ -30,6 +30,7 @@ import site_deployment
 import webbrowser
 import upload_esri_key
 import diagram_sync
+import deploy_guard
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / 'dist' / 'math-workflow.json'
@@ -363,6 +364,10 @@ def prepare_frontend(state, paths, code=False):
     for path in paths:
         if frontend_sync.read_text(ROOT if code else ROOT/'frontend', path, code) is None:
             raise ValueError('Selected local file is missing: '+path)
+    repo_paths = list(paths) if code else ['frontend/'+path for path in paths]
+    commit = deploy_guard.check(ROOT, repo_paths)
+    if commit:
+        print('Deploy guard passed: publishing from main at', commit[:7], '(clean and matches GitHub).')
     print('Reading selected live frontend files for comparison. No live changes.', flush=True)
     domain = None
     if code:
@@ -386,9 +391,18 @@ def prepare_frontend(state, paths, code=False):
     state['job'] = dict(kind=payload['kind'], domain=domain, canonical=('Website code: ' if code else 'Frontend files: ')+', '.join(item['path'] for item in payload['files']),
                         package=str(package), sha256=digest(package),
                         proposed={item['path']: frontend_sync.checksum(item['replacement']) for item in payload['files']},
-                        remote=None, checked=False)
+                        remote=None, checked=False, repo_paths=repo_paths, git_commit=commit)
     save(state)
     return report
+
+
+def guard_code_publication(job):
+    """Option 5: check again that the package still comes from a clean main that matches GitHub."""
+    if 'repo_paths' not in job:
+        raise ValueError('This package was prepared before the deploy guard existed. Prepare it again with option 14 or 15.')
+    commit = deploy_guard.check(ROOT, job['repo_paths'])
+    if commit != job['git_commit']:
+        raise ValueError('main has moved since this package was prepared. Prepare it again with option 14 or 15.')
 
 
 def finish_code_deployment(state):
@@ -453,6 +467,8 @@ def publish_reviewed(state):
     job = current_job(state)
     if not job['remote'] or not job['checked']:
         raise ValueError('Run a successful live check for this package first.')
+    if job.get('kind') in ('frontend-files', 'website-code'):
+        guard_code_publication(job)
     print('Selected entry:', job['canonical'])
     if job.get('kind') == 'photo-remove':
         print('REMOVE this photo from the live gallery. The image file will remain accessible at its direct URL.')

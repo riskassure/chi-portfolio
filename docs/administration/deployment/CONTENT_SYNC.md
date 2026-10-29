@@ -23,7 +23,9 @@ backend/src/routes/admin_photography.py, frontend/photography/gallery.js
 
 The supported scope is Python under `backend/src` plus matching frontend HTML,
 CSS and JavaScript. A code package must contain a changed Python file; use option
-14 for frontend-only updates. Database migrations, dependency installation,
+14 for frontend-only updates. Like option 14, it refuses unless the laptop folder is
+on a clean `main` that matches GitHub; see [Deploy guard](DEPLOY_GUARD.md).
+Database migrations, dependency installation,
 private settings, WSGI configuration, file deletion and other backend tools are
 outside this step. Test the selected changes locally with the installed
 dependencies before publication.
@@ -65,6 +67,11 @@ files** and enter up to 20 paths relative to `frontend`, separated by commas,
 for example `photography/photography.css`. Blank input cancels. Only UTF-8
 `.html`, `.css` and `.js` files are allowed (2 MB per file, 10 MB of review text).
 Python, database files, private settings, media, links and deletions are excluded.
+
+Code files are prepared only from a clean `main` that matches GitHub: the
+[deploy guard](DEPLOY_GUARD.md) runs `git fetch` and refuses on another branch,
+with uncommitted changes, or when the folder is behind or ahead of GitHub. A
+selection of only `geography/places-data.js` (saved map edits) skips it.
 
 The helper reads those exact files from PythonAnywhere over SSH and packages
 the live expected content together with your local replacement. Review **all**
