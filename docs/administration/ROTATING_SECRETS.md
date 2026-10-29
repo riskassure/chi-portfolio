@@ -57,6 +57,7 @@ The two are different things:
 
 ```bash
 cd ~/chi-portfolio/backend/src
+python3 hosting_secrets.py check           # optional: is the current one weak?
 python3 hosting_secrets.py password        # asks twice, hidden; 16+ characters
 python3 hosting_secrets.py session-secret  # only if you also want everyone signed out
 ```
@@ -79,6 +80,31 @@ Good to know:
   `backend/src/hosting_secrets.py`, then 3, 4, 5), or edit `hosting.json` by hand in the Files
   tab: replace the value of `ADMIN_PASSWORD`, keep the quotes, save, reload.
 - Choose a long random password from a password manager, used nowhere else.
+
+### Checking whether a password is weak
+
+`python3 hosting_secrets.py check` looks at the current live password and says either
+"No common weaknesses found" or "Weak:" with the reasons, without ever showing the
+password. `password` runs the same check on a new password and asks you to type
+`yes` before saving one that has weaknesses.
+
+It flags: fewer than 20 characters; fewer than three kinds of character (lowercase,
+uppercase, digits, symbols); words a guesser tries first (such as `password`,
+`admin`, `cwoo`, `chi`); something that looks like a year; one character three times
+in a row; runs like `abcd`, `1234` or `qwer`; and more than half the characters
+being repeats.
+
+What it can't do: no program can tell whether a password was *chosen* randomly.
+It only spots common patterns, so a password that passes can still be weak if you
+use it elsewhere or it is based on something about you. That is why the dependable
+route is a password manager's generator (20+ characters, all kinds of character),
+not the check. A generated multi-word passphrase made only of lowercase words is
+also strong, but the check will flag it for having few kinds of character; that
+warning is safe to override.
+
+There is no reminder to change the password on a schedule. Current advice (NIST
+SP 800-63B) is not to force periodic changes; change it when it is weak, reused,
+or may have been seen.
 
 ## Local admin password
 
