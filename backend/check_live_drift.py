@@ -27,6 +27,9 @@ PREFIX = 'LIVE_DRIFT='
 # (docs, tests, laptop helper scripts) was copied there by the first
 # deployment and is never used by the site.
 SITE_CODE = re.compile(r'(?:backend/src/|frontend/).+|backend/(?:pythonanywhere_wsgi\.py|serve\.py|requirements\.txt)')
+# Inside those folders, scripts run by hand on the laptop (math migrations and
+# diagnostics, old utilities) and notes the site never reads.
+NOT_SITE_CODE = re.compile(r'backend/src/(?:database/math/(?:migrations|diagnostics)|utils/old)/.+|.+\.(?:md|sql)')
 # Files the live site, or a helper option, rewrites as content rather than code.
 CONTENT_FILES = re.compile(r'frontend/(?:images/photography/.+|geography/places-data\.js|photography/gallery-settings\.js)')
 TEXT_SUFFIXES = ('.py', '.html', '.css', '.js', '.txt', '.md', '.ps1', '.cfg', '.ini', '.toml')
@@ -134,7 +137,7 @@ def ignored(root, paths):
 def area(path):
     if CONTENT_FILES.fullmatch(path):
         return 'content'
-    return 'site code' if SITE_CODE.fullmatch(path) else 'other'
+    return 'site code' if SITE_CODE.fullmatch(path) and not NOT_SITE_CODE.fullmatch(path) else 'other'
 
 
 def classify(main, live, ignored_paths):
@@ -165,9 +168,8 @@ def laptop_state(root, ref):
 
 
 def needs_decision(buckets):
-    """Live site code that differs from main, and live files git neither tracks nor ignores."""
-    return ([p for p in buckets['differs'] if area(p) == 'site code']
-            + [p for p in buckets['only on live'] if area(p) != 'content'])
+    """Live site code that differs from main or that git neither tracks nor ignores."""
+    return [p for p in buckets['differs'] + buckets['only on live'] if area(p) == 'site code']
 
 
 def save_live_copies(live, out):
@@ -223,18 +225,18 @@ def report(commit, ref, username, listing, main, buckets, laptop, saved):
             'server, or published them from the laptop before (or without) merging. The next option 14 or 15 '
             'that touches one of them will replace the live text. Diffs are below; the live copies are in the '
             'live/ folder next to this report.', code(buckets['differs'], True), diffs=True)
-    section('Needs a decision: files only on live that git does not ignore',
+    section('Needs a decision: site code only on live that git does not ignore',
             'These exist on the server but not in main, and .gitignore does not say they are data. '
             'Either they belong in git, or they are leftovers that can be deleted from the server.',
-            [p for p in buckets['only on live'] if area(p) != 'content'])
+            code(buckets['only on live'], True))
     section('Content files that differ or are only on live',
             'Files the site or a helper option writes as data (photos, travel places, gallery count). '
             'A difference here usually means a publish that has not been committed to git yet, not a code problem.',
             [p for p in buckets['differs'] + buckets['only on live'] if area(p) == 'content'], show_area=False)
-    section('Other files that differ',
-            'Docs, tests and laptop scripts copied to the server at the first deployment. The site never '
-            'uses them, so these differences are harmless.', [p for p in buckets['differs'] if area(p) == 'other'],
-            show_area=False)
+    section('Other files that differ or are only on live',
+            'Docs, tests, migrations and laptop scripts copied to the server at the first deployment. The site '
+            'never uses them, so these differences are harmless.',
+            [p for p in buckets['differs'] + buckets['only on live'] if area(p) == 'other'], show_area=False)
     section('Same apart from line endings',
             'Only Windows (CRLF) versus Unix (LF) line endings differ. Python, browsers and the site treat '
             'both the same way, so these are harmless.', buckets['line endings'])
