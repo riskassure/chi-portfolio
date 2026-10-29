@@ -83,8 +83,8 @@ preview: the helper explicitly selects a working copy.
 | New local photo | **11** |
 | Existing photo title, location or coordinates | **12** |
 | Remove photo from gallery | **13**; image file remains accessible at its direct URL |
-| Frontend HTML, CSS or JavaScript | **14**; paths relative to `frontend` |
-| Backend Python plus matching frontend files | **15**; repository-relative paths |
+| Frontend HTML, CSS or JavaScript | **14**; paths relative to `frontend`; only from a clean, pulled `main` ([deploy guard](administration/deployment/DEPLOY_GUARD.md)) |
+| Backend Python plus matching frontend files | **15**; repository-relative paths; only from a clean, pulled `main` |
 | Saved gallery display count | **18** |
 | Music details (genre, composer, performer, ...) | None: edit them on the live music page, then **8** brings them home |
 
@@ -411,6 +411,7 @@ Further references:
 - [Automatic tests on GitHub (CI)](administration/CI_TESTS.md): every PR and push to `main` runs `pytest backend/tests`; merge only on green checks
 - [Maintenance assessment plan](maintenance/MAINTENANCE_PLAN.md)
 - [Math synchronization](administration/deployment/CONTENT_SYNC.md)
+- [Deploy guard](administration/deployment/DEPLOY_GUARD.md): options 14 and 15 publish code only from a clean `main` that matches GitHub (`git switch main`, `git pull` first); option 5 checks again
 - [Live files vs main](administration/deployment/LIVE_DRIFT_CHECK.md): `python backend\check_live_drift.py` lists live files that differ from `main` (Files-tab edits, publishes from a branch, merges never published); read-only
 - [Broader deployment and recovery details](administration/deployment/MANUAL_UPDATES.md) (older manual package workflow)
 - [First hosting installation](administration/deployment/PYTHONANYWHERE.md) (not a routine update procedure)

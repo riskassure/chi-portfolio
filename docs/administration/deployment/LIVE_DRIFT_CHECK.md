@@ -17,9 +17,11 @@ Files reach that folder in three ways:
 
 1. The first deployment unpacked a ZIP of the laptop folder (October 2026).
 2. Helper options **14**, **15** and **18** replace individual files with **the
-   laptop folder's copy**, whatever branch or uncommitted edit it has. They check
-   that the live file has not changed since you reviewed it, but never that the
-   laptop's copy matches `main`.
+   laptop folder's copy**. Since the [deploy guard](DEPLOY_GUARD.md) (October
+   2026), options 14 and 15 refuse code files unless the folder is a clean `main`
+   that matches GitHub; before that they published whatever branch or uncommitted
+   edit the folder had. Content files (saved map places, gallery settings and
+   images) are still published before they are committed.
 3. Anyone editing in PythonAnywhere's **Files** tab changes the live file directly.
    That edit never comes home, and the next option 14 or 15 for that file shows it
    as a difference and then overwrites it.

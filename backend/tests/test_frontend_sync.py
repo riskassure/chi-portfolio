@@ -143,7 +143,8 @@ class FrontendSyncTests(unittest.TestCase):
         baseline = self.root/'base.db'
         baseline.write_bytes(b'unchanged baseline')
         state = dict(base=str(baseline), base_sha256=hashlib.sha256(baseline.read_bytes()).hexdigest(), username='cwoo')
-        with patch.object(helper, 'ROOT', self.root), patch.object(helper, 'save'), patch.object(files, 'capture_live', return_value={'page.html': 'older'}):
+        with patch.object(helper, 'ROOT', self.root), patch.object(helper, 'save'), patch.object(files, 'capture_live', return_value={'page.html': 'older'}), \
+             patch.object(helper.deploy_guard, 'check', return_value='0'*40):
             helper.prepare_frontend(state, ['page.html'])
             self.assertEqual(helper.current_job(state)['kind'], 'frontend-files')
             (self.front/'page.html').write_text('another local edit', encoding='utf-8')

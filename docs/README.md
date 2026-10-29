@@ -14,6 +14,7 @@ Committing code does not publish it to the website.
 | [Logins and API keys](administration/API_AUTHENTICATION.md) | Admin login, PythonAnywhere token and SSH, Spotify and Google OAuth, Esri key: how each works, renews and fails |
 | [Automatic tests on GitHub (CI)](administration/CI_TESTS.md) | What runs on every PR, reading the green tick or red cross, fixing a failure |
 | [Content synchronization](administration/deployment/CONTENT_SYNC.md) | Detailed helper preparation, checks and publication |
+| [Deploy guard](administration/deployment/DEPLOY_GUARD.md) | Why options 14 and 15 refuse unless the laptop is on a clean `main` that matches GitHub, and the fix for each refusal |
 | [Live files vs main](administration/deployment/LIVE_DRIFT_CHECK.md) | Read-only check of which files on the live site differ from `main`, and what to do about each |
 | [Travel map](features/travel/TRAVEL_MAP.md) | Map editing, reference data, photo bindings and gallery settings |
 | [Spotify](features/music/SPOTIFY.md) | Current top-track workflow; older export workflow is labeled separately |

@@ -184,7 +184,9 @@ version. A code change goes: branch, commit, pull request (PR), merge, pull, pub
 6. On the laptop: `git checkout main`, `git pull`.
 7. Publish: option **14** (frontend files only, paths relative to `frontend`) or
    **15** (Python plus matching frontend files, paths relative to the repository),
-   then 3/4/5. Check the changed page with Ctrl+F5 or a private window.
+   then 3/4/5. Check the changed page with Ctrl+F5 or a private window. Both refuse
+   unless step 6 left a clean `main` that matches GitHub
+   ([Deploy guard](deployment/DEPLOY_GUARD.md)).
 8. Changes to the helper itself (`backend/*.py`, not `backend/src`) are not
    published: exit and restart the helper after `git pull`.
 

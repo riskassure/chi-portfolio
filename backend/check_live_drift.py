@@ -20,6 +20,8 @@ import shlex
 import subprocess
 import sys
 
+from deploy_guard import CONTENT_FILES
+
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = 'LIVE_DRIFT='
 
@@ -30,8 +32,6 @@ SITE_CODE = re.compile(r'(?:backend/src/|frontend/).+|backend/(?:pythonanywhere_
 # Inside those folders, scripts run by hand on the laptop (math migrations and
 # diagnostics, old utilities) and notes the site never reads.
 NOT_SITE_CODE = re.compile(r'backend/src/(?:database/math/(?:migrations|diagnostics)|utils/old)/.+|.+\.(?:md|sql)')
-# Files the live site, or a helper option, rewrites as content rather than code.
-CONTENT_FILES = re.compile(r'frontend/(?:images/photography/.+|geography/places-data\.js|photography/gallery-settings\.js)')
 TEXT_SUFFIXES = ('.py', '.html', '.css', '.js', '.txt', '.md', '.ps1', '.cfg', '.ini', '.toml')
 
 # Runs on the server with python3.13 -I -B. Reads only; prints one JSON line.
