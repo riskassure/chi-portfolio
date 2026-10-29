@@ -330,6 +330,7 @@ Esri-only. See [Spotify implementation and setup](features/music/SPOTIFY.md).
 Record locations, never credential values, in documentation or Git. What each
 credential is, how it was obtained, how it renews and what to check when access
 fails: [How the site's logins and API keys work](administration/API_AUTHENTICATION.md).
+How to replace (rotate) each one: [Changing the site's secrets](administration/ROTATING_SECRETS.md).
 
 | Credential | Location |
 | --- | --- |

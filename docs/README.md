@@ -12,6 +12,7 @@ Committing code does not publish it to the website.
 | [Making a change](administration/CHANGE_STEPS.md) | On the road vs at home, the order of steps for each kind of change, and where each self-service checklist is |
 | [How the website works](administration/HOW_THE_SITE_WORKS.md) | Browser vs server, reloads, caching, logins, developer tools and where errors appear |
 | [Logins and API keys](administration/API_AUTHENTICATION.md) | Admin login, PythonAnywhere token and SSH, Spotify and Google OAuth, Esri key: how each works, renews and fails |
+| [Changing the site's secrets](administration/ROTATING_SECRETS.md) | When and how to rotate the admin password, session secret, PythonAnywhere token, SSH key, Spotify, Google and Esri credentials |
 | [Automatic tests on GitHub (CI)](administration/CI_TESTS.md) | What runs on every PR, reading the green tick or red cross, fixing a failure |
 | [Content synchronization](administration/deployment/CONTENT_SYNC.md) | Detailed helper preparation, checks and publication |
 | [Deploy guard](administration/deployment/DEPLOY_GUARD.md) | Why options 14 and 15 refuse unless the laptop is on a clean `main` that matches GitHub, and the fix for each refusal |
@@ -61,7 +62,7 @@ further changes. File size alone is not a reason to refactor it again.
 
 ## Folder organization
 
-- `administration/`: [Making a change](administration/CHANGE_STEPS.md), [How the website works](administration/HOW_THE_SITE_WORKS.md) and [Logins and API keys](administration/API_AUTHENTICATION.md).
+- `administration/`: [Making a change](administration/CHANGE_STEPS.md), [How the website works](administration/HOW_THE_SITE_WORKS.md), [Logins and API keys](administration/API_AUTHENTICATION.md) and [Changing the site's secrets](administration/ROTATING_SECRETS.md).
 - `administration/deployment/`: publishing, synchronization and hosting references.
 - `administration/backups/`: backup inventories and recovery results.
 - `features/`: math, music, photography and travel guides.

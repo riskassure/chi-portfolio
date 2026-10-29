@@ -53,6 +53,31 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(self.post('/api/login',headers={'Origin':'https://portfolio.example'},
             json={'password':'incorrect'}).status_code,429)
 
+    def failed_login(self, remote_addr, real_ip=None):
+        headers = {'Origin':'https://portfolio.example'}
+        if real_ip: headers['X-Real-IP'] = real_ip
+        return self.post('/api/login', headers=headers, json={'password':'incorrect'},
+                         environ_base={'REMOTE_ADDR':remote_addr}).status_code
+
+    def test_login_limit_is_per_visitor_behind_the_proxy(self):
+        # PythonAnywhere's balancer connects from a private address and names the visitor.
+        # (Real public addresses: Python counts the documentation example ranges as private.)
+        for _ in range(5): self.assertEqual(self.failed_login('10.0.0.7', '81.2.69.160'), 401)
+        self.assertEqual(self.failed_login('10.0.0.7', '81.2.69.160'), 429)
+        self.assertEqual(self.failed_login('10.0.0.7', '8.8.4.4'), 401)
+
+    def test_visitor_cannot_choose_their_address_directly(self):
+        # A public connection's own X-Real-IP is ignored, so changing it doesn't reset the limit.
+        for n in range(5): self.assertEqual(self.failed_login('81.2.69.160', f'1.1.1.{n}'), 401)
+        self.assertEqual(self.failed_login('81.2.69.160', '1.1.1.99'), 429)
+
+    def test_malformed_proxy_header_falls_back_to_connection(self):
+        with gateway.app.test_request_context(headers={'X-Real-IP':'not-an-ip'},
+                                              environ_base={'REMOTE_ADDR':'10.0.0.7'}):
+            self.assertEqual(gateway.client_address(), '10.0.0.7')
+        with gateway.app.test_request_context(environ_base={'REMOTE_ADDR':'10.0.0.7'}):
+            self.assertEqual(gateway.client_address(), '10.0.0.7')
+
     def test_public_static_and_private_paths(self):
         for path in ['/', '/bio.html','/resume.html','/math/','/runtime-config.js']:
             response=self.client.get(path)
