@@ -1,4 +1,4 @@
-"""Apply one reviewed, text-only math patch. Run on the host from a private folder."""
+"""Apply one reviewed change to an existing math entry (content and details). Run on the host from a private folder."""
 import argparse
 from contextlib import closing
 from datetime import datetime, timezone
@@ -7,7 +7,7 @@ from pathlib import Path
 import sqlite3
 import sys
 import uuid
-from preview_math_sync import read_snapshot, read_status
+from preview_math_sync import active_sql, read_snapshot, read_status
 from publish_math_entry import media_fragments
 
 LIST_FIELDS = ('classifications', 'types', 'synonyms', 'definitions', 'link_exclusions', 'related_concepts')
@@ -26,15 +26,56 @@ def check_stored_entry(expected):
             raise ValueError('Invalid expected entry.')
 
 
+# What an existing-entry patch may replace besides the content (replacement_tex),
+# each as replacement_<field>. The slug is left out: it is the page's address,
+# which other pages, search results and bookmarks use.
+METADATA_FIELDS = ('title', 'owner', 'is_cleaned', *LIST_FIELDS)
+REPLACEMENT_KEYS = {'replacement_' + key for key in METADATA_FIELDS}
+# Every snapshot field an existing-entry patch can change.
+PATCH_FIELDS = {'cleaned_tex', *METADATA_FIELDS}
+
+
+def patch_payload(canonical, expected, proposed):
+    """Return the patch that turns expected into proposed (both as read_snapshot gives them).
+
+    Only metadata that differs is included, so the patch leaves the rest as stored.
+    """
+    payload = dict(canonical_name=canonical, expected=expected, replacement_tex=proposed['cleaned_tex'])
+    payload.update({'replacement_' + key: proposed[key] for key in METADATA_FIELDS if proposed[key] != expected[key]})
+    return payload
+
+
+def _replacement(key, value):
+    """Return a checked replacement value for one metadata field, or raise ValueError."""
+    if key in ('title', 'owner'):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError('Missing text field: ' + key)
+        if value != value.strip():
+            raise ValueError(key.capitalize() + ' has leading or trailing spaces.')
+        return value
+    if key == 'is_cleaned':
+        if type(value) is not int or value not in (0, 1):
+            raise ValueError('Invalid cleaned flag.')
+        return value
+    if not isinstance(value, list) or any(not isinstance(v, str) or not v.strip() or v != v.strip()
+                                          for v in value) or len(set(value)) != len(value):
+        raise ValueError('Invalid metadata: ' + key)
+    if key == 'synonyms' and len({s.casefold() for s in value}) != len(value):
+        raise ValueError('Duplicate synonyms ignoring case.')
+    if key in ('classifications', 'types') and not value:
+        raise ValueError('Include classification and document type.')
+    return sorted(value)
+
+
 def patch_intended(payload):
-    """Return the entry a content/synonym patch produces, or raise ValueError if it is unsafe.
+    """Return the entry an existing-entry patch produces, or raise ValueError if it is unsafe.
 
     Only what the patch changes is validated, so an existing entry with missing
     classifications or duplicate unchanged metadata can still take a text fix.
     Diagrams and images must stay byte-identical (see media_fragments).
     """
     required = {'canonical_name', 'expected', 'replacement_tex'}
-    if not isinstance(payload, dict) or not required <= payload.keys() or set(payload) - required - {'replacement_synonyms'}:
+    if not isinstance(payload, dict) or not required <= payload.keys() or set(payload) - required - REPLACEMENT_KEYS:
         raise ValueError('Invalid existing-entry patch fields.')
     expected = payload['expected']
     check_stored_entry(expected)
@@ -47,15 +88,97 @@ def patch_intended(payload):
         raise ValueError('Diagram or image changed: existing-entry patches must leave every diagram, '
                          'image and embed exactly as it is.')
     intended = dict(expected, cleaned_tex=replacement)
-    if 'replacement_synonyms' in payload:
-        aliases = payload['replacement_synonyms']
-        if not isinstance(aliases, list) or any(not isinstance(v, str) or not v.strip() or v != v.strip()
-                                                 for v in aliases) or len(set(aliases)) != len(aliases):
-            raise ValueError('Invalid metadata: synonyms')
-        if len({s.casefold() for s in aliases}) != len(aliases):
-            raise ValueError('Duplicate synonyms ignoring case.')
-        intended['synonyms'] = sorted(aliases)
+    for key in METADATA_FIELDS:
+        if 'replacement_' + key in payload:
+            intended[key] = _replacement(key, payload['replacement_' + key])
+    if canonical in intended['related_concepts'] and intended['related_concepts'] != expected['related_concepts']:
+        raise ValueError('An entry cannot be related to itself.')
     return intended
+
+
+def detail_changes(expected, intended):
+    """Return review lines for each metadata field that intended changes from expected."""
+    lines = []
+    for key in METADATA_FIELDS:
+        before, after = expected[key], intended[key]
+        if before == after:
+            continue
+        label = key.replace('_', ' ').capitalize()
+        if key in LIST_FIELDS:
+            lines += [label + ' added: ' + json.dumps(sorted(set(after) - set(before)), ensure_ascii=False),
+                      label + ' removed: ' + json.dumps(sorted(set(before) - set(after)), ensure_ascii=False)]
+        else:
+            lines.append(label + ': ' + json.dumps(before, ensure_ascii=False) + ' -> ' + json.dumps(after, ensure_ascii=False))
+    return lines
+
+
+def metadata_conflict(db, canonical, expected, intended):
+    """Return why the open database db cannot take intended's changed metadata, or None.
+
+    The same rules as for a new entry, applied only to what changed: a new title
+    must not be another active entry's title, synonym or defined term, and every
+    added classification, type and related concept must exist (related ones active).
+    """
+    if intended['title'] != expected['title']:
+        active = active_sql(db)
+        if db.execute(f'SELECT 1 FROM math_concepts mc WHERE lower(trim(mc.title))=lower(trim(?)) '
+                      f'AND mc.canonical_name<>? AND {active}', (intended['title'], canonical)).fetchone():
+            return 'another entry already has the title ' + repr(intended['title'])
+        for table, column in (('math_synonyms', 'synonym_text'), ('math_definitions', 'defined_term')):
+            if db.execute(f'SELECT 1 FROM {table} a JOIN math_concepts mc ON mc.id=a.concept_id '
+                          f'WHERE lower(trim(a.{column}))=lower(trim(?)) AND mc.canonical_name<>? AND {active}',
+                          (intended['title'], canonical)).fetchone():
+                return 'the new title ' + repr(intended['title']) + ' is a synonym or defined term of another entry'
+    for key, table, column in (('classifications', 'math_classifications', 'code'),
+                               ('types', 'math_types', 'type_name'),
+                               ('related_concepts', 'math_concepts', 'canonical_name')):
+        for value in sorted(set(intended[key]) - set(expected[key])):
+            if not db.execute(f'SELECT 1 FROM {table} WHERE {column}=?', (value,)).fetchone():
+                return 'no ' + key.replace('_', ' ').rstrip('s') + ' ' + repr(value) + ' exists on this database'
+    added = sorted(set(intended['related_concepts']) - set(expected['related_concepts']))
+    status = read_status(None, connection=db) if added else {}
+    for value in added:
+        if status[value]['retired']:
+            survivor = status[value]['retired_into']
+            return 'related concept ' + repr(value) + ' is retired' + (f'; relate to {survivor!r} instead' if survivor else '')
+    return None
+
+
+def metadata_conflict_in(database, canonical, expected, intended):
+    """metadata_conflict against the database file at database, opened only when a checked field changed."""
+    if all(intended[key] == expected[key] for key in ('title', 'classifications', 'types', 'related_concepts')):
+        return None
+    with closing(sqlite3.connect(Path(database).resolve().as_uri() + '?mode=ro', uri=True)) as db:
+        return metadata_conflict(db, canonical, expected, intended)
+
+
+def write_metadata(db, ident, expected, intended):
+    """Store every metadata field where intended differs from expected, in the caller's transaction."""
+    changed = [key for key in METADATA_FIELDS if intended[key] != expected[key]]
+    for key in ('title', 'owner', 'is_cleaned'):
+        if key in changed:
+            db.execute(f'UPDATE math_concepts SET {key}=? WHERE id=?', (intended[key], ident))
+    for key, table, fk, lookup, column in (('classifications', 'math_concept_classifications', 'classification_id',
+                                            'math_classifications', 'code'),
+                                           ('types', 'math_concept_types', 'type_id', 'math_types', 'type_name')):
+        if key in changed:
+            db.execute(f'DELETE FROM {table} WHERE concept_id=?', (ident,))
+            for value in intended[key]:
+                target = db.execute(f'SELECT id FROM {lookup} WHERE {column}=?', (value,)).fetchone()[0]
+                db.execute(f'INSERT INTO {table}(concept_id,{fk}) VALUES(?,?)', (ident, target))
+    for key, table, column in (('synonyms', 'math_synonyms', 'synonym_text'),
+                               ('definitions', 'math_definitions', 'defined_term'),
+                               ('link_exclusions', 'math_link_exclusions', 'word')):
+        if key in changed:
+            db.execute(f'DELETE FROM {table} WHERE concept_id=?', (ident,))
+            db.executemany(f'INSERT INTO {table}(concept_id,{column}) VALUES(?,?)',
+                           [(ident, value) for value in intended[key]])
+    if 'related_concepts' in changed:
+        db.execute('DELETE FROM math_related_concepts WHERE concept_id=?', (ident,))
+        for value in intended['related_concepts']:
+            target = db.execute('SELECT id FROM math_concepts WHERE canonical_name=?', (value,)).fetchone()[0]
+            db.execute('INSERT INTO math_related_concepts(concept_id,related_canonical_name,related_concept_id) '
+                       'VALUES(?,?,?)', (ident, value, target))
 
 
 def missing_diagram_svgs(db, canonical, tex, extract_blocks):
@@ -100,6 +223,9 @@ def apply_patch(database, payload, backup_dir, source_dir):
             raise ValueError('Conflict: live entry no longer matches the reviewed snapshot. Nothing changed.')
         if read_status(database, connection=db)[canonical]['retired']:
             raise ValueError('This entry is retired; undo the retirement before changing it. Nothing changed.')
+        conflict=metadata_conflict(db,canonical,expected,intended)
+        if conflict:
+            raise ValueError('Conflict: '+conflict+'. Nothing changed.')
         missing=missing_diagram_svgs(db,canonical,replacement,extract_all_pstricks_diagram_blocks)
         if missing:
             raise ValueError(f'{missing} diagram(s) have no stored SVG and would show "[Diagram unavailable]". Nothing changed.')
@@ -114,15 +240,12 @@ def apply_patch(database, payload, backup_dir, source_dir):
         rendered=render_tex_reusing_existing_diagrams(ident,replacement,db.cursor())
         db.execute('UPDATE math_concepts SET cleaned_tex=?, rendered_tex=?, updated_at=? WHERE id=?',
                    (replacement,rendered,datetime.now(timezone.utc).isoformat(),ident))
-        if 'replacement_synonyms' in payload:
-            db.execute('DELETE FROM math_synonyms WHERE concept_id=?', (ident,))
-            db.executemany('INSERT INTO math_synonyms(concept_id,synonym_text) VALUES(?,?)',
-                           [(ident, synonym) for synonym in intended['synonyms']])
+        write_metadata(db,ident,expected,intended)
         after=read_snapshot(database,connection=db)[canonical]
         if after != intended:
             raise ValueError('Verification failed. Update rolled back.')
         db.commit()
-    print('Applied one content/synonym update:',canonical)
+    print('Applied one existing-entry update:',canonical)
     print('Verified backup:',backup)
     return backup
 

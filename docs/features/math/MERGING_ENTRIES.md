@@ -69,9 +69,9 @@ one has been brought home with option 8.
    the same versions. It then freezes both in `dist/merge-sessions/<id>/session.json`.
 2. **Edit S** in your working copy: start option **6**, sign in, open
    `http://127.0.0.1:5001/math/edit.html?id=<S's id>`, fold in A's content and save.
-   Change only the **body** and, if needed, the **synonyms**: those are the only
-   fields options 2 to 5 can publish for an existing entry (option 1 marks anything
-   else `[unsupported]`). Render any changed diagrams with option **19**. Leave A as
+   Change the **body** and, if needed, other details such as synonyms or the
+   title. Options 2 to 5 publish every field except the slug (option 1 marks a
+   slug change `[unsupported]`). Render any changed diagrams with option **19**. Leave A as
    it is. Check S's local page.
 3. **Publish S's text:** option **1** lists S; **2** prepares it (pick its number);
    then **3**, **4**, **5** and `PUBLISH`. Check S's live page. Stopping here is

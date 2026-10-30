@@ -238,7 +238,7 @@ one is brought home with **8** before the next. Full procedure, checks and undo:
 2. **Freeze:** **21 → 2**, `merge`, A's canonical name, S's canonical name, a reason
    (it is shown on A's old page). Do this before editing either entry.
 3. **Edit S's text** in the local editor (**6**, `math/edit.html?id=<S's id>`): fold
-   in A's content. Change only the body and synonyms; leave A untouched. Check S's
+   in A's content. Change the body and any details S needs (not the slug); leave A untouched. Check S's
    local page.
 4. **Publish S:** **1** shows S; **2** prepares it; then 3, 4, 5. Check S's live page.
    No option 8 is needed yet.

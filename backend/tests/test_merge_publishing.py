@@ -69,11 +69,15 @@ class MergeTrio(unittest.TestCase):
         return merge_workflow.start_session(self.state, action, absorbed, survivor, reason, view=self.view,
                                             sessions=self.root / 'sessions')
 
-    def publish_survivor_text(self, text=NEW_TEXT):
-        """Edit S in the working copy and publish it with the options 2-5 text patch."""
+    def publish_survivor_text(self, text=NEW_TEXT, title=None):
+        """Edit S in the working copy and publish it with the options 2-5 patch (with a new title, when given)."""
         expected = read_snapshot(self.live)[S]
         edit(self.local, 'UPDATE math_concepts SET cleaned_tex = ? WHERE canonical_name = ?', text, S)
-        data = zipped('patch.json', dict(canonical_name=S, expected=expected, replacement_tex=text))
+        details = {}
+        if title:
+            edit(self.local, 'UPDATE math_concepts SET title = ? WHERE canonical_name = ?', title, S)
+            details = dict(replacement_title=title)
+        data = zipped('patch.json', dict(canonical_name=S, expected=expected, replacement_tex=text, **details))
         self.assertEqual(publish(data, self.live, self.root / 'backups', SOURCE)['status'], 'APPLIED')
 
     def live_check(self):
@@ -96,9 +100,9 @@ class MergeTrio(unittest.TestCase):
                 patch('bring_changes_home.diagram_home.install_media'):
             return refresh(self.state, self.live, self.root / 'copies', Mock(), diagrams=self.root / 'diagrams')
 
-    def merge(self):
+    def merge(self, title=None):
         folder = self.start()
-        self.publish_survivor_text()
+        self.publish_survivor_text(title=title)
         merge_workflow.prepare(self.state, self.save, folder)
         self.assertTrue(self.live_check().startswith('ELIGIBLE'), self.live_check())
         return folder, self.publish_job()
@@ -390,6 +394,23 @@ class MigrationTests(MergeTrio):
         shutil.copyfile(self.base, rebuilt)  # The catalog before the survivor's text edit and the merge.
         for _ in range(2):  # Running it again changes nothing.
             math_entry_merge.replay(rebuilt, namespace['CHANGE_SETS'])
+        with closing(sqlite3.connect(rebuilt)) as mine, closing(sqlite3.connect(self.live)) as theirs:
+            self.assertEqual(inventory(mine, MATH_TABLES)[1], inventory(theirs, MATH_TABLES)[1])
+
+    def test_migration_replays_a_survivor_title_change(self):
+        sys.path.insert(0, str(SOURCE / 'database' / 'math' / 'migrations'))
+        import math_entry_merge
+        from bring_changes_home import MATH_TABLES, inventory
+        folder, _ = self.merge(title='group (algebra)')
+        self.synced()
+        script = self.root / 'merge_entries_title.py'
+        math_entry_merge.write_migration(script, [folder / 'receipt.json'])
+        namespace = {}
+        exec(compile(script.read_text(encoding='utf-8'), str(script), 'exec'), namespace)
+        rebuilt = self.root / 'rebuilt.db'
+        shutil.copyfile(self.base, rebuilt)
+        math_entry_merge.replay(rebuilt, namespace['CHANGE_SETS'])
+        self.assertEqual(read_snapshot(rebuilt)[S]['title'], 'group (algebra)')
         with closing(sqlite3.connect(rebuilt)) as mine, closing(sqlite3.connect(self.live)) as theirs:
             self.assertEqual(inventory(mine, MATH_TABLES)[1], inventory(theirs, MATH_TABLES)[1])
 

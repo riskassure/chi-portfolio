@@ -26,7 +26,8 @@ import uuid
 import zipfile
 from xml.etree import ElementTree
 
-from apply_math_text_patch import patch_intended
+from apply_math_text_patch import (PATCH_FIELDS, REPLACEMENT_KEYS, detail_changes, metadata_conflict,
+                                  patch_intended, patch_payload, write_metadata)
 from preview_math_sync import read_snapshot, read_status
 from publish_math_entry import check_target, insert_entry, validate as validate_entry
 
@@ -140,7 +141,7 @@ def _check_records(records, keys):
 def diagram_intended(payload, source_dir=None):
     """Return (entry, diagram rows) a diagram package produces, or raise ValueError if it is unsafe.
 
-    Existing entries keep the content/synonym rules of a text patch, and new
+    Existing entries keep the content and detail rules of a text patch, and new
     entries the full new-entry rules, with every PSTricks block masked out.
     The package's diagrams must be exactly the distinct PSTricks blocks of
     the resulting text, and must differ from the rows it was prepared against.
@@ -150,9 +151,8 @@ def diagram_intended(payload, source_dir=None):
         raise ValueError('Invalid diagram package.')
     common = {'kind', 'canonical_name', 'expected_diagrams', 'diagrams'}
     existing = common | {'expected', 'replacement_tex'}
-    if set(payload) - {'replacement_synonyms'} == existing:
-        patch = {k: payload[k] for k in ('canonical_name', 'expected', 'replacement_tex', 'replacement_synonyms')
-                 if k in payload}
+    if set(payload) - REPLACEMENT_KEYS == existing:
+        patch = {k: v for k, v in payload.items() if k in {'canonical_name', 'expected', 'replacement_tex'} | REPLACEMENT_KEYS}
         if not isinstance(payload['expected'], dict) or not isinstance(payload['replacement_tex'], str) \
                 or not isinstance(payload['expected'].get('cleaned_tex'), str):
             raise ValueError('Invalid existing-entry fields.')
@@ -338,14 +338,12 @@ def build_payload(base, local, canonical, diagram_dir, source_dir=None, snapshot
     if canonical in baseline:
         expected = baseline[canonical]
         changed = {key for key in expected if expected[key] != proposed[key]}
-        if changed - {'cleaned_tex', 'synonyms'}:
-            raise ValueError('Only content, synonym and diagram changes can be published for an existing entry.')
+        if changed - PATCH_FIELDS:
+            raise ValueError('An existing entry\'s slug cannot be changed with the helper.')
         with closing(sqlite3.connect(Path(base).resolve().as_uri() + '?mode=ro', uri=True)) as db:
             before = stored_diagrams(db, canonical)
-        payload = dict(kind=KIND, canonical_name=canonical, expected=expected,
-                       replacement_tex=proposed['cleaned_tex'], expected_diagrams=before, diagrams=records)
-        if 'synonyms' in changed:
-            payload['replacement_synonyms'] = proposed['synonyms']
+        payload = dict(patch_payload(canonical, expected, proposed), kind=KIND, expected_diagrams=before,
+                       diagrams=records)
     else:
         payload = dict(kind=KIND, canonical_name=canonical, entry=dict(proposed, canonical_name=canonical),
                        expected_diagrams=[], diagrams=records)
@@ -401,8 +399,7 @@ def review(payload, source_dir=None):
         report += list(difflib.unified_diff(payload['expected']['cleaned_tex'].splitlines(),
                                             payload['replacement_tex'].splitlines(), fromfile='expected text',
                                             tofile='proposed text', lineterm=''))
-        if 'replacement_synonyms' in payload:
-            report += ['Synonyms: ' + json.dumps(entry['synonyms'], ensure_ascii=False)]
+        report += detail_changes(payload['expected'], entry)
     sizes = {r['source_hash']: r['bytes'] for r in payload['diagrams']}
     report += [f'Diagram added: {svg_name(h)} ({sizes[h]} bytes)' for h in sorted(after - before)]
     report += [f'Diagram kept: {svg_name(h)}' for h in sorted(after & before)]
@@ -535,6 +532,9 @@ def status(database, diagram_dir, payload, files, source_dir=None, connection=No
                 return 'CONFLICT — this entry is retired; undo the retirement before changing it'
             if _row_set(stored) != _row_set(payload['expected_diagrams']):
                 return 'CONFLICT — stored diagram rows differ from the reviewed ones'
+            conflict = metadata_conflict(db, canonical, payload['expected'], entry)
+            if conflict:
+                return 'BLOCKED — ' + conflict
             verdict = 'EXPECTED TEXT MATCHES — eligible for further review'
     kept = sorted(svg_name(h) for h, state in states.items() if state == 'kept')
     if kept:
@@ -664,10 +664,7 @@ def _apply(database, payload, files, backup_dir, source_dir, diagram_dir, packag
             ident = db.execute('SELECT id FROM math_concepts WHERE canonical_name=?', (canonical,)).fetchone()[0]
             db.execute('UPDATE math_concepts SET cleaned_tex=?, updated_at=? WHERE id=?',
                        (entry['cleaned_tex'], now, ident))
-            if 'replacement_synonyms' in payload:
-                db.execute('DELETE FROM math_synonyms WHERE concept_id=?', (ident,))
-                db.executemany('INSERT INTO math_synonyms(concept_id,synonym_text) VALUES(?,?)',
-                               [(ident, synonym) for synonym in entry['synonyms']])
+            write_metadata(db, ident, payload['expected'], entry)
         stale = {r['source_hash'] for r in stored_diagrams(db, canonical)} - {r['source_hash'] for r in rows}
         db.executemany('DELETE FROM math_concept_diagrams WHERE concept_id=? AND source_hash=?',
                        [(ident, source_hash) for source_hash in stale])

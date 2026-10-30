@@ -16,7 +16,7 @@ from pythonanywhere_api import HOST, SETTINGS, NoRedirects, validate
 from stage_pythonanywhere_package import MAX_BYTES, read_package, validate_package
 from publish_math_entry import validate as validate_entry, check_target
 from preview_math_sync import read_snapshot, read_status
-from apply_math_text_patch import patch_intended
+from apply_math_text_patch import detail_changes, metadata_conflict_in, patch_intended
 import profile_sync
 import photo_sync
 import photo_metadata_sync
@@ -140,13 +140,11 @@ def preview(data, snapshot=None, *, live=False):
         intended = patch_intended(payload)
         canonical = payload['canonical_name']
         expected = payload['expected']
-        report += ['Proposed operation: change existing entry text and/or synonyms', 'Entry: ' + canonical]
+        report += ['Proposed operation: change an existing entry\'s text and/or details', 'Entry: ' + canonical]
         report += list(difflib.unified_diff(expected['cleaned_tex'].splitlines(),
                       payload['replacement_tex'].splitlines(), fromfile='expected text',
                       tofile='proposed text', lineterm=''))
-        if 'replacement_synonyms' in payload:
-            report += ['Synonyms added: ' + json.dumps(sorted(set(intended['synonyms']) - set(expected['synonyms']))),
-                       'Synonyms removed: ' + json.dumps(sorted(set(expected['synonyms']) - set(intended['synonyms'])))]
+        report += detail_changes(expected, intended)
         if snapshot:
             current = read_snapshot(snapshot).get(canonical)
             status = ('ALREADY PRESENT — no update needed' if current == intended else
@@ -154,6 +152,9 @@ def preview(data, snapshot=None, *, live=False):
                       'CONFLICT — snapshot differs from expected entry')
             if status.startswith('EXPECTED') and read_status(snapshot).get(canonical, {}).get('retired'):
                 status = 'CONFLICT — this entry is retired; undo the retirement before changing it'
+            conflict = status.startswith('EXPECTED') and metadata_conflict_in(snapshot, canonical, expected, intended)
+            if conflict:
+                status = 'BLOCKED — ' + conflict
     else:
         validate_entry(payload)
         report += ['Proposed operation: add one new entry', json.dumps(payload, ensure_ascii=False, indent=2)]

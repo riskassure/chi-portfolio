@@ -35,6 +35,6 @@ class PreparePatchTests(unittest.TestCase):
     def test_unsupported_changes_refused(self):
         entry = fixtures.InspectTests().entry()
         canonical = entry.pop('canonical_name')
-        with patch('prepare_math_patch.read_snapshot', side_effect=[{canonical: entry}, {canonical: dict(entry, title='Other')} ]):
+        with patch('prepare_math_patch.read_snapshot', side_effect=[{canonical: entry}, {canonical: dict(entry, slug='other')} ]):
             with self.assertRaises(ValueError):
                 prepare(Path('base'), Path('local'), canonical, Path('unused.zip'))

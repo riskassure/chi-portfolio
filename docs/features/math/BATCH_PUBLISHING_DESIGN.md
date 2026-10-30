@@ -78,7 +78,7 @@ These come from Chi's revision. Each one holds in every step below.
 | Question | Decision |
 | --- | --- |
 | Batch-aware live check | The check code is sent over SSH as now, with no server deployment. The first check may validate against the planned batch order. Right before each entry publishes, its dependencies must really exist on production, so a failed earlier entry blocks everything that depends on it. |
-| Mutually related entries and loops | Stop, keep both directions, report the exact loop and block approval of the batch. You may remove those entries and their dependants from the selection and regenerate the review. Two passes don't work yet, because adding a relationship to a live entry needs a metadata publisher that doesn't exist. |
+| Mutually related entries and loops | Stop, keep both directions, report the exact loop and block approval of the batch. You may remove those entries and their dependants from the selection and regenerate the review. Two passes work since option 2 publishes related concepts of an existing entry (2026-10-30): publish without one direction, then add it with option 2. |
 | `\PMlinkname` targets | Resolved with the site's actual rules. The review shows each resolved destination, and unresolved or ambiguous targets block. A target must be live, or scheduled earlier in the batch and confirmed live before the referring entry publishes. |
 | Edits to existing entries | Kept separate in the first version. Later, only edits you explicitly select could be added. |
 | Pause between entries | 20 seconds, configurable. Reducing repeated SSH connections is the better speed-up to explore later. |

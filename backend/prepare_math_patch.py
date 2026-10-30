@@ -1,4 +1,4 @@
-"""Package one existing entry's content/synonym changes from a known baseline."""
+"""Package one existing entry's content and detail changes from a known baseline."""
 import argparse
 from contextlib import closing
 import json
@@ -7,7 +7,7 @@ import sqlite3
 import sys
 import zipfile
 
-from apply_math_text_patch import missing_diagram_svgs, patch_intended
+from apply_math_text_patch import PATCH_FIELDS, metadata_conflict_in, missing_diagram_svgs, patch_intended, patch_payload
 from inspect_staged_package import preview
 from preview_math_sync import read_snapshot
 
@@ -29,13 +29,14 @@ def prepare(base, local, canonical, output):
         raise ValueError('Existing entry must appear in both baseline and working database.')
     expected, proposed = baseline[canonical], working[canonical]
     changed = {key for key in expected if expected[key] != proposed[key]}
-    if not changed or changed - {'cleaned_tex', 'synonyms'}:
-        raise ValueError('Select an entry with changes only to content and/or synonyms.')
-    payload = dict(canonical_name=canonical, expected=expected, replacement_tex=proposed['cleaned_tex'])
-    if 'synonyms' in changed:
-        payload['replacement_synonyms'] = proposed['synonyms']
+    if not changed or changed - PATCH_FIELDS:
+        raise ValueError('Select an entry with changes other than its slug.')
+    payload = patch_payload(canonical, expected, proposed)
     if patch_intended(payload) != proposed:
         raise ValueError('Patch does not exactly reproduce the selected local entry.')
+    conflict = metadata_conflict_in(local, canonical, expected, proposed)
+    if conflict:
+        raise ValueError(conflict[0].upper() + conflict[1:] + '.')
     missing = local_missing_svgs(local, canonical, proposed['cleaned_tex'])
     if missing:
         raise ValueError(f'{missing} diagram(s) have no stored SVG; publishing would show "[Diagram unavailable]".')

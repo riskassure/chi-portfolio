@@ -1,6 +1,8 @@
+from contextlib import closing
 import io
 import json
 from pathlib import Path
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -45,6 +47,33 @@ class InspectTests(unittest.TestCase):
             self.assertIn(status, report)
             self.assertIn('-Original definition.', report)
             self.assertIn('+Revised definition.', report)
+
+    def test_detail_patch_lists_changes_and_checks_the_snapshot(self):
+        entry = self.entry()
+        canonical = entry.pop('canonical_name')
+        data = self.package(dict(canonical_name=canonical, expected=entry, replacement_tex=entry['cleaned_tex'],
+                                 replacement_title='Metric spaces', replacement_types=['Theorem']))
+        report = preview(data)
+        self.assertIn('Title: "Test" -> "Metric spaces"', report)
+        self.assertIn('Types added: ["Theorem"]', report)
+        self.assertIn('Types removed: ["Definition"]', report)
+        with tempfile.TemporaryDirectory() as temp:
+            snapshot = Path(temp) / 'snapshot.db'
+            with closing(sqlite3.connect(snapshot)) as db:
+                db.executescript('''
+                    CREATE TABLE math_concepts(id INTEGER PRIMARY KEY, canonical_name TEXT, title TEXT);
+                    CREATE TABLE math_synonyms(concept_id INTEGER, synonym_text TEXT);
+                    CREATE TABLE math_definitions(concept_id INTEGER, defined_term TEXT);
+                    CREATE TABLE math_types(id INTEGER PRIMARY KEY, type_name TEXT);
+                ''')
+            for types, status in [([], "BLOCKED — no type 'Theorem' exists"),
+                                  ([(1, 'Theorem')], 'EXPECTED TEXT MATCHES')]:
+                with closing(sqlite3.connect(snapshot)) as db:
+                    db.executemany('INSERT INTO math_types VALUES(?, ?)', types)
+                    db.commit()
+                with patch('inspect_staged_package.read_snapshot', return_value={canonical: entry}), \
+                        patch('inspect_staged_package.read_status', return_value={}):
+                    self.assertIn(status, preview(data, snapshot))
 
     def test_fetch_only_get_and_mismatch_rejected(self):
         data = self.package(self.entry())

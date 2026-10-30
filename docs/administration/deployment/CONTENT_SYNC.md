@@ -319,8 +319,8 @@ Prepared packages, review reports and receipts are retained under ignored
 `dist/math-workflow/`. Baseline or package changes and edits to the selected local
 entry invalidate the prepared workflow. Conflicts prevent publication. A failed
 publication requires another live check before retrying. The helper supports new
-text-only entries and content/synonym updates to existing entries that pass the
-publisher's checks. Option 1 runs the same checks as option 2 and marks any other
+text-only entries and updates to existing entries (content and every detail except
+the slug) that pass the publisher's checks. Option 1 runs the same checks as option 2 and marks any other
 change `[unsupported]` with a `Why:` line; see
 [Entries the helper cannot publish](#entries-the-helper-cannot-publish). Do not
 run multiple helpers simultaneously.
@@ -343,8 +343,8 @@ Option 1 only reports; it changes nothing. The publication safeguards in options
 | Option 1 reason begins with | Meaning |
 |---|---|
 | `deleted locally` | Deletions are not supported. |
-| `changes <fields>` | Only content (`cleaned_tex`) and synonyms of an existing entry can be published. Title, classification, type, definition, link-exclusion and related-concept changes have no helper route. |
-| `local version ...` | Your edit itself would fail: empty content, a duplicate or untrimmed synonym, or an image or embed that was added, removed or changed. |
+| `changes slug` | An existing entry's slug is its page address, which other pages, search results and bookmarks use, so the helper never changes it. Every other field can be published. |
+| `local version ...` | Your edit itself would fail: empty content or title, a duplicate or untrimmed value, a synonym repeated in different capitals, no classification or type left, a title already used by another entry (as its title, synonym or defined term), a classification, type or related concept that does not exist, or an image or embed that was added, removed or changed. |
 | `has N diagram(s) with no stored SVG` | The entry's PSTricks diagrams have no generated SVG in your working database, so the page would show "[Diagram unavailable]". Choose **19** to render them; option 2 then publishes them with the text (see [Publish a diagram change](#publish-a-diagram-change)). |
 | `has diagrams with no rendered SVG` | A changed or new diagram has no SVG in your working copy yet. Choose **19**, then **1** again. |
 | `new entry ...` | A new entry fails the new-entry checks (slug, classification, type, media). |
@@ -352,8 +352,9 @@ Option 1 only reports; it changes nothing. The publication safeguards in options
 **Existing entries** are checked only on what the edit changes
 (`apply_math_text_patch.patch_intended`, shared by options 1 to 5):
 
-- Only content (`cleaned_tex`) and synonyms may change, and content must not be
-  empty.
+- Content (`cleaned_tex`) and every detail may change except the slug: title,
+  owner, cleaned flag, classifications, document types, synonyms, defined terms,
+  link exclusions and related concepts. Content and title must not be empty.
 - **Every diagram, image and embed must stay byte-identical and in the same
   order.** This covers PSTricks blocks (`pspicture`, `\pstree`, `\psset`),
   `\includegraphics`, `\input`, `\include`, `figure` and `tikzpicture`
@@ -365,8 +366,15 @@ Option 1 only reports; it changes nothing. The publication safeguards in options
 - Each PSTricks diagram must already have a stored SVG. Option 1/2 check the
   working database and the live publisher checks the live database again before
   taking its backup. The text update reuses stored SVGs and never runs LaTeX.
-- **Changed** synonyms must be non-blank, trimmed and unique ignoring
-  capitalization. Unchanged synonyms are left exactly as stored.
+- **Changed** details follow the new-entry rules for that field: values are
+  non-blank, trimmed and unique (synonyms also ignoring capitalization), and a
+  changed classification or type list keeps at least one value.
+- A **changed title** must not be another active entry's title, synonym or
+  defined term. **Added** classifications, types and related concepts must
+  already exist, and a related concept must not be retired. Option 1 checks this
+  against your working copy; option 4 and the publish itself check live.
+- Unchanged details are left exactly as stored. A package from before this
+  change (content and synonyms only) still publishes the same way.
 - Metadata the edit does not touch is not judged: a missing classification or
   type, a duplicate defined term or an older-style slug no longer blocks a text
   fix. Fix those separately (production-first, below) when you want to.
@@ -397,7 +405,8 @@ have edited.
 and then bringing the change home with option 8 is reasonable only for:
 
 - metadata fixes with unchanged text (adding a missing classification or type,
-  removing a duplicate term); the editor re-renders using the stored diagrams;
+  removing a duplicate term) when you are away from the laptop; at home, option 2
+  publishes these after review; the editor re-renders using the stored diagrams;
 - text edits that leave every PSTricks block (`pspicture`, `\pstree`)
   byte-identical; check the live page for "[Diagram unavailable]";
 - text edits near `\includegraphics`/`figure` that leave the image references
@@ -448,8 +457,8 @@ changes through the diagram route below, with SVGs rendered on the laptop.
 PSTricks diagrams (`pspicture`, with any `\psset` just before it, and top-level
 `\pstree`) are rendered **on this computer**, never on the server. Their SVGs
 travel in the package with the entry. This covers:
-- an existing entry whose diagrams changed, with or without content or synonym
-  edits;
+- an existing entry whose diagrams changed, with or without content or detail
+  edits (the same detail rules as above);
 - a new entry with diagrams;
 - an entry whose diagrams have no stored SVG, such as `deduction`,
   `derivations-in-natural-deduction` and `rooted-tree`.
@@ -557,9 +566,10 @@ stay out of a batch; publish existing-entry edits one at a time with option 2.
    - a loop: entries that need each other through related concepts or explicit
      links. Both directions are kept, so no order works and the batch can't be
      approved. The message names the loop and every entry that depends on it;
-     remove those from the selection to go ahead with the rest. Two passes are
-     not a workaround yet, because adding a relationship to a live entry needs a
-     metadata publisher the helper does not have.
+     remove those from the selection to go ahead with the rest. Two passes work:
+     in the working copy, drop one direction of the loop, publish the batch, bring
+     it home with option 8, then add that relationship back and publish it with
+     option 2.
 3. **Freeze and review.** Each entry gets a package (as option 2 builds it)
    under `packages/NN-<slug>/`, in publish order: every entry comes after the
    related concepts and link targets it needs. `review.txt` lists the order,
@@ -750,25 +760,27 @@ reload is performed by this command. Each report requires a new output filename.
 
 ## Publish one new text-only entry
 
-### Prepare an existing entry's content and synonym changes
+### Prepare an existing entry's content and detail changes
 
 ```powershell
 .\.venv313\Scripts\python.exe backend/prepare_math_patch.py --base dist/sync-first-test/base.db --local dist/sync-first-test/working.db --canonical CANONICAL-NAME --output dist/entry-update-review.zip
 ```
 
 Use the actual unchanged baseline from which the working copy was created.
-The reusable preparer requires both copies to contain the entry and rejects
-changes outside content and synonyms. It packages the full expected baseline
-record plus the proposed content and optional replacement synonym list. Review
-the text diff and synonym additions/removals before staging. Existing text-only
-packages remain supported and preserve synonyms.
+The reusable preparer requires both copies to contain the entry and rejects a
+slug change. It packages the full expected baseline record plus the proposed
+content and a `replacement_<field>` value for each detail that changed (for
+example `replacement_title`, `replacement_types`). Review the text diff and the
+detail lines (`Title: "old" -> "new"`, `Types added: [...]`, `Types removed:
+[...]`) before staging. Older content/synonym packages remain supported.
 
-Preflight checks the full expected entry, including its synonyms. Publication
-repeats that check under the write lock, creates a verified backup, then updates
-content and synonyms in the same transaction. A failure rolls back both changes.
-Synonym changes on the live entry cause a conflict, even if its text still
-matches. An already-applied package is skipped only when both content and
-synonyms match. These checks do not establish mathematical correctness or detect
+Preflight checks the full expected entry, including all its details, and that
+the changed details fit live (title not taken, classifications, types and related
+concepts exist). Publication repeats both checks under the write lock, creates a
+verified backup, then updates content and details in the same transaction. A
+failure rolls back every change. A detail changed on the live entry causes a
+conflict, even if its text still matches. An already-applied package is skipped
+only when the whole entry matches. These checks do not establish mathematical correctness or detect
 aliases belonging to other entries; review meaning and cross-entry naming before
 publication.
 

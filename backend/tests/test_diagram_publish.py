@@ -61,8 +61,10 @@ class DiagramPublishTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def package(self, base_tex, working_tex=None, rows=(), live_files=None):
-        """Build a package on the 'laptop' and a matching live database; return its bytes."""
+    def package(self, base_tex, working_tex=None, rows=(), live_files=None, working_sql=''):
+        """Build a package on the 'laptop' and a matching live database; return its bytes.
+
+        working_sql runs on the working copy only, after its text is set."""
         base = self.laptop / 'base.db'
         base.unlink(missing_ok=True)
         create_db(base, base_tex, rows)
@@ -82,6 +84,7 @@ class DiagramPublishTests(unittest.TestCase):
                     db.execute('INSERT INTO math_concept_types VALUES(1,1)')
                 else:
                     db.execute('UPDATE math_concepts SET cleaned_tex=?', (working_tex,))
+                db.executescript(working_sql)
                 db.commit()
         render_missing(working, 'RootedTree', self.laptop_diagrams, svg_for)
         payload, files = build_payload(base, working, 'RootedTree', self.laptop_diagrams)
@@ -144,6 +147,26 @@ class DiagramPublishTests(unittest.TestCase):
         self.assertTrue(snapshot['RootedTree']['cleaned_tex'].startswith('New intro.'))
         self.assertEqual((self.live_diagrams / self.name(PICTURE)).read_bytes(), svg_for(PICTURE))
         self.assert_no_dangling_rows()
+
+    def test_changed_diagram_with_new_details(self):
+        changed = PICTURE.replace('(2,2)\\end', '(1,2)\\end')
+        data = self.package('Intro. ' + PICTURE, 'Intro. ' + changed, rows=[PICTURE], working_sql='''
+            INSERT INTO math_types VALUES(2, 'Theorem');
+            INSERT INTO math_concept_types VALUES(1, 2);
+            UPDATE math_concepts SET title='Rooted tree';
+            INSERT INTO math_definitions VALUES(1, 'root');''')
+        self.assertIn("BLOCKED — no type 'Theorem' exists", preview(data, self.live, live=True))
+        with self.assertRaisesRegex(ValueError, "no type 'Theorem'"):
+            self.run_publish(data)
+        with closing(sqlite3.connect(self.live)) as db:
+            db.execute("INSERT INTO math_types VALUES(2, 'Theorem')")
+            db.commit()
+        self.assertIn('EXPECTED TEXT MATCHES', preview(data, self.live, live=True))
+        self.assertEqual(self.run_publish(data)['status'], 'APPLIED')
+        snapshot, rows, _ = self.live_state()
+        self.assertEqual(snapshot['RootedTree'], read_snapshot(self.working)['RootedTree'])
+        self.assertEqual(snapshot['RootedTree']['types'], ['Definition', 'Theorem'])
+        self.assertEqual([r[1] for r in rows], [changed])
 
     def test_new_entry_with_diagram_and_duplicate_refused(self):
         data = self.package(None, 'A tree. ' + TREE)
