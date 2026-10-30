@@ -22,12 +22,11 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))  # backend/, for merge_sync
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # backend/src, for the renderer
+from apply_math_text_patch import PATCH_FIELDS, write_metadata  # noqa: E402
 import math_schema  # noqa: E402
 import merge_sync  # noqa: E402
 from migration_db import migration_target  # noqa: E402
 
-# What a text publish (options 2-5) may change on the survivor before a merge.
-TEXT_FIELDS = {'cleaned_tex', 'synonyms'}
 
 
 def recorded(db, change_set):
@@ -45,7 +44,7 @@ def label(change_set):
 
 
 def survivor_text(db, change_set):
-    """Give the survivor its approved text and synonyms, unless it has them already."""
+    """Give the survivor its approved text and details (as options 2-5 publish them), unless it has them already."""
     from services.math.concept_render_service import render_tex_reusing_existing_diagrams
     name = change_set['survivor']
     strip = lambda entry: {k: v for k, v in entry.items() if k != 'diagrams'}  # noqa: E731
@@ -55,15 +54,13 @@ def survivor_text(db, change_set):
         return
     if current != before:
         raise ValueError(f'{name} matches neither its recorded version before the merge nor the approved one.')
-    if {key for key in after if after[key] != before[key]} - TEXT_FIELDS:
-        raise ValueError(f'{name} changed beyond its text and synonyms; record that change in its own migration first.')
+    if {key for key in after if after[key] != before[key]} - PATCH_FIELDS:
+        raise ValueError(f'{name} changed its slug; record that change in its own migration first.')
     ident = merge_sync.ident(db, name)
     rendered = render_tex_reusing_existing_diagrams(ident, after['cleaned_tex'], db.cursor())
     db.execute("UPDATE math_concepts SET cleaned_tex = ?, rendered_tex = ?, updated_at = datetime('now') WHERE id = ?",
                (after['cleaned_tex'], rendered, ident))
-    db.execute('DELETE FROM math_synonyms WHERE concept_id = ?', (ident,))
-    db.executemany('INSERT INTO math_synonyms(concept_id, synonym_text) VALUES (?, ?)',
-                   [(ident, value) for value in after['synonyms']])
+    write_metadata(db, ident, before, after)
 
 
 def replay(database, change_sets):

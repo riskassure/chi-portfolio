@@ -235,11 +235,27 @@ class DiagramWorkflowTests(unittest.TestCase):
                 working.unlink()
         working = self.working_copy(changed + ' ' + FIGURE)
         with closing(sqlite3.connect(working)) as db:
+            db.execute("UPDATE math_concepts SET slug='rooted-trees'")
+            db.commit()
+        render_missing(working, 'RootedTree', self.diagrams, self.render)
+        with self.assertRaisesRegex(ValueError, 'slug cannot be changed'):
+            build_payload(self.base, working, 'RootedTree', self.diagrams)
+
+    def test_changed_diagram_with_a_title_edit(self):
+        self.create(self.base, PICTURE + ' ' + FIGURE, rows=[PICTURE])
+        self.file(PICTURE).write_bytes(svg_for(PICTURE))
+        working = self.working_copy(PICTURE.replace('(2,2)\\end', '(1,2)\\end') + ' ' + FIGURE)
+        with closing(sqlite3.connect(working)) as db:
             db.execute("UPDATE math_concepts SET title='Rooted tree'")
             db.commit()
         render_missing(working, 'RootedTree', self.diagrams, self.render)
-        with self.assertRaisesRegex(ValueError, 'Only content'):
-            build_payload(self.base, working, 'RootedTree', self.diagrams)
+        output = self.root / 'package.zip'
+        report = prepare(self.base, working, 'RootedTree', output, self.diagrams)
+        self.assertIn('Title: "rooted tree" -> "Rooted tree"', report)
+        payload, _ = unpack(output.read_bytes())
+        self.assertEqual(payload['replacement_title'], 'Rooted tree')
+        self.assertNotIn('replacement_synonyms', payload)
+        self.assertEqual(diagram_intended(payload)[0], read_snapshot(working)['RootedTree'])
 
     def test_new_entry_with_diagrams(self):
         self.create(self.base, None)

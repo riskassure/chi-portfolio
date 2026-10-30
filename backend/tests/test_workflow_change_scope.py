@@ -27,13 +27,24 @@ class ChangeScopeTests(unittest.TestCase):
     """Option 1 must report the same scope that option 2 enforces, with a reason."""
 
     def working_db(self, folder, svgs):
-        """A working database holding only stored diagram SVGs: {canonical: tex whose diagrams have SVGs}."""
+        """A working database holding stored diagram SVGs ({canonical: tex whose diagrams have SVGs}),
+        the lookup lists and one other entry, Other, with the title 'other space' and synonym 'another space'."""
         path = Path(folder)/'working.db'
         with closing(sqlite3.connect(path)) as db:
-            db.execute('CREATE TABLE math_concepts(id INTEGER PRIMARY KEY, canonical_name TEXT)')
-            db.execute('CREATE TABLE math_concept_diagrams(concept_id INTEGER, source_hash TEXT, svg_path TEXT)')
+            db.executescript('''
+                CREATE TABLE math_concepts(id INTEGER PRIMARY KEY, canonical_name TEXT, title TEXT);
+                CREATE TABLE math_concept_diagrams(concept_id INTEGER, source_hash TEXT, svg_path TEXT);
+                CREATE TABLE math_classifications(id INTEGER PRIMARY KEY, code TEXT);
+                CREATE TABLE math_types(id INTEGER PRIMARY KEY, type_name TEXT);
+                CREATE TABLE math_synonyms(concept_id INTEGER, synonym_text TEXT);
+                CREATE TABLE math_definitions(concept_id INTEGER, defined_term TEXT);
+                INSERT INTO math_classifications VALUES(1, '54E35');
+                INSERT INTO math_types VALUES(1, 'Definition'), (2, 'Theorem');
+                INSERT INTO math_concepts VALUES(100, 'Other', 'other space');
+                INSERT INTO math_synonyms VALUES(100, 'another space');
+            ''')
             for ident, (name, tex) in enumerate(svgs.items(), 1):
-                db.execute('INSERT INTO math_concepts VALUES(?, ?)', (ident, name))
+                db.execute('INSERT INTO math_concepts VALUES(?, ?, ?)', (ident, name, name))
                 for block in extract_all_pstricks_diagram_blocks(tex):
                     db.execute("INSERT INTO math_concept_diagrams VALUES(?, ?, 'd.svg')", (ident, block['source_hash']))
             db.commit()
@@ -91,11 +102,31 @@ class ChangeScopeTests(unittest.TestCase):
         self.assertIn('differs only in capitalization', changes['B']['reason'])
         self.assertEqual(changes['C']['reason'], 'local version has empty content')
 
-    def test_other_field_changes_deletions_and_bad_new_entries(self):
-        changes = self.scan({'A': entry(), 'Gone': entry()},
-                            {'A': entry(types=['Theorem']),
-                             "Euler'stheorem": entry(slug="euler'stheorem")})
-        self.assertIn('changes types; only content and synonym changes', changes['A']['reason'])
+    def test_every_detail_except_the_slug_is_supported(self):
+        details = dict(title='metric spaces', owner='CWoo', is_cleaned=0, types=['Definition', 'Theorem'],
+                       definitions=['distance'], link_exclusions=['space'], related_concepts=['Other'])
+        changes = self.scan({'A': entry(), 'Slug': entry()},
+                            {'A': entry(**details), 'Slug': entry(slug='metric-spaces')})
+        self.assertTrue(changes['A']['supported'], changes['A']['reason'])
+        self.assertEqual(changes['A']['fields'], list(details))
+        self.assertIn('changes slug; a slug is the page', changes['Slug']['reason'])
+
+    def test_detail_changes_that_would_clash_are_flagged(self):
+        changes = self.scan({'Title': entry(), 'Synonym': entry(), 'Type': entry(), 'Related': entry(),
+                             'Unclassified': entry(), 'Spaces': entry()},
+                            {'Title': entry(title='Other Space'), 'Synonym': entry(title='another space'),
+                             'Type': entry(types=['Lemma']), 'Related': entry(related_concepts=['Missing']),
+                             'Unclassified': entry(classifications=[]), 'Spaces': entry(title='metric space ')})
+        self.assertIn("another entry already has the title 'Other Space'", changes['Title']['reason'])
+        self.assertIn('is a synonym or defined term of another entry', changes['Synonym']['reason'])
+        self.assertIn("no type 'Lemma' exists", changes['Type']['reason'])
+        self.assertIn("no related concept 'Missing' exists", changes['Related']['reason'])
+        self.assertIn('has no MSC classification', changes['Unclassified']['reason'])
+        self.assertIn('leading or trailing spaces', changes['Spaces']['reason'])
+
+    def test_deletions_and_bad_new_entries(self):
+        changes = self.scan({'Gone': entry()},
+                            {"Euler'stheorem": entry(slug="euler'stheorem")})
         self.assertIn('deletions are not supported', changes['Gone']['reason'])
         self.assertIn('new entry slug', changes["Euler'stheorem"]['reason'])
 
@@ -110,7 +141,8 @@ class ChangeScopeTests(unittest.TestCase):
         baseline = {'Text': entry(), 'Diagram': entry(cleaned_tex=PICTURE), 'NoSvg': entry(cleaned_tex=PICTURE),
                     'ChangedDiagram': entry(cleaned_tex=PICTURE), 'Unclassified': entry(classifications=[]),
                     'Untyped': entry(types=[]), 'Duplicate': entry(synonyms=['ring', 'ring']),
-                    'Synonyms': entry(), 'CaseSynonyms': entry(), 'AddsImage': entry(), 'Empty': entry()}
+                    'Synonyms': entry(), 'CaseSynonyms': entry(), 'AddsImage': entry(), 'Empty': entry(),
+                    'Details': entry(), 'TitleClash': entry(), 'Slug': entry()}
         working = {'Text': entry(cleaned_tex='Edited.'), 'Diagram': entry(cleaned_tex=PICTURE + ' Edited.'),
                    'NoSvg': entry(cleaned_tex=PICTURE + ' Edited.'),
                    'ChangedDiagram': entry(cleaned_tex=PICTURE.replace('(1,1)', '(2,2)')),
@@ -120,6 +152,8 @@ class ChangeScopeTests(unittest.TestCase):
                    'Synonyms': entry(synonyms=['distance space', 'metric']),
                    'CaseSynonyms': entry(synonyms=['Metric', 'metric']),
                    'AddsImage': entry(cleaned_tex='<img src="x.png">'),
+                   'Details': entry(title='metric spaces', types=['Theorem'], definitions=['distance']),
+                   'TitleClash': entry(title='other space'), 'Slug': entry(slug='metric-spaces'),
                    'Empty': entry(cleaned_tex=''),
                    'NewText': entry(slug='new-text', title='new text'),
                    'NewDiagram': entry(slug='new-diagram', title='new diagram', cleaned_tex=PICTURE),
@@ -143,7 +177,7 @@ class ChangeScopeTests(unittest.TestCase):
                         accepted = False
                     self.assertEqual(item['supported'], accepted, item['reason'])
         self.assertEqual({name for name, item in changes.items() if item['supported']},
-                         {'Text', 'Diagram', 'Unclassified', 'Untyped', 'Duplicate', 'Synonyms', 'NewText'})
+                         {'Text', 'Diagram', 'Unclassified', 'Untyped', 'Duplicate', 'Synonyms', 'Details', 'NewText'})
 
 
 if __name__ == '__main__':

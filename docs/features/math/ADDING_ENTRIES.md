@@ -204,15 +204,14 @@ synchronization are complete.
 - **No database swapping:** never upload the entire laptop database to make the
   sites match. It could overwrite newer music, photo, profile or math content.
 
-## Existing-entry document types and diagram publication gaps
+## Existing-entry details and diagram publication gaps
 
-Document types can be changed in the authenticated math editor
-(`math/edit.html?id=ENTRY-ID`), which sends `types` to the existing update route.
-However, the publication helper only supports source-text and synonym changes
-for existing entries. A local document-type change is detected as unsupported;
-there is currently no reviewed helper publication path for it.
+Every field the math editor (`math/edit.html?id=ENTRY-ID`) can change on an
+existing entry (title, body, classifications, document types, synonyms, defined
+terms, related concepts), plus owner, cleaned flag and link exclusions, can be
+published from the laptop with options 1 to 5. Only the slug cannot change.
 
-Content and synonym edits to existing entries are allowed when every diagram,
+Content and detail edits to existing entries are allowed when every diagram,
 image and embed stays byte-identical and each PSTricks diagram already has a
 stored SVG. Missing classifications or types and duplicate unchanged metadata do
 not block them. Edits that add, remove or change an image or embed are refused.
@@ -223,14 +222,15 @@ Option 1 marks refused edits `[unsupported]` and gives the reason. See
 [Entries the helper cannot publish](../../administration/deployment/CONTENT_SYNC.md#entries-the-helper-cannot-publish)
 for the rules and for which of those edits production-first can and cannot cover.
 
-For a deliberate production-first type correction, take the fresh backup described
+Production-first remains possible when you are away from the laptop. For a
+deliberate production-first type correction, take the fresh backup described
 in section B, open the existing entry's editor on production, preserve its other
 fields, change Document Types and save. Verify the entry while logged out, then
 stop the local server and use **8** to bring it home. Resolve any unpublished local
 changes before doing this; do not duplicate a local metadata edit on production
 and assume the refresh will merge it. This route is confirmed from the editor,
 update route and metadata service, not a live write test. If local-first review is
-required, defer the edit until a metadata publisher is implemented. This
+required, make the edit locally and publish it with option 2 instead. This
 metadata-only route does not extend to edits that change or add diagrams or
 images. Publish diagram changes through the diagram route from your local copy;
 image files still have no supported route.

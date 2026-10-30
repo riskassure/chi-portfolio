@@ -120,7 +120,7 @@ class PatchRuleTests(unittest.TestCase):
         data = io.BytesIO()
         with zipfile.ZipFile(data, 'w') as archive:
             archive.writestr('patch.json', json.dumps(payload(stored(classifications=[]), 'Fixed.')))
-        self.assertIn('Proposed operation: change existing entry text', preview(data.getvalue()))
+        self.assertIn("Proposed operation: change an existing entry's text", preview(data.getvalue()))
 
 
 class ApplyDiagramEntryTests(unittest.TestCase):

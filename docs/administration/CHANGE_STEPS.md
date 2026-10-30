@@ -155,9 +155,10 @@ first, then redo the local edit on top of the road version.
 6. Repeat 2-5 for any other entries. Then stop the server and run option **8** once.
 7. No commit: the database isn't in git, and a single edit needs no migration.
 
-Option 2 publishes only the body and synonyms of an existing entry. A change to
-title, classifications, types, defined terms or related concepts can't be published
-from the laptop; make it on the live site (next example) and bring it home.
+Option 2 publishes everything you can change about an existing entry: the body,
+title, owner, cleaned flag, classifications, document types, synonyms, defined
+terms, link exclusions and related concepts, all in one package. Only the slug
+(the page's address) can't change; option 1 marks such an edit `[unsupported]`.
 
 ### Example: editing a math entry on the road
 

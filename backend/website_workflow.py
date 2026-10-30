@@ -18,7 +18,7 @@ from stage_pythonanywhere_package import stage, read_package
 from preflight_live_package import preflight
 from publish_staged_package import publish_staged
 from pythonanywhere_api import SETTINGS, validate
-from apply_math_text_patch import patch_intended
+from apply_math_text_patch import PATCH_FIELDS, metadata_conflict_in, patch_intended, patch_payload
 from download_live_database import download
 from bring_changes_home import refresh
 import profile_sync
@@ -148,16 +148,17 @@ def publish_blocker(name, baseline, working, working_db=None):
             return 'new entry ' + explain_rejection(entry, str(error))
         return None
     fields = {key for key in working[name] if working[name][key] != baseline[name][key]}
-    if fields - {'cleaned_tex', 'synonyms'}:
-        return ('changes ' + ', '.join(sorted(fields - {'cleaned_tex', 'synonyms'})) +
-                '; only content and synonym changes can be published')
-    payload = dict(canonical_name=name, expected=baseline[name], replacement_tex=working[name]['cleaned_tex'])
-    if 'synonyms' in fields:
-        payload['replacement_synonyms'] = working[name]['synonyms']
+    if fields - PATCH_FIELDS:
+        return ('changes ' + ', '.join(sorted(fields - PATCH_FIELDS)) +
+                '; a slug is the page\'s address and cannot be changed with the helper')
     try:
-        patch_intended(payload)
+        intended = patch_intended(patch_payload(name, baseline[name], working[name]))
     except ValueError as error:
         return 'local version ' + explain_rejection(entry, str(error))
+    # Option 4 repeats this against live; here it catches clashes within the working copy.
+    conflict = working_db and metadata_conflict_in(working_db, name, baseline[name], intended)
+    if conflict:
+        return 'local version: ' + conflict
     missing = working_db and local_missing_svgs(working_db, name, working[name]['cleaned_tex'])
     if missing:
         return (f'has {missing} diagram(s) with no stored SVG, so the page would show '
