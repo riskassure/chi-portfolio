@@ -256,7 +256,8 @@ and then published through the helper: field theory, real analysis and averages
 in live id order, and their related links are the published ones. In the three
 20261023 scripts a related link to an entry published later was dropped, because
 the live publisher accepts only related entries that are already live. Their
-shared code is in `math_entry_batch.py`. How to write one for a new batch:
+shared code is in `math_entry_batch.py`. Batches from now on are recorded by helper
+option 23 as data replayed by `math_entry_record.py`; see
 [Record a batch in git](../../administration/deployment/CONTENT_SYNC.md#record-a-batch-in-git).
 `merge_entries_*.py` are the records of option 21 merges; see
 [Merging and retiring entries](MERGING_ENTRIES.md).

@@ -536,7 +536,7 @@ def main():
         if state:
             print('Working copy:', state['working'])
             print('Selected entry:', (state.get('job') or {}).get('canonical', '(none)'))
-        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n17. Upload Esri map key\n18. Prepare saved gallery display settings\n19. Render missing diagrams for an entry\n20. Publish a batch of new entries\n21. Merge or retire entries\n22. Update PythonAnywhere packages from requirements.txt\n0. Exit')
+        print('1. Show local changes\n2. Prepare an entry for review\n3. Stage reviewed package\n4. Check live\n5. Publish reviewed package\n6. Start local server\n7. Set baseline and working paths\n8. Bring website changes home\n9. Prepare biography or resume update\n10. Open Google Photos import\n11. Prepare a new photo for publication\n12. Prepare changes to existing photo details\n13. Prepare removal from the gallery (keep image)\n14. Prepare frontend files (HTML, CSS, JavaScript)\n15. Prepare Python and matching frontend files\n16. Retry code reload and homepage verification\n17. Upload Esri map key\n18. Prepare saved gallery display settings\n19. Render missing diagrams for an entry\n20. Publish a batch of new entries\n21. Merge or retire entries\n22. Update PythonAnywhere packages from requirements.txt\n23. Record a published batch in git\n0. Exit')
         choice = input('Choose: ').strip()
         try:
             if choice == '0':
@@ -585,6 +585,9 @@ def main():
             elif choice == '22':
                 import live_packages
                 live_packages.run(state)
+            elif choice == '23':
+                import batch_record
+                batch_record.run(state)
             elif choice == '9':
                 print(prepare_profile(state, input('Page to prepare (bio or resume): ').strip()))
                 print('Review the changes above, then choose 3 to stage, 4 to check live, and 5 to publish.')

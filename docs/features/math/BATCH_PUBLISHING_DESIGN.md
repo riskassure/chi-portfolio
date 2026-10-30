@@ -10,11 +10,14 @@ and the runbook checklist
 [Add many new entries at once](../../ADMIN_RUNBOOK.md#add-many-new-entries-at-once-option-20);
 where they differ from this design, those guides and the code are current.
 
-The last section, the repository record and git step, was **not built**. In
-practice each batch has been recorded by hand as an `add_<topic>_entries_<date>.py`
-migration using `math_entry_batch.run_batch` (see
-[Record a batch in git](../../administration/deployment/CONTENT_SYNC.md#record-a-batch-in-git)),
-not as the declarative payloads preferred below, and there is no `COMMIT` action.
+The last section, the repository record and git step, was built on 2026-10-30 as
+helper option 23 (plan step 8; see
+[Record a batch in git](../../administration/deployment/CONTENT_SYNC.md#record-a-batch-in-git)).
+It follows Chi's preference below: the record is the batch's reviewed package
+payloads, as data, replayed by one shared importer (`math_entry_record.py`) through
+the live publishing code; it is checked on scratch copies before a separate
+`COMMIT`; and the commit goes on `entries/<date>-<topic>` from an isolated checkout.
+The batches before it were recorded by hand with `math_entry_batch.run_batch`.
 
 The text below is the agreed design (originally a PDF dated 2026-10-23), unchanged
 except for formatting. Its own status line read: "The design is agreed. Nothing is
@@ -232,7 +235,7 @@ Acceptance means:
 - an interruption can be recovered;
 - no unrelated local or production work is lost.
 
-## Later: repository record and git (not built)
+## Later: repository record and git (built as option 23)
 
 A separate feature, to be designed after option 20 is working.
 
