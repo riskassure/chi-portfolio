@@ -75,7 +75,9 @@ the page can't read it.
   **new random secret each time it starts**. That's why restarting option 6 signs
   you out.
 
-**Protections.** Five login attempts per minute per address (then HTTP 429). Edits
+**Protections.** Five login attempts per minute per visitor address (then HTTP 429);
+on PythonAnywhere the address comes from the load balancer's `X-Real-IP` header, see
+[How the login limiter decides who is who](ROTATING_SECRETS.md#how-the-login-limiter-decides-who-is-who). Edits
 must come from the site's own address (the request's `Origin` header is checked);
 locally, use exactly `http://127.0.0.1:5001`. Sessions last 8 hours.
 
@@ -87,9 +89,10 @@ locally, use exactly `http://127.0.0.1:5001`. Sessions last 8 hours.
 - "Request origin rejected": you opened the local site as `localhost:5001` or another
   address. Use `127.0.0.1:5001`.
 
-**Changing the live password.** Edit `ADMIN_PASSWORD` in `hosting.json` on the server,
-then reload the web app from the Web tab. Changing `FLASK_SECRET_KEY` as well signs
-everyone out.
+**Changing the live password.** Run `hosting_secrets.py password` in a PythonAnywhere
+Bash console, then reload the web app from the Web tab. `hosting_secrets.py session-secret`
+also signs everyone out. Steps for this and every other secret:
+[Changing the site's secrets](ROTATING_SECRETS.md).
 
 ## PythonAnywhere: API token and SSH
 

@@ -8,6 +8,7 @@ from collections import defaultdict, deque
 from threading import Lock
 from datetime import timedelta
 from urllib.parse import urlsplit
+import ipaddress
 
 app = Flask(__name__, static_folder=None)
 IS_PRODUCTION = os.environ.get("FLASK_ENV") == "production"
@@ -34,6 +35,26 @@ login_lock = Lock()
 LOCAL_ORIGINS = {"http://127.0.0.1:5000", "http://localhost:5000",
                  "http://127.0.0.1:5500", "http://localhost:5500"}
 
+def client_address():
+    """The visitor's address, for the login limiter.
+
+    On PythonAnywhere every request reaches Flask through their load balancer, so
+    remote_addr is the balancer's private address and all visitors would share one
+    limit. The balancer puts the visitor's address in X-Real-IP. A visitor can send
+    that header too, so it is only believed when the request really came from a
+    private-network proxy; anything reaching Flask directly keeps remote_addr.
+    """
+    direct = request.remote_addr or "unknown"
+    forwarded = request.headers.get("X-Real-IP", "").strip()
+    if not forwarded:
+        return direct
+    try:
+        via_proxy = ipaddress.ip_address(direct).is_private
+        ipaddress.ip_address(forwarded)
+    except ValueError:
+        return direct
+    return forwarded if via_proxy else direct
+
 @app.before_request
 def protect_requests():
     if request.path == "/api/photography/rotate" and request.method == "POST" and not session.get("is_admin"):
@@ -46,9 +67,8 @@ def protect_requests():
             return jsonify(error="Request origin rejected."), 403
     if request.method == "POST" and request.path in {
             "/api/login", "/api/music/spotify/login", "/api/photography/google/login"}:
-        # One-process limiter. The documented Waitress deployment uses one process.
-        # Do not trust arbitrary X-Forwarded-For headers; the proxy also needs rate limits.
-        key = request.remote_addr or "unknown"
+        # Counts are kept per web worker process, so each worker allows five a minute.
+        key = client_address()
         now = time.monotonic()
         with login_lock:
             for old_key in list(login_attempts):
