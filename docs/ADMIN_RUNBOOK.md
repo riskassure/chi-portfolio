@@ -86,11 +86,12 @@ preview: the helper explicitly selects a working copy.
 | Frontend HTML, CSS or JavaScript | **14**; paths relative to `frontend`; only from a clean, pulled `main` ([deploy guard](administration/deployment/DEPLOY_GUARD.md)) |
 | Backend Python plus matching frontend files | **15**; repository-relative paths; only from a clean, pulled `main` |
 | Saved gallery display count | **18** |
+| Python package versions (after merging a Dependabot PR) | **22**; see [Package updates](administration/deployment/PACKAGE_UPDATES.md) |
 | Music details (genre, composer, performer, ...) | None: edit them on the live music page, then **8** brings them home |
 
 Option **1** is not a comprehensive list of all website changes. Option **15**
 reloads the app and verifies the homepage, but that does not replace checking the
-changed feature. It does not install dependencies or run database migrations.
+changed feature. It does not install dependencies (option **22** does) or run database migrations.
 Option **16** retries code reload/verification after a published code package.
 Option **17** uploads only the saved Esri key; it is not a general file uploader.
 Option **7** changes baseline/working paths and is not a routine publishing step.
@@ -413,6 +414,7 @@ Further references:
 - [Maintenance assessment plan](maintenance/MAINTENANCE_PLAN.md)
 - [Math synchronization](administration/deployment/CONTENT_SYNC.md)
 - [Deploy guard](administration/deployment/DEPLOY_GUARD.md): options 14 and 15 publish code only from a clean `main` that matches GitHub (`git switch main`, `git pull` first); option 5 checks again
+- [Package updates](administration/deployment/PACKAGE_UPDATES.md): Dependabot opens PRs for new package versions; after merging one, `git pull` and option **22** installs them on PythonAnywhere
 - [Live files vs main](administration/deployment/LIVE_DRIFT_CHECK.md): `python backend\check_live_drift.py` lists live files that differ from `main` (Files-tab edits, publishes from a branch, merges never published); read-only
 - [Broader deployment and recovery details](administration/deployment/MANUAL_UPDATES.md) (older manual package workflow)
 - [First hosting installation](administration/deployment/PYTHONANYWHERE.md) (not a routine update procedure)

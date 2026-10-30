@@ -24,6 +24,7 @@ everything from the project folder `C:\Development\chi-portfolio` in PowerShell.
 | Biography or resume | [Biography and resume updates](deployment/CONTENT_SYNC.md#biography-and-resume-updates) | Option 9 |
 | Travel map | [Runbook: Travel and photography](../ADMIN_RUNBOOK.md#travel-and-photography) | Option 14 with `geography/places-data.js` |
 | Frontend or Python change | [Code changes with git](#code-changes-with-git) below, then [option 14](deployment/CONTENT_SYNC.md#publishing-frontend-files-option-14) or [option 15](deployment/CONTENT_SYNC.md#python-and-matching-frontend-deployments-options-15-and-16) | |
+| Python package update (Dependabot PR) | [Package updates](deployment/PACKAGE_UPDATES.md#handling-a-dependabot-pr) | Merge when green, `git pull`, then option 22 |
 | Bring live data home | [Runbook: Bring database changes home](../ADMIN_RUNBOOK.md#bring-database-changes-home) | When it refuses: [If option 8 refuses](#if-option-8-refuses) |
 | Check a live page | [How the website works: caching](HOW_THE_SITE_WORKS.md#browser-caching-why-a-page-can-look-unchanged) | Private window, logged out; Ctrl+F5 |
 
@@ -38,7 +39,7 @@ and the local preview.
 | --- | --- | --- |
 | Tool | Any browser, signed in at `https://www.cwoo.me/admin_dashboard.html` | The laptop: the helper (`python backend/website_workflow.py`), the local server (option **6**), git |
 | What it changes | Rows in the live database, and only through the edit buttons on the live pages | Anything: data, frontend files, Python code, the database schema, media |
-| How a change goes live | Immediately, when you press Save. No review, no package, no reload | Only when you publish it with the helper (options 2-5, 9, 11-15, 18-21) |
+| How a change goes live | Immediately, when you press Save. No review, no package, no reload | Only when you publish it with the helper (options 2-5, 9, 11-15, 18-22) |
 | Backup | None automatic (see [Backups for live edits](#backups-for-live-edits)) | The helper takes a server backup before every publish |
 | Reaches the laptop | Next time you run option **8** at home | Already there (it started there) |
 

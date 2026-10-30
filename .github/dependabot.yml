@@ -1,0 +1,36 @@
+# Dependabot: GitHub opens a pull request when a newer version of a package
+# the site uses (backend/requirements.txt) or of a GitHub Actions step used by
+# the tests (.github/workflows) is released. Nothing here installs anything on
+# the laptop or the live site: after merging a package PR, run helper option 22.
+# Plain-language guide: docs/administration/deployment/PACKAGE_UPDATES.md
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    # Wait a week after a release before proposing it: broken or tampered
+    # releases are usually found and pulled within days.
+    cooldown:
+      default-days: 7
+    # Minor and patch updates arrive together in one weekly PR; a major
+    # version (which may need code changes) gets a PR of its own.
+    groups:
+      python-packages:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "Python packages"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "GitHub Actions"
