@@ -75,7 +75,7 @@ class FinishedBatch(BatchFixture):
                 patch.object(batch_check, 'live_catalog', lambda username: sorted(site.live | {'Group'})), \
                 patch('builtins.input', side_effect=['RESUME', 'PUBLISH ALL', 'VERIFIED']):
             bp.run(self.state)
-        return json.loads((Path(manifest['folder']) / 'manifest.json').read_text())
+        return json.loads((Path(manifest['folder']) / 'manifest.json').read_text(encoding='utf-8'))
 
 
 class MigrationTests(FinishedBatch):
@@ -202,7 +202,7 @@ class GitRecordTests(FinishedBatch):
         return lambda prompt: values.pop(0)
 
     def manifest_now(self):
-        return json.loads((Path(self.manifest['folder']) / 'manifest.json').read_text())
+        return json.loads((Path(self.manifest['folder']) / 'manifest.json').read_text(encoding='utf-8'))
 
     def test_commit_holds_only_the_record_and_leaves_the_folder_alone(self):
         batch_record.record_batch(self.manifest, self.state, self.answers('group-basics', 'COMMIT'), root=self.repo)
