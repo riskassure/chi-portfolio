@@ -74,7 +74,7 @@ calls; ours just imports `pythonanywhere_wsgi.py`) is how it finds the app.
 | Python under `backend/src` | **Yes** | The running process still has the old code imported | **15** (it reloads and checks the homepage; **16** retries) |
 | HTML, CSS or JavaScript under `frontend/` | No | Flask reads the file from disk on every request | **14** |
 | Database content | No | Every API call opens the database fresh | options 2-5, 9, 12, 20, 21, ... |
-| A new Python package (`pip install`) | Yes, after installing | Not handled by the helper | By hand in a PythonAnywhere Bash console, in `/home/cwoo/.virtualenvs/chi-portfolio`, then reload from the Web tab |
+| A new or updated Python package (`pip install`) | Yes, after installing | The running process still has the old package imported | **22** installs `backend/requirements.txt` into `/home/cwoo/.virtualenvs/chi-portfolio`, then reloads ([Package updates](deployment/PACKAGE_UPDATES.md)) |
 
 Locally it is the same: the option 6 server does not notice Python edits. Stop it
 with Ctrl+C and start option 6 again. Frontend edits show up on the next page load.

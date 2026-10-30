@@ -105,7 +105,8 @@ of four or more random words).
 
 zxcvbn is installed in the site's virtualenv from `backend/requirements.txt`. If the
 tool says "The zxcvbn package is missing", you ran it without `workon chi-portfolio`,
-or the package hasn't been installed there yet:
+or the package hasn't been installed there yet: run helper option 22
+([Package updates](deployment/PACKAGE_UPDATES.md)), or by hand
 `workon chi-portfolio` then `pip install zxcvbn==4.5.0`.
 
 There is no reminder to change the password on a schedule. Current advice (NIST

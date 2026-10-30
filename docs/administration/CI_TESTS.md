@@ -82,7 +82,10 @@ flaky failure (or use **Re-run jobs** on a finished run).
 
 - **Python version:** `python-version` in the workflow. Keep it the same as the
   laptop's `.venv313` and PythonAnywhere's.
-- **New dependency:** add it to `backend/requirements.txt`; CI picks it up.
+- **New dependency:** add it to `backend/requirements.txt`; CI picks it up. Install it
+  on the live site with helper option 22 before publishing code that uses it
+  ([Package updates](deployment/PACKAGE_UPDATES.md)). Dependabot PRs for newer
+  versions run these same checks.
 - **pytest version:** pinned in the workflow's install step.
 - Edit the workflow on a branch and open a PR like any code change; the PR runs
   the edited workflow, so you see the effect before merging.

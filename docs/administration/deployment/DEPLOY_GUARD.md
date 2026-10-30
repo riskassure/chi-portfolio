@@ -49,7 +49,9 @@ A selection made only of these skips the guard completely, on any branch. Their
 uncommitted changes also never block a code publish.
 
 Options 2-5 for math entries, 8, 9, 11-13, 20 and 21 publish database rows, not
-files, and are not affected. Option **16** (retry reload) only reloads code that
+files, and are not affected. Option **22** ([package updates](PACKAGE_UPDATES.md))
+runs the same guard on `backend/requirements.txt`, so packages are installed only
+from the `main` that the tests checked. Option **16** (retry reload) only reloads code that
 option 5 already uploaded and verified, so it isn't guarded again.
 
 ## The normal sequence

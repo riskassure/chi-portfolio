@@ -25,8 +25,8 @@ The supported scope is Python under `backend/src` plus matching frontend HTML,
 CSS and JavaScript. A code package must contain a changed Python file; use option
 14 for frontend-only updates. Like option 14, it refuses unless the laptop folder is
 on a clean `main` that matches GitHub; see [Deploy guard](DEPLOY_GUARD.md).
-Database migrations, dependency installation,
-private settings, WSGI configuration, file deletion and other backend tools are
+Database migrations, dependency installation (option 22, see
+[Package updates](PACKAGE_UPDATES.md)), private settings, WSGI configuration, file deletion and other backend tools are
 outside this step. Test the selected changes locally with the installed
 dependencies before publication.
 
