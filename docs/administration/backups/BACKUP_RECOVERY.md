@@ -3,6 +3,11 @@
 > Update 2026-10-27: nightly live database backups with automatic retention now
 > exist; see [NIGHTLY_BACKUPS.md](NIGHTLY_BACKUPS.md). The statements below that no
 > schedule or retention policy is installed describe October 18.
+>
+> Update 2026-10-30: the recovery procedure, tested that day, is
+> [When the site is down](SITE_DOWN_RECOVERY.md). A newer full-site archive,
+> `full-site-20261030.zip` (SHA-256 `97af3db8aaf00e3f3fa7da8ea5fbab786cb5752c323f023de3e69072ea0064da`),
+> is on the laptop in the same folder as the October 18 one.
 
 Reviewed October 18, 2026. Production backup inventory and recovery-source access
 were read-only. No existing backup, live database, schedule or website file was

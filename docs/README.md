@@ -12,6 +12,8 @@ Committing code does not publish it to the website.
 | [Making a change](administration/CHANGE_STEPS.md) | On the road vs at home, the order of steps for each kind of change, and where each self-service checklist is |
 | [How the website works](administration/HOW_THE_SITE_WORKS.md) | Browser vs server, reloads, caching, logins, developer tools and where errors appear |
 | [Logins and API keys](administration/API_AUTHENTICATION.md) | Admin login, PythonAnywhere token and SSH, Spotify and Google OAuth, Esri key: how each works, renews and fails |
+| [When the site is down](administration/backups/SITE_DOWN_RECOVERY.md) | What kind of outage it is, then: site won't start, bad database, domain/DNS, rebuilding on a new account; keeping recovery copies fresh and the disk from filling up |
+| [Renewing the Spotify sign-in](administration/SPOTIFY_RENEWAL.md) | When the music page stops updating: sign in on the laptop, copy the token to the server, test, delete the laptop copy |
 | [Changing the site's secrets](administration/ROTATING_SECRETS.md) | When and how to rotate the admin password, session secret, PythonAnywhere token, SSH key, Spotify, Google and Esri credentials |
 | [Automatic tests on GitHub (CI)](administration/CI_TESTS.md) | What runs on every PR, reading the green tick or red cross, fixing a failure |
 | [Content synchronization](administration/deployment/CONTENT_SYNC.md) | Detailed helper preparation, checks and publication |
@@ -33,7 +35,8 @@ Committing code does not publish it to the website.
 
 - [Tracked backup review](administration/backups/HISTORICAL_BACKUP_REVIEW.md): provenance, integrity checks and preservation history.
 - [Nightly backups](administration/backups/NIGHTLY_BACKUPS.md): the daily live database backup, its scheduled task, checking it, and restoring the live site from it.
-- [Backup and recovery review](administration/backups/BACKUP_RECOVERY.md): inventory, isolated restore results and proposed retention; not a complete disaster-recovery procedure.
+- [When the site is down](administration/backups/SITE_DOWN_RECOVERY.md): the recovery procedure, tested 2026-10-30.
+- [Backup and recovery review](administration/backups/BACKUP_RECOVERY.md): October 18 inventory, isolated restore results and proposed retention.
 
 ## Maintenance
 
@@ -65,7 +68,7 @@ further changes. File size alone is not a reason to refactor it again.
 
 - `administration/`: [Making a change](administration/CHANGE_STEPS.md), [How the website works](administration/HOW_THE_SITE_WORKS.md), [Logins and API keys](administration/API_AUTHENTICATION.md) and [Changing the site's secrets](administration/ROTATING_SECRETS.md).
 - `administration/deployment/`: publishing, synchronization and hosting references.
-- `administration/backups/`: backup inventories and recovery results.
+- `administration/backups/`: nightly backups, the site-down recovery guide, backup inventories and recovery results.
 - `features/`: math, music, photography and travel guides.
 - `maintenance/assessments/`: scoped technical reviews.
 - `maintenance/history/`: historical subject-specific audits.

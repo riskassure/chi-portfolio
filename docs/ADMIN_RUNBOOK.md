@@ -318,16 +318,17 @@ cd /home/cwoo/chi-portfolio/backend/src && SPOTIFY_TOKEN_PATH=/home/cwoo/.config
 ```
 
 If it fails, read the safe error message before retrying. Rate-limit backoff still
-applies to forced refresh. Reauthorization may eventually be needed. Local setup
+applies to forced refresh. If the log says Spotify rejected the authorization, follow
+[Renewing the Spotify sign-in](administration/SPOTIFY_RENEWAL.md) (tested 2026-10-30). Local setup
 uses `http://127.0.0.1:5001/api/music/spotify/connect`. The exact registered redirect
 URI is `http://127.0.0.1:5001/api/music/spotify/callback`.
 Credentials transferred to production should not also drive a
 local scheduled refresh; do not re-enable the old laptop job. Coordinate a separate
 local authorization if continued local refreshing is needed.
 
-There is currently no Spotify credential-upload option in the helper. Renewal
-requires a deliberate private transfer and production verification; option 17 is
-Esri-only. See [Spotify implementation and setup](features/music/SPOTIFY.md).
+There is no Spotify credential-upload option in the helper (option 17 is Esri-only);
+renewal copies the token with `scp`, as the renewal guide shows. See
+[Spotify implementation and setup](features/music/SPOTIFY.md).
 
 ## Credentials and renewals
 
@@ -359,6 +360,12 @@ credentials without understanding which environment uses them.
 
 ## Backups, failures and recovery
 
+**Site down?** Start with [When the site is down](administration/backups/SITE_DOWN_RECOVERY.md):
+a table of symptoms, then what to do for a site that won't start, a bad database, a
+domain problem or a lost account, with the Web tab, task and DNS settings recorded on
+2026-10-30. It also has the monthly full-site archive download and the command that
+keeps `~/backups` from filling the disk.
+
 **Nightly backups.** A daily PythonAnywhere task backs up the live database to
 `/home/cwoo/backups/nightly/` (compressed, verified, keeps 7 daily, 4 weekly and 6
 monthly). Setup, checking, and how to restore the live site from one:
@@ -368,8 +375,8 @@ See the [October 18 backup review](administration/backups/BACKUP_RECOVERY.md) fo
 database recovery exercise: integrity and five application queries passed on a
 temporary copy of the pre-Spotify snapshot. A subsequent full-site archive restore also passed: 18 photos, 76 diagram
 references and ten page/API checks. See that review for archive locations and
-checksums. Hosting/credential recovery, an additional off-device copy and retention
-policy remain follow-up decisions.
+checksums. A newer archive (2026-10-30) and the hosting/credential rebuild steps are in
+the site-down guide; a copy off the laptop remains your choice.
 
 Publication receipts and reviews live under `dist/math-workflow/`. Server backups
 are under `/home/cwoo/backups/`; receipt output identifies the relevant backup.
@@ -383,7 +390,8 @@ The initial Spotify refresh backup was
 - Local edits would be lost during option 8: retain existing copies and inspect
   its comparison report before resolving differences.
 - Spotify authorization expired/mismatched: start a fresh connection in the same
-  browser; finish within ten minutes and keep the local server running.
+  browser; finish within ten minutes and keep the local server running. To get the new
+  sign-in to the server, see [Renewing the Spotify sign-in](administration/SPOTIFY_RENEWAL.md).
 - Failed code release: restore only the changed code from its reviewed backup,
   then reload and verify; preserve current database content.
 - Database recovery: preserve the current state and plan the restore first.

@@ -33,7 +33,7 @@ for changes you didn't make.
 | PythonAnywhere API token | PythonAnywhere Account page, API token tab | No | Laptop `pythonanywhere-api.json` |
 | SSH key | New key pair on the laptop | No | Server `authorized_keys`, laptop SSH config |
 | PythonAnywhere account password | PythonAnywhere Account page | Your PythonAnywhere browser sessions | Nothing in the helper |
-| Spotify tokens | Spotify account, Manage apps | Stops the daily music refresh | Server token copy (procedure not written yet) |
+| Spotify tokens | Spotify account, Manage apps | Stops the daily music refresh | Server token copy: [Spotify renewal](SPOTIFY_RENEWAL.md) |
 | Google Photos client secret | Google Cloud Console | No | Laptop `google-oauth.json` |
 | Google Photos tokens | Google account, third-party access | Laptop import only | Connect again |
 | Esri key | ArcGIS developer dashboard | No | Laptop key file, then option 17 |
@@ -181,9 +181,8 @@ working, and the daily music refresh on the server fails safely (the music page 
 its last list).
 
 Connecting again on the laptop (option 6, then `/api/music/spotify/connect`) gives the
-laptop new tokens. Getting a fresh set to the server is the private transfer the
-runbook mentions; that procedure will be written after a real run, so only revoke
-Spotify access if you actually need to.
+laptop new tokens; copying them to the server and deleting the laptop copy is in
+[Renewing the Spotify sign-in](SPOTIFY_RENEWAL.md) (tested 2026-10-30, about 10 minutes).
 
 ## Google Photos
 

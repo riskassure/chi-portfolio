@@ -193,8 +193,8 @@ These setup pages refuse to run on the live site.
 - **When it fails:** the music page keeps the last good list. "Spotify rejected the
   authorization. Please connect again." means the refresh token was refused (revoked in
   your Spotify account settings, or replaced). Reconnecting on the laptop updates only
-  the laptop's file. Getting a fresh set to the server is the private transfer the
-  runbook mentions; that procedure will be written up after a real run.
+  the laptop's file; [Renewing the Spotify sign-in](SPOTIFY_RENEWAL.md) copies it to the
+  server.
 - **Disconnect fully:** delete the token file and remove the app's access in your Spotify
   account settings (Manage apps).
 
@@ -258,7 +258,7 @@ powerful ArcGIS credential in that file.
 | "Too many login attempts" | Login limit | Wait a minute |
 | "Authentication failed. Check or regenerate your API token." | PythonAnywhere API token | `python backend/pythonanywhere_api.py check` |
 | "Permission denied (publickey)" or an unexpected password prompt | SSH key | Is the key loaded and the public half in `authorized_keys`? |
-| "Spotify rejected the authorization. Please connect again." | Spotify refresh token | Reconnect on the laptop; check the server copy separately |
+| "Spotify rejected the authorization. Please connect again." | Spotify refresh token | Follow [Spotify renewal](SPOTIFY_RENEWAL.md) |
 | "Authorization expired or did not match this browser" | Pending OAuth approval | Start the connection again, same browser, within 10 minutes |
 | "Check the private google-oauth.json file..." | Google app credentials | File present and lists the exact redirect URI |
 | "Map basemap access is not configured." | Esri key | Key file present on that machine (option 17 uploads it) |

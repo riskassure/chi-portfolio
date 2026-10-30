@@ -92,8 +92,9 @@ Open the task's log (the log link beside it in the Tasks tab) and confirm a
 - **Disk use**: the report's `folder_mb` is the nightly folder's size. If it goes above
   200 MB the report adds a `"warning"` line (the run still succeeds). The **Account**
   page on PythonAnywhere shows your whole quota. Other backups in `/home/cwoo/backups/`
-  still pile up and are still yours to delete through the Files tab; the biggest are the
-  uncompressed 16 MB `portfolio-<time>-<id>.db` copies each option 8 leaves there.
+  still pile up; the biggest are the uncompressed 16 MB `portfolio-<time>-<id>.db`
+  copies each option 8 leaves there. Compress them now and then with the command in
+  [Keep the disk from filling up](SITE_DOWN_RECOVERY.md#keep-the-disk-from-filling-up).
 
 To keep a different number of backups, add `--keep-daily N`, `--keep-weekly N` or
 `--keep-monthly N` to the task's command.
@@ -133,7 +134,10 @@ paths. Open the result with `sqlite3` or a DB browser.
    inside the open database under SQLite's own locking, so visitors see either the old
    or the restored database, never a mix; you don't need to stop the site. It finishes
    with an integrity check. To undo a restore, restore from the before-restore copy
-   (gzip it first: `gzip -k` on the file, then use the `.db.gz`).
+   (gzip it first: `gzip -k` on the file, then use the `.db.gz`). Once you're happy
+   with the result, compress the before-restore copy (`gzip` on it) so the 16 MB file
+   doesn't stay on the disk. A drill of these steps on a copy on 2026-10-30 took 6
+   seconds ([site-down guide](SITE_DOWN_RECOVERY.md#b-bad-database)).
 3. **Reload** the web app (Web tab, green button) and look at a few pages.
 4. **At home, run option 8.** The laptop's last sync point no longer matches the live
    site, so option 8 will treat the restored content as live changes and bring them
@@ -152,8 +156,8 @@ account or the disk. Your off-server copies today:
 - Each **option 8** run downloads a verified live snapshot to the laptop
   (`Downloads\chi-portfolio\database\<time>\live-snapshot.db`). That is as recent
   as your last option 8, which can be weeks.
-- The full-site archive of 2026-10-18 on the laptop (see
-  [BACKUP_RECOVERY.md](BACKUP_RECOVERY.md)).
+- The newest full-site archive on the laptop (2026-10-30 at the time of writing; how to
+  make and download a new one: [site-down guide](SITE_DOWN_RECOVERY.md#keep-the-recovery-copies-fresh)).
 
 That is probably enough for a personal site. If you want more, download the newest
 nightly `.db.gz` through the Files tab once a month and run `extract` on it locally to
