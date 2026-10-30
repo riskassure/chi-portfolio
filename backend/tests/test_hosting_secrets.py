@@ -55,12 +55,14 @@ class HostingSecretsTests(unittest.TestCase):
         self.assertEqual(self.saved()['ADMIN_PASSWORD'], weak)
 
     def test_weaknesses(self):
-        self.assertEqual(hosting_secrets.weaknesses(STRONG), [])
-        for weak, reason in [('xK9mP2vL8nQ4wR7tB3', 'shorter'), ('alllowercaselettersonlyhere', 'kinds'),
-                             ('Admin-Zq8#vT2!kW9@xL', 'admin'), ('Zq8#vT2!kW9@xL1999ab', 'year'),
-                             ('Zq8#vT2!kW9@xLaaa7Pm', 'repeats one'), ('Zq8#vT2!kW9@xL1234Pm', 'run'),
-                             ('Ab1!Ab1!Ab1!Ab1!Ab1!', 'half')]:
-            self.assertIn(reason, ' '.join(hosting_secrets.weaknesses(weak)), weak)
+        for strong in [STRONG, 'xK9mP2vL8nQ4wR7tB3', 'glacier tumble orchid nimbus']:
+            self.assertEqual(hosting_secrets.weaknesses(strong), [], strong)
+        for weak in ['Chi-password-2024!!', 'cwoo-portfolio-admin', 'correcthorsebatterystaple',
+                     'Summer2024!Summer2024!']:
+            found = hosting_secrets.weaknesses(weak)
+            self.assertTrue(found, weak)
+            self.assertIn('guessed in about 10^', found[0])
+        self.assertIn('Repeats', ' '.join(hosting_secrets.weaknesses('Ab1!Ab1!Ab1!Ab1!Ab1!')))
 
     def test_check_never_shows_the_password(self):
         message, strong = hosting_secrets.check_password(self.path)

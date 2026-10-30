@@ -2,10 +2,11 @@
 
 Run on PythonAnywhere in a Bash console, then reload the web app from the Web tab:
 
+    workon chi-portfolio
     cd ~/chi-portfolio/backend/src
-    python3 hosting_secrets.py check           # is the current admin password weak?
-    python3 hosting_secrets.py password        # choose a new admin password
-    python3 hosting_secrets.py session-secret  # new session secret: signs everyone out
+    python hosting_secrets.py check            # is the current admin password weak?
+    python hosting_secrets.py password         # choose a new admin password
+    python hosting_secrets.py session-secret   # new session secret: signs everyone out
 
 password and session-secret rewrite ~/.config/chi-portfolio/hosting.json in place, keeping its other
 settings and its owner-only permissions.
@@ -15,53 +16,45 @@ import getpass
 import json
 import os
 from pathlib import Path
-import re
 import secrets
 
 SETTINGS = Path.home() / '.config' / 'chi-portfolio' / 'hosting.json'
 MIN_PASSWORD, MIN_SECRET = 16, 32
-GOOD_LENGTH = 20
-# Words a guesser tries first: generic passwords and names tied to this site.
-GUESSABLE = ('password', 'passw0rd', 'admin', 'letmein', 'welcome', 'qwerty', 'asdf',
-             'iloveyou', 'monkey', 'dragon', 'secret', 'cwoo', 'woo', 'chi', 'portfolio',
-             'python', 'anywhere', 'math')
-SEQUENCES = ('abcdefghijklmnopqrstuvwxyz', '0123456789', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm')
+# zxcvbn's estimate of the guesses needed; 10**15 is beyond any online guessing.
+GOOD_GUESSES_LOG10 = 15
+# Words tied to this site and its owner, which a guesser would try early.
+SITE_WORDS = ['cwoo', 'woo', 'chi', 'portfolio', 'admin', 'pythonanywhere', 'math']
 
 
 def weaknesses(password):
     """Plain-language reasons a password is easier to guess than a random one.
 
-    This catches common patterns only. It can't prove a password is random: a
-    password that passes can still be weak if it is reused or based on something
-    about you. A password manager's generator is the dependable source.
+    Uses zxcvbn, which estimates how many guesses an attacker would need from
+    common passwords, words, names, keyboard patterns, dates and repeats. It can't
+    see whether a password is reused elsewhere, so a password manager's generator
+    is still the dependable source.
     """
-    found = []
-    lowered = password.lower()
-    if len(password) < GOOD_LENGTH:
-        found.append(f'it is shorter than {GOOD_LENGTH} characters')
-    kinds = sum(bool(re.search(pattern, password)) for pattern in
-                (r'[a-z]', r'[A-Z]', r'[0-9]', r'[^a-zA-Z0-9]'))
-    if kinds < 3:
-        found.append('it uses fewer than three kinds of character '
-                     '(lowercase, uppercase, digits, symbols)')
-    words = [word for word in GUESSABLE if word in lowered]
-    if words:
-        found.append('it contains an easily guessed word (' + ', '.join(words) + ')')
-    if re.search(r'(19|20)[0-9]{2}', password):
-        found.append('it contains something that looks like a year')
-    if re.search(r'(.)\1\1', password):
-        found.append('it repeats one character three or more times in a row')
-    runs = [run for run in SEQUENCES for start in range(len(run) - 3)
-            if run[start:start + 4] in lowered or run[start:start + 4][::-1] in lowered]
-    if runs:
-        found.append('it contains a run such as abcd, 1234 or qwer')
-    if len(set(password)) < len(password) / 2:
-        found.append('more than half of its characters are repeats')
+    try:
+        from zxcvbn import zxcvbn
+    except ImportError:
+        raise SystemExit('The zxcvbn package is missing. Run this with the site\'s virtualenv '
+                         '(workon chi-portfolio), or pip install -r backend/requirements.txt there.')
+    result = zxcvbn(password, user_inputs=SITE_WORDS)
+    if result['guesses_log10'] >= GOOD_GUESSES_LOG10:
+        return []
+    feedback = result['feedback']
+    found = [f'It could be guessed in about 10^{int(result["guesses_log10"])} tries '
+             f'(aim for at least 10^{GOOD_GUESSES_LOG10})']
+    if feedback['warning']:
+        found.append(feedback['warning'].rstrip('.'))
+    found.extend(suggestion.rstrip('.') for suggestion in feedback['suggestions'])
     return found
 
 
 def report(found):
-    return 'Weak: ' + '; '.join(found) + '.' if found else 'No common weaknesses found.'
+    if not found:
+        return 'No common weaknesses found.'
+    return 'Weak:\n' + ''.join(f'  - {line}\n' for line in found)
 
 
 def load(path):
@@ -86,7 +79,7 @@ def save(path, values):
 def check_password(path):
     """Look at the current admin password without showing it."""
     found = weaknesses(str(load(path).get('ADMIN_PASSWORD', '')))
-    advice = (' Consider a new one from a password manager: python3 hosting_secrets.py password'
+    advice = ('Consider a new one from a password manager: python hosting_secrets.py password'
               if found else '')
     return report(found) + advice, not found
 

@@ -56,10 +56,11 @@ The two are different things:
 **Steps** (in a PythonAnywhere **Bash console**: Dashboard, then Consoles, then Bash):
 
 ```bash
+workon chi-portfolio                      # use the site's virtualenv (has zxcvbn)
 cd ~/chi-portfolio/backend/src
-python3 hosting_secrets.py check           # optional: is the current one weak?
-python3 hosting_secrets.py password        # asks twice, hidden; 16+ characters
-python3 hosting_secrets.py session-secret  # only if you also want everyone signed out
+python hosting_secrets.py check           # optional: is the current one weak?
+python hosting_secrets.py password        # asks twice, hidden; 16+ characters
+python hosting_secrets.py session-secret  # only if you also want everyone signed out
 ```
 
 Then open the **Web** tab and press **Reload**. Sign in at the live admin page with
@@ -83,24 +84,29 @@ Good to know:
 
 ### Checking whether a password is weak
 
-`python3 hosting_secrets.py check` looks at the current live password and says either
+`python hosting_secrets.py check` looks at the current live password and says either
 "No common weaknesses found" or "Weak:" with the reasons, without ever showing the
 password. `password` runs the same check on a new password and asks you to type
 `yes` before saving one that has weaknesses.
 
-It flags: fewer than 20 characters; fewer than three kinds of character (lowercase,
-uppercase, digits, symbols); words a guesser tries first (such as `password`,
-`admin`, `cwoo`, `chi`); something that looks like a year; one character three times
-in a row; runs like `abcd`, `1234` or `qwer`; and more than half the characters
-being repeats.
+The check uses [zxcvbn](https://pypi.org/project/zxcvbn/), a widely used password
+strength estimator (a Python port of one Dropbox built). It estimates how many guesses
+an attacker would need, knowing tens of thousands of common passwords, English words
+and names, keyboard patterns like `qwerty`, dates, repeats, and swaps like `p@ssw0rd`.
+The tool also tells it the words tied to this site (`cwoo`, `chi`, `portfolio`,
+`admin` and so on) so it counts those as easy guesses. A password counts as weak if it
+would take fewer than 10^15 guesses; a random 16-character password or four random
+words clears that. When it is weak you see zxcvbn's own warning and suggestions.
 
-What it can't do: no program can tell whether a password was *chosen* randomly.
-It only spots common patterns, so a password that passes can still be weak if you
-use it elsewhere or it is based on something about you. That is why the dependable
-route is a password manager's generator (20+ characters, all kinds of character),
-not the check. A generated multi-word passphrase made only of lowercase words is
-also strong, but the check will flag it for having few kinds of character; that
-warning is safe to override.
+What it can't do: no program can tell whether a password was *chosen* randomly, or
+whether you use it somewhere else. It only estimates from patterns, so the dependable
+route is still a password manager's generator (20+ random characters, or a passphrase
+of four or more random words).
+
+zxcvbn is installed in the site's virtualenv from `backend/requirements.txt`. If the
+tool says "The zxcvbn package is missing", you ran it without `workon chi-portfolio`,
+or the package hasn't been installed there yet:
+`workon chi-portfolio` then `pip install zxcvbn==4.5.0`.
 
 There is no reminder to change the password on a schedule. Current advice (NIST
 SP 800-63B) is not to force periodic changes; change it when it is weak, reused,

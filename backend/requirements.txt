@@ -1,6 +1,7 @@
 Flask==3.1.3
 Pillow==12.2.0
 waitress==3.0.2
+zxcvbn==4.5.0
 # Transitive dependencies pinned to the verified environment.
 blinker==1.9.0
 click==8.5.0
