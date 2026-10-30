@@ -625,29 +625,55 @@ Git is separate: a batch publishes database content and commits nothing.
 
 #### Record a batch in git
 
-After `VERIFIED` and a successful option 8, record the batch as a migration so the
-repository can rebuild the same entries. This is how the field theory, real
-analysis, averages, K_1 and naive set theory batches were recorded
-(`add_*_entries_2026102*.py`, PRs #14, #17 and #19).
+After `VERIFIED` and a successful option 8, record the batch in git with helper
+option **23**, so the repository can rebuild the same entries. It does three things,
+and nothing on the live site or in your databases changes:
 
-1. Write `backend/src/database/math/migrations/add_<topic>_entries_<date>.py`.
-   It lists each entry (title, slug, classifications, synonyms, defined terms,
-   related slugs, body, reference) and calls `math_entry_batch.run_batch`, with
-   any autolink escapes the batch needed. Its docstring names the batch and the
-   date it was published.
-2. Put the entries in **live id order**, the order option 20 published them
-   (`review.txt` and the receipts show it), with an `ORDER` list and an
-   assertion that it covers every entry. Option 20 chooses its own dependency
-   order, so this is usually not the order the entries were written in.
-3. Check it on a copy of a database from just before the batch: for example the
-   live snapshot that option 8 brought home with the batch's entries removed, or
-   a pre-batch live snapshot. Run it with `--db` (a preview), then `--apply` on
-   that copy, and compare the new rows with the live snapshot. Ids, text and
-   metadata should match exactly. Never run it on the working copy or on live.
-4. Open a PR, merge it, then `git pull` on the laptop.
+1. **Writes the migration** `backend/src/database/math/migrations/add_<topic>_entries_<date>.py`
+   from the batch's frozen packages (exactly the bytes you reviewed and published),
+   in option 20's publish order, which is the live id order. The entries are kept
+   as data (a JSON list), and the shared `math_entry_record.py` replays them through
+   the same publishing code the live site ran. Diagram SVGs go beside it in
+   `batch_diagrams/<migration name>/`.
+2. **Checks it** on scratch copies of your baseline (the live snapshot option 8
+   brought home): it removes the batch's entries from a copy, replays the
+   migration, and requires every entry, its metadata and diagram rows to match the
+   baseline, and the ids to come out in the same order (normally identical). It
+   stops if an entry was edited after the batch, or if another entry now points at
+   one of them; then the record must be written by hand (below).
+3. **After you type `COMMIT`**, commits only that file (and its SVGs) on a new
+   branch `entries/<date>-<topic>`, starting from GitHub's `main`, and pushes it.
+   The commit is made in a separate checkout under `dist/math-batches/<batch id>/git`,
+   so your own folder, its branch and anything you have staged there are left
+   alone. It then prints a link to open the pull request.
+
+It asks for the topic once (lowercase words joined by hyphens, such as
+`group-basics`) and saves it with the branch in the batch manifest. If anything
+stops it (a failed push, the window closed), choose 23 again: it reuses the
+branch, skips a commit it already made and retries the push. Open the pull request
+from the link, wait for the checks, merge it, then `git pull` on the laptop.
 
 The migration is a record. It does not publish anything, and option 20 remains the
-way to publish new entries.
+way to publish new entries. To try one yourself, run it on a copy of a pre-batch
+database, never on the working copy or live:
+
+```powershell
+.\.venv313\Scripts\python.exe backend/src/database/math/migrations/add_<topic>_entries_<date>.py --db C:\path\to\copy.db
+```
+
+That previews; add `--apply` to write to the copy after a backup. Diagram files go
+into `data\math\diagrams` next to that copy.
+
+Option 23 only lists batches whose entries are all live, and refuses one whose
+pages are not marked `VERIFIED` or that option 8 has not brought home.
+
+**By hand** (only if option 23 cannot check a batch, for example because an entry
+was edited before the record was made): the older batches (field theory, real
+analysis, averages, K_1, naive set theory; PRs #14, #17 and #19) were recorded as
+`add_<topic>_entries_<date>.py` scripts built on `math_entry_batch.run_batch`, with
+each entry's fields written out, an `ORDER` list in live id order, and checked on a
+pre-batch copy against the live snapshot. Copy the newest one and ask Claude in the
+project to help.
 
 ### Merge or retire entries (option 21)
 

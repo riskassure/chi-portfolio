@@ -16,7 +16,7 @@ sys.path.insert(0, str(MIGRATIONS))
 import add_autolink_inflection_synonyms
 import migration_db
 
-SCRIPTS = sorted(p for p in MIGRATIONS.glob('*.py') if p.name not in {'__init__.py', 'migration_db.py', 'math_entry_batch.py', 'math_entry_merge.py'})
+SCRIPTS = sorted(p for p in MIGRATIONS.glob('*.py') if p.name not in {'__init__.py', 'migration_db.py', 'math_entry_batch.py', 'math_entry_merge.py', 'math_entry_record.py'})
 
 SCHEMA = '''
 CREATE TABLE math_concepts (id INTEGER PRIMARY KEY, slug TEXT UNIQUE, canonical_name TEXT,

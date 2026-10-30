@@ -75,7 +75,7 @@ preview: the helper explicitly selects a working copy.
 | Change | Preparation option |
 | --- | --- |
 | Supported math changes | **1** lists math changes; **2** prepares one |
-| Several new math entries at once | **20** publishes a reviewed batch of new entries; see [Publish a batch of new entries](administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries) |
+| Several new math entries at once | **20** publishes a reviewed batch of new entries, then **23** records it in git; see [Publish a batch of new entries](administration/deployment/CONTENT_SYNC.md#publish-a-batch-of-new-entries) |
 | Merge two math entries, retire one, or undo either | **21**, then 3/4/5 for its package; see [Merge two entries](#merge-two-entries-option-21) |
 | Math entry with new, changed or missing PSTricks diagrams | **19** renders missing SVGs on this computer, then **1** and **2**; see [Publish a diagram change](administration/deployment/CONTENT_SYNC.md#publish-a-diagram-change) |
 | Biography or resume text | **9** |
@@ -214,9 +214,12 @@ Every step is on the laptop, in the project folder. Details, stops and resuming:
 7. **Option 8.** Stop the local server, type `STOPPED`. If it reports
    "synchronization blocked", the batch is still published: resolve the named
    difference and choose 20 again (nothing is republished).
-8. **Record it in git:** a migration `add_<topic>_entries_<date>.py` built on
-   `math_entry_batch.run_batch`, with its `ORDER` list in live id order, checked to
-   reproduce the live rows. Open a PR, merge it, then `git pull` on the laptop. See
+8. **Option 23: record it in git.** Pick the batch and give a topic (lowercase
+   words joined by hyphens, such as `group-basics`). It writes the migration, checks
+   it rebuilds the batch exactly as your baseline holds it, and after you type
+   `COMMIT` pushes it on its own branch `entries/<date>-<topic>`. Open the pull
+   request from the link it prints, merge it when the checks are green, then
+   `git pull`. If it stops, choose 23 again. See
    [Record a batch in git](administration/deployment/CONTENT_SYNC.md#record-a-batch-in-git).
 
 Edits to existing entries are not part of a batch: publish them one at a time with

@@ -494,7 +494,8 @@ def synchronize(manifest, state):
     if result['safe']:
         state.pop('batch', None)
         w.save(state)
-        print(f"Batch \"{manifest['name']}\" is finished: published, verified and brought home.")
+        print(f"Batch \"{manifest['name']}\" is finished: published, verified and brought home. "
+              'Choose 23 to record it in git.')
     else:
         print('Publication complete; synchronization blocked. Your working copy is unchanged. '
               'Review the comparison report, then choose 20 to run option 8 again; nothing will be republished.')

@@ -18,7 +18,7 @@ everything from the project folder `C:\Development\chi-portfolio` in PowerShell.
 | Edit an existing math entry (on the road) | [Example below](#example-editing-a-math-entry-on-the-road) | Also the only route for title, classification, type, defined-term and related-concept fixes |
 | Add one new entry | [Adding a math entry, section A](../features/math/ADDING_ENTRIES.md#a-local-first-create-review-then-publish) | Section B is the live-site route |
 | Publish a diagram change | [Publish a diagram change](deployment/CONTENT_SYNC.md#publish-a-diagram-change) | Option 19, then 1 and 2 |
-| Add many entries at once | [Runbook: option 20](../ADMIN_RUNBOOK.md#add-many-new-entries-at-once-option-20) | Publishing is self-service. Writing its migration is the hard part: see [Recording a batch yourself](#recording-a-batch-yourself) |
+| Add many entries at once | [Runbook: option 20](../ADMIN_RUNBOOK.md#add-many-new-entries-at-once-option-20) | Publishing is self-service; option **23** then writes and pushes its migration: see [Recording a batch](#recording-a-batch) |
 | Merge two entries | [Runbook: option 21](../ADMIN_RUNBOOK.md#merge-two-entries-option-21) | The migration is generated for you (`math_entry_merge.py --write`) |
 | Photo title, location, coordinates | [Updating existing photo details](deployment/CONTENT_SYNC.md#updating-existing-photo-details) | Option 12 |
 | Biography or resume | [Biography and resume updates](deployment/CONTENT_SYNC.md#biography-and-resume-updates) | Option 9 |
@@ -129,7 +129,7 @@ first, then redo the local edit on top of the road version.
 | Edit an existing math entry, on the road | Live `math/edit.html?id=<id>`, after a backup | Saving publishes it | None | When you're home |
 | One new math entry, at home | Local `math/create.html` | **2**, then 3/4/5 (**19** first if it has diagrams) | None | Yes |
 | One new math entry, on the road | Live `math/create.html`, after a backup | Saving publishes it | None | When you're home |
-| Many new entries | Working copy (local editor or a script) | **20** | Migration PR afterwards, then `git pull` | Yes, before the migration |
+| Many new entries | Working copy (local editor or a script) | **20**, then **23** | Option 23's PR afterwards, then `git pull` | Yes, before the migration |
 | Merge or retire entries | Working copy (S's text), plus option 21's session | **2**-5 for S, then **21** and 3/4/5 | Migration PR afterwards, then `git pull` | Yes, after each merge |
 | Photo title, location, coordinates, at home | Local gallery, **Save Details** | **12**, then 3/4/5 | None | Yes |
 | Photo title, location, coordinates, on the road | Live gallery, **Save Details** | Saving publishes it | None | When you're home |
@@ -210,27 +210,14 @@ changed: your old working copy is still the one in use. Open the report:
 Never edit the baseline, copy a database over another, or delete the report folder
 to get past a refusal.
 
-## Recording a batch yourself
+## Recording a batch
 
-Option 20 publishes a batch on its own, but there is no generator for its git record
-yet (unlike merges). To write one by hand:
-
-1. Copy the newest batch migration, such as
-   `backend/src/database/math/migrations/add_settheory_entries_20261025.py`, to
-   `add_<topic>_entries_<date>.py`.
-2. Replace its entries with yours, taking each entry's title, slug, classifications,
-   synonyms, defined terms, related slugs and body from the working copy
-   (`math_concepts` and its side tables). Set `ORDER` to the live id order shown in
-   `dist/math-batches/<batch id>/review.txt`.
-3. Run it with `--db <copy of a pre-batch database>` (preview), adjust the escape
-   lists until its links match the live entries, then `--apply` on that copy and
-   compare the rows with the live snapshot, as in
-   [Record a batch in git](deployment/CONTENT_SYNC.md#record-a-batch-in-git).
-4. Commit, PR, merge, `git pull`.
-
-Step 3 (matching the automatic links exactly) is the fiddly part. If it's in the way,
-the batch is still safely published without it; the migration only lets the
-repository rebuild the entries.
+Option 20 publishes a batch, and option **23** records it: it writes the migration,
+checks it against your baseline, and pushes it on a branch `entries/<date>-<topic>`
+for you to open a pull request, merge, and `git pull`. See
+[Record a batch in git](deployment/CONTENT_SYNC.md#record-a-batch-in-git). If option 23
+cannot check a batch, the batch is still safely published; the migration only lets
+the repository rebuild the entries, and the page above says how to write one by hand.
 
 ## Backups for live edits
 
