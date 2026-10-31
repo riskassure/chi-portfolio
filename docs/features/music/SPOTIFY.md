@@ -45,8 +45,8 @@ cd /home/cwoo/chi-portfolio/backend/src && SPOTIFY_TOKEN_PATH=/home/cwoo/.config
 The CLI requires an explicit existing database; it never creates a missing
 portfolio database. Production setup requires deployment, private token
 installation, an initial refresh verification, and daily task activation.
-Spotify may require reauthorization later; reconnect if refresh is
-rejected. Never commit, paste into chat, or place tokens in a deployment package.
+Spotify may require reauthorization later; if refresh is rejected, follow
+[Renewing the Spotify sign-in](../../administration/SPOTIFY_RENEWAL.md). Never commit, paste into chat, or place tokens in a deployment package.
 
 References: https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks
 and https://developer.spotify.com/documentation/web-api/tutorials/refreshing-tokens
