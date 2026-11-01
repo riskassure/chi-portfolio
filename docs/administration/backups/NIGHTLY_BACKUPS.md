@@ -37,6 +37,13 @@ next run removes leftovers older than a day.
 `/home/cwoo/backups/` (option 8, publishes, `before-live-edit-…`, `before-restore-…`,
 full-site archives) is never touched.
 
+## Access logs too (added 2026-11-01)
+
+With `--access-log /var/log/www.cwoo.me.access.log --log-archive /home/cwoo/backups/access-logs`
+the same task also copies every rotated web server log into the archive folder, once each,
+before PythonAnywhere deletes it. Those files are never rotated away. Setup and the full task
+command: [Weekly visit report](../WEEKLY_VISIT_REPORT.md#5-scheduled-tasks).
+
 ## Set it up (once)
 
 ### 1. Merge, pull, publish the script

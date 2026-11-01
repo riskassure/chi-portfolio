@@ -10,6 +10,10 @@ Commands (all take explicit paths; nothing has a default location):
   restore-live Copy one backup INTO the live database. Preview unless --apply;
                a verified before-restore copy of the current database is made first.
 
+backup can also keep the web server's old access logs (--access-log and --log-archive):
+every rotated copy PythonAnywhere has not deleted yet is saved, compressed, once; see
+services/access_log_archive.py. Saved logs are never rotated away.
+
 Only files named portfolio-YYYYMMDDTHHMMSSZ.db.gz (and their .json notes) in the
 nightly folder are ever deleted. Other backups are never touched.
 
@@ -245,6 +249,14 @@ def restore_live(path, database, folder, apply=False, now=None):
             staged.unlink()
 
 
+def save_access_logs(log, folder):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from services import access_log_archive
+    report = access_log_archive.save_rotated(log, folder)
+    report['status'] = 'ok'
+    return report
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -255,6 +267,9 @@ def main(argv=None):
     run.add_argument('--keep-weekly', type=int, default=4)
     run.add_argument('--keep-monthly', type=int, default=6)
     run.add_argument('--warn-mb', type=int, default=200)
+    run.add_argument('--access-log', type=Path,
+                     help='also save rotated copies of this log, e.g. /var/log/www.cwoo.me.access.log')
+    run.add_argument('--log-archive', type=Path, help='where saved logs go, e.g. /home/cwoo/backups/access-logs')
     check = commands.add_parser('check', help='verify every nightly backup')
     check.add_argument('--backups', required=True, type=Path)
     out = commands.add_parser('extract', help='decompress one backup into a new .db file')
@@ -270,9 +285,22 @@ def main(argv=None):
     if args.command == 'backup':
         if min(args.keep_daily, args.keep_weekly, args.keep_monthly) < 1:
             parser.error('keep counts must be at least 1')
+        if (args.access_log is None) != (args.log_archive is None):
+            parser.error('--access-log and --log-archive go together')
+        logs = None
+        if args.access_log:
+            # Saved first and on its own: a log problem must not stop the database backup.
+            try:
+                logs = save_access_logs(args.access_log, args.log_archive)
+            except Exception as error:
+                logs = dict(status='failed', error=f'{type(error).__name__}: {error}')
         report = backup(args.database, args.backups, daily=args.keep_daily, weekly=args.keep_weekly,
                         monthly=args.keep_monthly, warn_mb=args.warn_mb)
+        if logs is not None:
+            report['access_logs'] = logs
         print(json.dumps(report, indent=2))
+        if logs is not None and logs.get('status') == 'failed':
+            return 1
     elif args.command == 'check':
         rows = check_all(args.backups)
         for name, ok, detail in rows:

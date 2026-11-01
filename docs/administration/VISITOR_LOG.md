@@ -29,7 +29,9 @@ browser sends of itself).
 PythonAnywhere **rotates** the log: it renames the file to `.1`, then compresses older copies
 as `.2.gz`, `.3.gz` and so on, and eventually deletes the oldest. The download reads all of
 them, so the CSV goes back only as far as PythonAnywhere keeps them, typically a few weeks.
-If you want a longer history, download the CSV every couple of weeks and keep the files.
+Since 2026-11-01 the nightly backup also saves every rotated log for good, in
+`/home/cwoo/backups/access-logs/`, and a weekly Excel report is emailed to you built from them:
+[Weekly visit report](WEEKLY_VISIT_REPORT.md).
 
 ## The CSV columns
 

@@ -37,6 +37,7 @@ for changes you didn't make.
 | Google Photos client secret | Google Cloud Console | No | Laptop `google-oauth.json` |
 | Google Photos tokens | Google account, third-party access | Laptop import only | Connect again |
 | Esri key | ArcGIS developer dashboard | No | Laptop key file, then option 17 |
+| Gmail app password (weekly report) | Google account, App passwords; then PythonAnywhere Bash console: `hosting_secrets.py email` | No | Nothing: [Weekly visit report](WEEKLY_VISIT_REPORT.md#changing-or-cancelling) |
 
 ## Live admin password and session secret
 
