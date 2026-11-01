@@ -209,8 +209,13 @@ def loaded_page_parts(row, times):
     return i < len(later) and later[i] <= start + FOLLOW_UP_SECONDS
 
 
-def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True, zone=timezone.utc):
-    """CSV text, plus counts of what was kept and left out; local columns use zone."""
+def build_rows(lines, my_address='', ignore=(), locate=None, pages_only=True, zone=timezone.utc,
+               start=None, end=None):
+    """Rows of COLUMNS values (raw, not spreadsheet-safe), plus counts of what was kept and left out.
+
+    Local columns use zone. With start/end (aware datetimes), only requests in [start, end)
+    become rows; requests outside still count for spotting admin days and real browsers.
+    """
     rows = [row for row in map(parse, lines) if row]
     rows.sort(key=lambda row: row['when'])
     day = lambda row: row['when'].astimezone(timezone.utc).date()
@@ -218,11 +223,10 @@ def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True, zon
     follow_ups = follow_up_times(rows)
     always = set(ignore) | ({my_address} if my_address else set())
     counts = Counter()
-    places, visitors = {}, {}
-    out = io.StringIO()
-    writer = csv.writer(out)
-    writer.writerow(COLUMNS)
+    places, visitors, found = {}, {}, []
     for row in rows:
+        if (start and row['when'] < start) or (end and row['when'] >= end):
+            continue
         kind, system, browser = device(row['user_agent'])
         if row['ip'] in always or (row['ip'], day(row)) in mine:
             counts['you'] += 1
@@ -244,11 +248,22 @@ def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True, zon
         else:
             real = ''
         utc, local = row['when'].astimezone(timezone.utc), row['when'].astimezone(zone)
-        writer.writerow(map(safe_cell, [utc.strftime('%Y-%m-%d %H:%M:%S'), local.strftime('%Y-%m-%d %H:%M:%S'),
-                         local.strftime('%A'), local.hour, f'V{visitor}', row['ip'],
-                         kind, system, browser, city, region, country, network,
-                         'yes' if is_cloud(network) else '', real, row['method'],
-                         row['page'], row['status'], row['referrer'], row['user_agent']]))
+        found.append([utc.strftime('%Y-%m-%d %H:%M:%S'), local.strftime('%Y-%m-%d %H:%M:%S'),
+                      local.strftime('%A'), local.hour, f'V{visitor}', row['ip'],
+                      kind, system, browser, city, region, country, network,
+                      'yes' if is_cloud(network) else '', real, row['method'],
+                      row['page'], row['status'], row['referrer'], row['user_agent']])
+    return found, counts
+
+
+def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True, zone=timezone.utc):
+    """CSV text, plus counts of what was kept and left out; local columns use zone."""
+    found, counts = build_rows(lines, my_address, ignore, locate, pages_only, zone)
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(COLUMNS)
+    for values in found:
+        writer.writerow(map(safe_cell, values))
     return out.getvalue(), counts
 
 

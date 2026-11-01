@@ -7,8 +7,9 @@ Run on PythonAnywhere in a Bash console, then reload the web app from the Web ta
     python hosting_secrets.py check            # is the current admin password weak?
     python hosting_secrets.py password         # choose a new admin password
     python hosting_secrets.py session-secret   # new session secret: signs everyone out
+    python hosting_secrets.py email            # Gmail address + app password for the weekly report
 
-password and session-secret rewrite ~/.config/chi-portfolio/hosting.json in place, keeping its other
+password, session-secret and email rewrite ~/.config/chi-portfolio/hosting.json in place, keeping its other
 settings and its owner-only permissions.
 """
 import argparse
@@ -111,9 +112,28 @@ def change_session_secret(path):
             'everyone signed in (including you) is then signed out.')
 
 
+def change_email(path, ask=getpass.getpass, answer=input):
+    """Store the Gmail address and app password the weekly visit report sends with."""
+    values = load(path)
+    sender = answer('Gmail address to send from: ').strip()
+    if '@' not in sender:
+        raise SystemExit('That is not an email address. Nothing was changed.')
+    recipient = answer(f'Send the report to [{sender}]: ').strip() or sender
+    if '@' not in recipient:
+        raise SystemExit('That is not an email address. Nothing was changed.')
+    # Google shows app passwords as four groups of four letters; the spaces are optional.
+    password = ''.join(ask('Gmail app password (16 letters, spaces optional): ').split())
+    if len(password) != 16 or not password.isalpha():
+        raise SystemExit('A Gmail app password is 16 letters. Nothing was changed.')
+    values.update(REPORT_EMAIL_FROM=sender, REPORT_EMAIL_TO=recipient, REPORT_EMAIL_PASSWORD=password)
+    save(path, values)
+    return ('Email settings saved. Check them with: python weekly_visit_report.py test-email '
+            '(no reload needed; the website does not use them).')
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('what', choices=['check', 'password', 'session-secret'])
+    parser.add_argument('what', choices=['check', 'password', 'session-secret', 'email'])
     parser.add_argument('--settings', type=Path, default=SETTINGS, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.what == 'check':
@@ -122,6 +142,8 @@ def main(argv=None):
         raise SystemExit(0 if strong else 1)
     if args.what == 'password':
         print(change_password(args.settings))
+    elif args.what == 'email':
+        print(change_email(args.settings))
     else:
         print(change_session_secret(args.settings))
 

@@ -364,6 +364,10 @@ The admin page's **Visitor log** buttons download a CSV of visits, without your 
 robots. Columns, limits (location is approximate, names are never known) and the one-time
 PythonAnywhere setup: [Visitor log](administration/VISITOR_LOG.md).
 
+Every Monday an email brings last week's visits as an Excel file (summaries of real visitors
+plus every page view with the robot filter), and the nightly backup keeps every access log
+so the history isn't lost: [Weekly visit report](administration/WEEKLY_VISIT_REPORT.md).
+
 ## Backups, failures and recovery
 
 **Site down?** Start with [When the site is down](administration/backups/SITE_DOWN_RECOVERY.md):

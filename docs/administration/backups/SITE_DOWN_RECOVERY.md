@@ -163,12 +163,13 @@ name, including in the helper's settings):
    `webapp-…pythonanywhere.com` value ([C](#c-domain-problem)). When `nslookup` shows it,
    turn on the auto-renewing Let's Encrypt certificate in the Web tab's Security section.
 
-6. **Scheduled tasks.** Tasks tab, two daily tasks (recorded 2026-10-30):
+6. **Scheduled tasks.** Tasks tab, three daily tasks (recorded 2026-10-30; weekly report and log copy added 2026-11-01):
 
    | Time (UTC) | Command | Description |
    | --- | --- | --- |
-   | 10:17 | `/home/cwoo/.virtualenvs/chi-portfolio/bin/python /home/cwoo/chi-portfolio/backend/src/database/nightly_backup.py backup --database /home/cwoo/chi-portfolio/backend/portfolio.db --backups /home/cwoo/backups/nightly` | Nightly live DB backup |
+   | 10:17 | `/home/cwoo/.virtualenvs/chi-portfolio/bin/python /home/cwoo/chi-portfolio/backend/src/database/nightly_backup.py backup --database /home/cwoo/chi-portfolio/backend/portfolio.db --backups /home/cwoo/backups/nightly --access-log /var/log/www.cwoo.me.access.log --log-archive /home/cwoo/backups/access-logs` | Nightly live DB backup and access-log copy |
    | 16:30 | `cd /home/cwoo/chi-portfolio/backend/src && SPOTIFY_TOKEN_PATH=/home/cwoo/.config/chi-portfolio/spotify-tokens.json /home/cwoo/.virtualenvs/chi-portfolio/bin/python -m services.music.spotify_top --database /home/cwoo/chi-portfolio/backend/portfolio.db --refresh` | Refresh six-month Spotify top tracks |
+   | 17:05 | `/home/cwoo/.virtualenvs/chi-portfolio/bin/python /home/cwoo/chi-portfolio/backend/src/weekly_visit_report.py send` | Weekly visit report email (sends once per week) |
 
 7. **Keys.** Esri: helper option 17 from the laptop. Spotify: follow
    [Spotify renewal](../SPOTIFY_RENEWAL.md). SSH for the helper: add the laptop's public
