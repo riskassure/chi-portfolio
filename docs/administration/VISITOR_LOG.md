@@ -36,11 +36,16 @@ If you want a longer history, download the CSV every couple of weeks and keep th
 | Column | Meaning |
 | --- | --- |
 | `time_utc` | When the request arrived, in UTC (Coordinated Universal Time, not your local time) |
+| `local_time` | The same moment in your own time zone (the admin page tells the server which time zone your browser is set to; daylight saving is handled) |
+| `weekday` | Day of the week in your time zone, e.g. `Friday` |
+| `hour` | Hour of the day in your time zone, 0 to 23 (`18` means 6:00 to 6:59 pm), handy for a pivot table of busy times |
 | `visitor` | `V1`, `V2`, ... One number per IP address plus browser, in order of first visit. A rough way to count people; see the limits below |
 | `ip` | The visitor's IP address |
 | `device` | `phone`, `tablet`, `computer` or `unknown`, guessed from the User-Agent |
 | `os`, `browser` | Operating system and browser, also from the User-Agent |
 | `city`, `region`, `country` | Approximate place, from the IP address (blank until the location file is installed, see below) |
+| `network` | Who owns the IP address: a home or phone provider such as "Comcast Cable" or "Verizon", or a company such as "Amazon.com" (blank until the network file is installed) |
+| `cloud` | `yes` when `network` is a cloud or hosting company (Amazon, Microsoft, DigitalOcean, Hetzner, ...). Real people rarely browse from those, so these rows are almost always robots pretending to be browsers. Filter on this column in Excel to hide them |
 | `method` | `GET` means "fetch this"; other methods send data to the server |
 | `page` | The address asked for. For math entries the `slug=` part says which entry |
 | `status` | 200 = worked, 304 = browser already had it, 404 = not found |
@@ -98,8 +103,9 @@ told apart and will appear as visitors.
 ## One-time setup on PythonAnywhere
 
 After the code is published (option 15 with `backend/src/services/visitor_log.py,
-backend/src/routes/admin_visitors.py, backend/src/geoip_update.py, backend/src/app.py`, then
-option 14 with `frontend/admin_dashboard.html,frontend/admin_style.css`, then options 3, 4, 5),
+backend/src/routes/admin_visitors.py, backend/src/geoip_update.py, backend/src/app.py,
+frontend/admin_app.js`, then
+option 14 with `admin_dashboard.html,admin_style.css` (option 14 paths are relative to `frontend/`), then options 3, 4, 5),
 open a **Bash console** on PythonAnywhere and run:
 
 ```
@@ -112,8 +118,8 @@ python geoip_update.py
 Then **Reload** the web app on the Web tab. The download works without the location file, just
 with blank location columns.
 
-`geoip_update.py` downloads the city-level file (about 130 MB of your disk space). If disk is
-tight, use `python geoip_update.py --country` instead (about 8 MB, country only). DB-IP
+`geoip_update.py` downloads the city-level file (about 130 MB of your disk space) and the network-owner file (about 10 MB). If disk is
+tight, use `python geoip_update.py --country` instead (about 8 MB, country only; the network file still comes too). DB-IP
 publishes a new file every month; addresses move slowly, so re-running it every few months is
 plenty. No reload is needed after an update.
 

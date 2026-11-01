@@ -3,7 +3,8 @@
 PythonAnywhere writes one line per request to /var/log/<domain>.access.log and keeps a
 few older copies beside it (.1, then .2.gz, .3.gz, ...). Each line starts with the
 visitor's IP address and ends with the browser's User-Agent text. From those we work
-out the device type, and, when a DB-IP location file is installed, the rough place.
+out the device type, and, when DB-IP's files are installed, the rough place and who
+owns the network (a cloud company's network almost always means a robot).
 
 Chi's own requests are left out: the address of whoever is downloading, any address
 that did admin work (sign-in or a saved change) on the same UTC day, and any address
@@ -23,6 +24,7 @@ from urllib.parse import urlsplit
 CONFIG = Path.home() / '.config' / 'chi-portfolio'
 IGNORE_FILE = CONFIG / 'visitor-log-ignore-ips.txt'
 GEO_FILE = CONFIG / 'geoip' / 'dbip-location.mmdb'
+ASN_FILE = CONFIG / 'geoip' / 'dbip-asn.mmdb'
 
 # PythonAnywhere's format is nginx "combined" plus extra fields after the user agent.
 LINE = re.compile(r'(?P<ip>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "(?P<request>[^"]*)" '
@@ -30,8 +32,14 @@ LINE = re.compile(r'(?P<ip>\S+) \S+ \S+ \[(?P<time>[^\]]+)\] "(?P<request>[^"]*)
 BOT_WORDS = ('bot', 'crawl', 'spider', 'slurp', 'curl', 'wget', 'python', 'go-http',
              'java/', 'okhttp', 'headless', 'scrapy', 'httpclient', 'monitor', 'uptime',
              'preview', 'facebookexternalhit', 'feedfetcher', 'zgrab', 'masscan')
-COLUMNS = ['time_utc', 'visitor', 'ip', 'device', 'os', 'browser', 'city', 'region',
-           'country', 'method', 'page', 'status', 'referrer', 'user_agent']
+# Words in a network owner's name that mean a data centre rather than a home or phone line.
+CLOUD_WORDS = ('amazon', 'aws', 'google', 'microsoft', 'azure', 'digitalocean', 'linode',
+               'akamai', 'ovh', 'hetzner', 'vultr', 'choopa', 'contabo', 'oracle', 'alibaba',
+               'tencent', 'huawei cloud', 'cloudflare', 'leaseweb', 'scaleway', 'hosting',
+               'datacenter', 'data center', 'server', 'colocation', 'm247', 'fastly', 'facebook',
+               'meta platforms', 'censys', 'shodan', 'internet measurement')
+COLUMNS = ['time_utc', 'local_time', 'weekday', 'hour', 'visitor', 'ip', 'device', 'os', 'browser', 'city', 'region',
+           'country', 'network', 'cloud', 'method', 'page', 'status', 'referrer', 'user_agent']
 
 
 def log_files(path):
@@ -129,27 +137,45 @@ def ignored_addresses(path=IGNORE_FILE):
     return found
 
 
-def open_locator(path=GEO_FILE):
-    """A lookup function for the DB-IP file, or None when it is not installed."""
+def open_reader(path):
     try:
         import maxminddb
-        reader = maxminddb.open_database(str(path))
+        return maxminddb.open_database(str(path))
     except (ImportError, OSError, ValueError):
         return None
 
-    def locate(ip):
+
+def is_cloud(network):
+    text = network.lower()
+    # Google Fiber is a home internet provider, unlike the rest of Google's networks.
+    if 'fiber' in text:
+        return False
+    return any(word in text for word in CLOUD_WORDS)
+
+
+def open_locator(path=None, asn_path=None):
+    """Look up (city, region, country, network) in the DB-IP files; None when neither is installed."""
+    places, owners = open_reader(path or GEO_FILE), open_reader(asn_path or ASN_FILE)
+    if not places and not owners:
+        return None
+
+    def find(reader, ip):
         try:
-            found = reader.get(ip) or {}
+            return (reader.get(ip) if reader else None) or {}
         except ValueError:
-            found = {}
+            return {}
+
+    def locate(ip):
+        found = find(places, ip)
         name = lambda part: (part or {}).get('names', {}).get('en', '')
         regions = found.get('subdivisions') or [{}]
-        return name(found.get('city')), name(regions[0]), name(found.get('country'))
+        owner = find(owners, ip).get('autonomous_system_organization', '')
+        return name(found.get('city')), name(regions[0]), name(found.get('country')), owner
     return locate
 
 
-def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True):
-    """CSV text, plus counts of what was kept and left out."""
+def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True, zone=timezone.utc):
+    """CSV text, plus counts of what was kept and left out; local columns use zone."""
     rows = [row for row in map(parse, lines) if row]
     rows.sort(key=lambda row: row['when'])
     day = lambda row: row['when'].astimezone(timezone.utc).date()
@@ -176,10 +202,12 @@ def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True):
         visitor = visitors.setdefault((row['ip'], row['user_agent']), len(visitors) + 1)
         if locate and row['ip'] not in places:
             places[row['ip']] = locate(row['ip'])
-        city, region, country = places.get(row['ip'], ('', '', ''))
-        utc = row['when'].astimezone(timezone.utc)
-        writer.writerow([utc.strftime('%Y-%m-%d %H:%M:%S'), f'V{visitor}', row['ip'],
-                         kind, system, browser, city, region, country, row['method'],
+        city, region, country, network = places.get(row['ip'], ('', '', '', ''))
+        utc, local = row['when'].astimezone(timezone.utc), row['when'].astimezone(zone)
+        writer.writerow([utc.strftime('%Y-%m-%d %H:%M:%S'), local.strftime('%Y-%m-%d %H:%M:%S'),
+                         local.strftime('%A'), local.hour, f'V{visitor}', row['ip'],
+                         kind, system, browser, city, region, country, network,
+                         'yes' if is_cloud(network) else '', row['method'],
                          row['page'], row['status'], row['referrer'], row['user_agent']])
     return out.getvalue(), counts
 

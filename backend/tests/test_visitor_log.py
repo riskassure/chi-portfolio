@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 SRC = Path(__file__).resolve().parents[1] / 'src'
 sys.path.insert(0, str(SRC))
@@ -64,7 +65,7 @@ class BuildCsvTests(unittest.TestCase):
         ]
         text, counts = visitor_log.build_csv(
             lines, my_address='5.5.5.5', ignore={'6.6.6.6'},
-            locate=lambda ip: ('Mountain View', 'California', 'United States'))
+            locate=lambda ip: ('Mountain View', 'California', 'United States', 'Google LLC'))
         found = rows(text)
         self.assertEqual(list(found[0]), visitor_log.COLUMNS)
         self.assertEqual([(r['ip'], r['page']) for r in found], [
@@ -75,9 +76,20 @@ class BuildCsvTests(unittest.TestCase):
                          ('2026-10-30 01:00:00', 'V1', 'phone', 'iOS'))
         self.assertEqual((first['city'], first['country'], first['referrer']),
                          ('Mountain View', 'United States', 'https://www.google.com/'))
+        self.assertEqual((first['network'], first['cloud']), ('Google LLC', 'yes'))
+        self.assertEqual((first['local_time'], first['weekday'], first['hour']),
+                         ('2026-10-30 01:00:00', 'Friday', '1'))
         self.assertEqual(counts['you'], 4)
         self.assertEqual(counts['bots'], 1)
         self.assertEqual(counts['kept'], 3)
+
+    def test_local_time_weekday_and_hour_follow_the_zone(self):
+        # 01:00 UTC on Friday 30 October is 18:00 on Thursday in Los Angeles (daylight time).
+        text, _ = visitor_log.build_csv([line('8.8.8.8', '30/Oct/2026:01:00:00', 'GET /')],
+                                        zone=ZoneInfo('America/Los_Angeles'))
+        row = rows(text)[0]
+        self.assertEqual((row['time_utc'], row['local_time'], row['weekday'], row['hour']),
+                         ('2026-10-30 01:00:00', '2026-10-29 18:00:00', 'Thursday', '18'))
 
     def test_every_request_mode_keeps_assets_but_still_drops_me_and_bots(self):
         lines = [line('8.8.8.8', '30/Oct/2026:01:00:00', 'GET /'),
@@ -86,7 +98,13 @@ class BuildCsvTests(unittest.TestCase):
                  line('9.9.9.9', '30/Oct/2026:01:00:03', 'GET /api/admin/math/types')]
         text, counts = visitor_log.build_csv(lines, pages_only=False)
         self.assertEqual([r['page'] for r in rows(text)], ['/', '/style.css'])
-        self.assertEqual(rows(text)[0]['city'], '')
+        self.assertEqual((rows(text)[0]['city'], rows(text)[0]['cloud']), ('', ''))
+
+    def test_cloud_networks(self):
+        for name in ('Amazon.com, Inc.', 'DigitalOcean, LLC', 'Hetzner Online GmbH', 'Microsoft Corporation'):
+            self.assertTrue(visitor_log.is_cloud(name), name)
+        for name in ('Comcast Cable Communications, LLC', 'Verizon Business', 'Google Fiber Inc.', ''):
+            self.assertFalse(visitor_log.is_cloud(name), name)
 
     def test_ignore_file_skips_comments_and_bad_lines(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -96,7 +114,8 @@ class BuildCsvTests(unittest.TestCase):
             self.assertEqual(visitor_log.ignored_addresses(Path(folder) / 'missing.txt'), set())
 
     def test_no_location_file_means_no_locator(self):
-        self.assertIsNone(visitor_log.open_locator(Path(tempfile.gettempdir()) / 'no-such.mmdb'))
+        missing = Path(tempfile.gettempdir()) / 'no-such.mmdb'
+        self.assertIsNone(visitor_log.open_locator(missing, missing))
 
 
 class LogFileTests(unittest.TestCase):
@@ -128,7 +147,8 @@ class RouteTests(unittest.TestCase):
                             + line('8.8.8.8', '30/Oct/2026:01:00:01', 'GET /style.css', agent=PHONE))
         for patcher in (patch.dict(os.environ, {'VISITOR_LOG_PATH': str(self.log)}),
                         patch.object(visitor_log, 'IGNORE_FILE', Path(folder.name) / 'none.txt'),
-                        patch.object(visitor_log, 'GEO_FILE', Path(folder.name) / 'none.mmdb')):
+                        patch.object(visitor_log, 'GEO_FILE', Path(folder.name) / 'none.mmdb'),
+                        patch.object(visitor_log, 'ASN_FILE', Path(folder.name) / 'none-asn.mmdb')):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.client = gateway.app.test_client()
@@ -143,6 +163,11 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('attachment; filename="visitors-pages-', response.headers['Content-Disposition'])
         self.assertEqual([r['device'] for r in rows(response.get_data(as_text=True))], ['phone'])
+        local = rows(self.client.get('/api/admin/visitor-log.csv?tz=Asia/Tokyo').get_data(as_text=True))
+        self.assertEqual((local[0]['local_time'], local[0]['weekday']), ('2026-10-30 10:00:00', 'Friday'))
+        for bad in ('Nope/Zone', '../etc/passwd', 'x' * 5000):
+            fallback = self.client.get('/api/admin/visitor-log.csv', query_string={'tz': bad})
+            self.assertEqual(rows(fallback.get_data(as_text=True))[0]['hour'], '1')
         everything = self.client.get('/api/admin/visitor-log.csv?all=1')
         self.assertEqual(len(rows(everything.get_data(as_text=True))), 2)
         self.log.unlink()
@@ -156,8 +181,10 @@ class GeoDownloadTests(unittest.TestCase):
     def test_falls_back_to_last_month_and_replaces_file(self):
         asked = []
 
-        def opener(url, timeout):
+        def opener(request, timeout):
+            url = request.full_url
             asked.append(url)
+            self.assertNotIn('Python-urllib', request.get_header('User-agent'))
             if '2026-11' in url:
                 raise OSError('404 Not Found')
             return io.BytesIO(gzip.compress(b'mmdb-bytes'))

@@ -1,5 +1,6 @@
 """Admin download of the visitor log as a CSV file; reads the access logs, changes nothing."""
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import Blueprint, Response, jsonify, request
 from services import visitor_log
 
@@ -17,11 +18,16 @@ def download_visitor_log():
         if not files:
             return jsonify(success=False, message=f'No access log found at {path}.'), 404
         pages_only = request.args.get('all') != '1'
+        # The admin page sends the browser's time zone, e.g. America/Los_Angeles.
+        try:
+            zone = ZoneInfo(request.args.get('tz', ''))
+        except (ValueError, OSError, ZoneInfoNotFoundError):
+            zone = timezone.utc
         try:
             text, counts = visitor_log.build_csv(
                 visitor_log.read_lines(files), my_address=client_address(),
                 ignore=visitor_log.ignored_addresses(), locate=visitor_log.open_locator(),
-                pages_only=pages_only)
+                pages_only=pages_only, zone=zone)
         except OSError as error:
             return jsonify(success=False, message=f'Could not read the access log: {error}'), 500
         stamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')

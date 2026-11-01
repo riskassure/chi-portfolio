@@ -3,6 +3,8 @@ Pillow==12.2.0
 waitress==3.0.2
 zxcvbn==4.5.0
 maxminddb==3.2.0
+# Time zone rules for zoneinfo where the system has none (Windows).
+tzdata==2026.4
 # Transitive dependencies pinned to the verified environment.
 blinker==1.9.0
 click==8.5.0
