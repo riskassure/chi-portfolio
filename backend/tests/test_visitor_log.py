@@ -29,7 +29,7 @@ def line(ip, when, request, status=200, agent=PC, referrer='-'):
 
 
 def rows(text):
-    return list(csv.DictReader(io.StringIO(text)))
+    return list(csv.DictReader(io.StringIO(text.removeprefix('\ufeff'))))
 
 
 class DeviceTests(unittest.TestCase):
@@ -90,6 +90,27 @@ class BuildCsvTests(unittest.TestCase):
         row = rows(text)[0]
         self.assertEqual((row['time_utc'], row['local_time'], row['weekday'], row['hour']),
                          ('2026-10-30 01:00:00', '2026-10-29 18:00:00', 'Thursday', '18'))
+
+    def test_real_browser_means_the_page_parts_were_loaded_soon_after(self):
+        lines = [line('8.8.8.8', '30/Oct/2026:01:00:00', 'GET /'),
+                 line('8.8.8.8', '30/Oct/2026:01:00:01', 'GET /style.css', status=304),
+                 line('8.8.8.8', '30/Oct/2026:01:05:00', 'GET /music/'),
+                 line('8.8.8.8', '30/Oct/2026:01:05:02', 'GET /api/session-check'),
+                 # Same address, other browser: its page parts don't count for this one.
+                 line('8.8.8.8', '30/Oct/2026:01:05:03', 'GET /api/session-check', agent=PHONE),
+                 line('8.8.8.8', '30/Oct/2026:01:05:00', 'GET /travel/', agent=MAC),
+                 # Parts loaded too late, or failed, don't count.
+                 line('7.7.7.7', '30/Oct/2026:02:00:00', 'GET /'),
+                 line('7.7.7.7', '30/Oct/2026:02:05:00', 'GET /style.css'),
+                 line('6.6.6.6', '30/Oct/2026:03:00:00', 'GET /'),
+                 line('6.6.6.6', '30/Oct/2026:03:00:01', 'GET /missing.js', status=404)]
+        found = rows(visitor_log.build_csv(lines)[0])
+        self.assertEqual([(r['ip'], r['page'], r['real_browser']) for r in found], [
+            ('8.8.8.8', '/', 'yes'), ('8.8.8.8', '/music/', 'yes'), ('8.8.8.8', '/travel/', 'no'),
+            ('7.7.7.7', '/', 'no'), ('6.6.6.6', '/', 'no')])
+        everything = rows(visitor_log.build_csv(lines, pages_only=False)[0])
+        self.assertEqual(everything[1]['page'], '/style.css')
+        self.assertEqual(everything[1]['real_browser'], '')
 
     def test_every_request_mode_keeps_assets_but_still_drops_me_and_bots(self):
         lines = [line('8.8.8.8', '30/Oct/2026:01:00:00', 'GET /'),
@@ -162,6 +183,8 @@ class RouteTests(unittest.TestCase):
         response = self.client.get('/api/admin/visitor-log.csv')
         self.assertEqual(response.status_code, 200)
         self.assertIn('attachment; filename="visitors-pages-', response.headers['Content-Disposition'])
+        self.assertEqual(response.headers['Content-Type'], 'text/csv; charset=utf-8')
+        self.assertTrue(response.data.startswith('\ufefftime_utc,'.encode('utf-8')))
         self.assertEqual([r['device'] for r in rows(response.get_data(as_text=True))], ['phone'])
         local = rows(self.client.get('/api/admin/visitor-log.csv?tz=Asia/Tokyo').get_data(as_text=True))
         self.assertEqual((local[0]['local_time'], local[0]['weekday']), ('2026-10-30 10:00:00', 'Friday'))

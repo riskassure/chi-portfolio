@@ -32,7 +32,8 @@ def download_visitor_log():
             return jsonify(success=False, message=f'Could not read the access log: {error}'), 500
         stamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
         name = f"visitors-{'pages' if pages_only else 'all'}-{stamp}.csv"
-        response = Response(text, mimetype='text/csv')
+        # The byte-order mark tells Excel the file is UTF-8, so "São Paulo" isn't shown as "SÃ£o Paulo".
+        response = Response('\ufeff' + text, content_type='text/csv; charset=utf-8')
         response.headers['Content-Disposition'] = f'attachment; filename="{name}"'
         response.headers['X-Visitor-Log-Counts'] = ', '.join(f'{k}={v}' for k, v in sorted(counts.items()))
         return response
