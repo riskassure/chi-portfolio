@@ -175,6 +175,19 @@ def open_locator(path=None, asn_path=None):
     return locate
 
 
+# Excel and other spreadsheets treat a cell starting with one of these as a formula. The
+# referrer, User-Agent, page and method come straight from visitors, so a crafted value such
+# as "=HYPERLINK(...)" could run when the file is opened.
+FORMULA_STARTS = ('=', '+', '-', '@', '\t', '\r')
+
+
+def safe_cell(value):
+    """Text that a spreadsheet shows as typed: a leading ' stops it being read as a formula."""
+    if isinstance(value, str) and value.startswith(FORMULA_STARTS):
+        return "'" + value
+    return value
+
+
 # A real browser opening a page fetches its style sheets and scripts, and the page asks the
 # server for data (every page checks /api/session-check). Most robots read only the page.
 FOLLOW_UP_SECONDS = 60
@@ -231,11 +244,11 @@ def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True, zon
         else:
             real = ''
         utc, local = row['when'].astimezone(timezone.utc), row['when'].astimezone(zone)
-        writer.writerow([utc.strftime('%Y-%m-%d %H:%M:%S'), local.strftime('%Y-%m-%d %H:%M:%S'),
+        writer.writerow(map(safe_cell, [utc.strftime('%Y-%m-%d %H:%M:%S'), local.strftime('%Y-%m-%d %H:%M:%S'),
                          local.strftime('%A'), local.hour, f'V{visitor}', row['ip'],
                          kind, system, browser, city, region, country, network,
                          'yes' if is_cloud(network) else '', real, row['method'],
-                         row['page'], row['status'], row['referrer'], row['user_agent']])
+                         row['page'], row['status'], row['referrer'], row['user_agent']]))
     return out.getvalue(), counts
 
 
