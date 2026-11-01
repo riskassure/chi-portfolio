@@ -99,7 +99,7 @@ told apart and will appear as visitors.
 
 After the code is published (option 15 with `backend/src/services/visitor_log.py,
 backend/src/routes/admin_visitors.py, backend/src/geoip_update.py, backend/src/app.py`, then
-option 14 with `frontend/admin_dashboard.html,frontend/admin_style.css`, then options 3, 4, 5),
+option 14 with `admin_dashboard.html,admin_style.css` (option 14 paths are relative to `frontend/`), then options 3, 4, 5),
 open a **Bash console** on PythonAnywhere and run:
 
 ```
