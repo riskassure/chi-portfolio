@@ -46,6 +46,7 @@ If you want a longer history, download the CSV every couple of weeks and keep th
 | `city`, `region`, `country` | Approximate place, from the IP address (blank until the location file is installed, see below) |
 | `network` | Who owns the IP address: a home or phone provider such as "Comcast Cable" or "Verizon", or a company such as "Amazon.com" (blank until the network file is installed) |
 | `cloud` | `yes` when `network` is a cloud or hosting company (Amazon, Microsoft, DigitalOcean, Hetzner, ...). Real people rarely browse from those, so these rows are almost always robots pretending to be browsers. Filter on this column in Excel to hide them |
+| `real_browser` | `yes` when, within a minute of opening the page, the same address and browser also fetched the page's parts (style sheets, scripts, or the data every page asks the server for). Real browsers always do; most robots read only the page itself, so `no` usually means a robot even when `network` is a home provider. Can say `no` for a real person who closed the page instantly. Blank on non-page rows of the every-request file |
 | `method` | `GET` means "fetch this"; other methods send data to the server |
 | `page` | The address asked for. For math entries the `slug=` part says which entry |
 | `status` | 200 = worked, 304 = browser already had it, 404 = not found |
@@ -74,6 +75,13 @@ customer had it, but only gives that out to the police with a court order.
 **Counting people is rough.** One person on a phone and a laptop counts as two visitors. A whole
 office or a family behind one router can share one IP address. Phone networks change a phone's
 address often, so one person can show as several visitors over a day.
+
+## Opening the file in Excel
+
+The file starts with an invisible marker (a UTF-8 "byte-order mark") that tells Excel which
+alphabet the text uses, so names like "São Paulo" or "Zürich" show correctly. Without it Excel
+shows them garbled, like "SÃ£o Paulo". If you load the file into SQLite or Python instead, read it
+as `utf-8-sig`, which skips the marker.
 
 ## How your own visits are left out
 

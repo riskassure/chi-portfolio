@@ -10,7 +10,8 @@ Chi's own requests are left out: the address of whoever is downloading, any addr
 that did admin work (sign-in or a saved change) on the same UTC day, and any address
 listed in ~/.config/chi-portfolio/visitor-log-ignore-ips.txt.
 """
-from collections import Counter
+from bisect import bisect_left
+from collections import Counter, defaultdict
 import csv
 from datetime import datetime, timezone
 import gzip
@@ -39,7 +40,7 @@ CLOUD_WORDS = ('amazon', 'aws', 'google', 'microsoft', 'azure', 'digitalocean', 
                'datacenter', 'data center', 'server', 'colocation', 'm247', 'fastly', 'facebook',
                'meta platforms', 'censys', 'shodan', 'internet measurement')
 COLUMNS = ['time_utc', 'local_time', 'weekday', 'hour', 'visitor', 'ip', 'device', 'os', 'browser', 'city', 'region',
-           'country', 'network', 'cloud', 'method', 'page', 'status', 'referrer', 'user_agent']
+           'country', 'network', 'cloud', 'real_browser', 'method', 'page', 'status', 'referrer', 'user_agent']
 
 
 def log_files(path):
@@ -174,12 +175,34 @@ def open_locator(path=None, asn_path=None):
     return locate
 
 
+# A real browser opening a page fetches its style sheets and scripts, and the page asks the
+# server for data (every page checks /api/session-check). Most robots read only the page.
+FOLLOW_UP_SECONDS = 60
+
+
+def follow_up_times(rows):
+    """Times of the non-page requests each (address, browser) made, sorted, for real_browser."""
+    times = defaultdict(list)
+    for row in rows:
+        if row['method'] in {'GET', 'HEAD'} and row['status'] < 400 and not is_page_view(row):
+            times[(row['ip'], row['user_agent'])].append(row['when'].timestamp())
+    return times
+
+
+def loaded_page_parts(row, times):
+    later = times.get((row['ip'], row['user_agent']), [])
+    start = row['when'].timestamp()
+    i = bisect_left(later, start)
+    return i < len(later) and later[i] <= start + FOLLOW_UP_SECONDS
+
+
 def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True, zone=timezone.utc):
     """CSV text, plus counts of what was kept and left out; local columns use zone."""
     rows = [row for row in map(parse, lines) if row]
     rows.sort(key=lambda row: row['when'])
     day = lambda row: row['when'].astimezone(timezone.utc).date()
     mine = {(row['ip'], day(row)) for row in rows if is_admin_work(row)}
+    follow_ups = follow_up_times(rows)
     always = set(ignore) | ({my_address} if my_address else set())
     counts = Counter()
     places, visitors = {}, {}
@@ -203,11 +226,15 @@ def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True, zon
         if locate and row['ip'] not in places:
             places[row['ip']] = locate(row['ip'])
         city, region, country, network = places.get(row['ip'], ('', '', '', ''))
+        if is_page_view(row):
+            real = 'yes' if loaded_page_parts(row, follow_ups) else 'no'
+        else:
+            real = ''
         utc, local = row['when'].astimezone(timezone.utc), row['when'].astimezone(zone)
         writer.writerow([utc.strftime('%Y-%m-%d %H:%M:%S'), local.strftime('%Y-%m-%d %H:%M:%S'),
                          local.strftime('%A'), local.hour, f'V{visitor}', row['ip'],
                          kind, system, browser, city, region, country, network,
-                         'yes' if is_cloud(network) else '', row['method'],
+                         'yes' if is_cloud(network) else '', real, row['method'],
                          row['page'], row['status'], row['referrer'], row['user_agent']])
     return out.getvalue(), counts
 
