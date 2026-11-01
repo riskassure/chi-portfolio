@@ -7,7 +7,18 @@ const API_BASE = `${window.PORTFOLIO_API_BASE}`;
 // Instantly run session diagnostic check when page mounts
 window.addEventListener('DOMContentLoaded', () => {
     verifySystemSession();
+    addVisitorLogTimeZone();
 });
+
+// Visitor log: ask for local_time, weekday and hour in this browser's time zone
+function addVisitorLogTimeZone() {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!zone) return;
+    document.querySelectorAll('a[href*="visitor-log.csv"]').forEach(link => {
+        const href = link.getAttribute('href');
+        link.setAttribute('href', `${href}${href.includes('?') ? '&' : '?'}tz=${encodeURIComponent(zone)}`);
+    });
+}
 
 // 🟢 DIAGNOSTIC: Check if browser already has access
 async function verifySystemSession() {

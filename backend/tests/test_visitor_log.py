@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 SRC = Path(__file__).resolve().parents[1] / 'src'
 sys.path.insert(0, str(SRC))
@@ -76,9 +77,19 @@ class BuildCsvTests(unittest.TestCase):
         self.assertEqual((first['city'], first['country'], first['referrer']),
                          ('Mountain View', 'United States', 'https://www.google.com/'))
         self.assertEqual((first['network'], first['cloud']), ('Google LLC', 'yes'))
+        self.assertEqual((first['local_time'], first['weekday'], first['hour']),
+                         ('2026-10-30 01:00:00', 'Friday', '1'))
         self.assertEqual(counts['you'], 4)
         self.assertEqual(counts['bots'], 1)
         self.assertEqual(counts['kept'], 3)
+
+    def test_local_time_weekday_and_hour_follow_the_zone(self):
+        # 01:00 UTC on Friday 30 October is 18:00 on Thursday in Los Angeles (daylight time).
+        text, _ = visitor_log.build_csv([line('8.8.8.8', '30/Oct/2026:01:00:00', 'GET /')],
+                                        zone=ZoneInfo('America/Los_Angeles'))
+        row = rows(text)[0]
+        self.assertEqual((row['time_utc'], row['local_time'], row['weekday'], row['hour']),
+                         ('2026-10-30 01:00:00', '2026-10-29 18:00:00', 'Thursday', '18'))
 
     def test_every_request_mode_keeps_assets_but_still_drops_me_and_bots(self):
         lines = [line('8.8.8.8', '30/Oct/2026:01:00:00', 'GET /'),
@@ -152,6 +163,11 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('attachment; filename="visitors-pages-', response.headers['Content-Disposition'])
         self.assertEqual([r['device'] for r in rows(response.get_data(as_text=True))], ['phone'])
+        local = rows(self.client.get('/api/admin/visitor-log.csv?tz=Asia/Tokyo').get_data(as_text=True))
+        self.assertEqual((local[0]['local_time'], local[0]['weekday']), ('2026-10-30 10:00:00', 'Friday'))
+        for bad in ('Nope/Zone', '../etc/passwd', 'x' * 5000):
+            fallback = self.client.get('/api/admin/visitor-log.csv', query_string={'tz': bad})
+            self.assertEqual(rows(fallback.get_data(as_text=True))[0]['hour'], '1')
         everything = self.client.get('/api/admin/visitor-log.csv?all=1')
         self.assertEqual(len(rows(everything.get_data(as_text=True))), 2)
         self.log.unlink()

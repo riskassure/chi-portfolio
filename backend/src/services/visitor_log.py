@@ -38,7 +38,7 @@ CLOUD_WORDS = ('amazon', 'aws', 'google', 'microsoft', 'azure', 'digitalocean', 
                'tencent', 'huawei cloud', 'cloudflare', 'leaseweb', 'scaleway', 'hosting',
                'datacenter', 'data center', 'server', 'colocation', 'm247', 'fastly', 'facebook',
                'meta platforms', 'censys', 'shodan', 'internet measurement')
-COLUMNS = ['time_utc', 'visitor', 'ip', 'device', 'os', 'browser', 'city', 'region',
+COLUMNS = ['time_utc', 'local_time', 'weekday', 'hour', 'visitor', 'ip', 'device', 'os', 'browser', 'city', 'region',
            'country', 'network', 'cloud', 'method', 'page', 'status', 'referrer', 'user_agent']
 
 
@@ -174,8 +174,8 @@ def open_locator(path=None, asn_path=None):
     return locate
 
 
-def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True):
-    """CSV text, plus counts of what was kept and left out."""
+def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True, zone=timezone.utc):
+    """CSV text, plus counts of what was kept and left out; local columns use zone."""
     rows = [row for row in map(parse, lines) if row]
     rows.sort(key=lambda row: row['when'])
     day = lambda row: row['when'].astimezone(timezone.utc).date()
@@ -203,8 +203,9 @@ def build_csv(lines, my_address='', ignore=(), locate=None, pages_only=True):
         if locate and row['ip'] not in places:
             places[row['ip']] = locate(row['ip'])
         city, region, country, network = places.get(row['ip'], ('', '', '', ''))
-        utc = row['when'].astimezone(timezone.utc)
-        writer.writerow([utc.strftime('%Y-%m-%d %H:%M:%S'), f'V{visitor}', row['ip'],
+        utc, local = row['when'].astimezone(timezone.utc), row['when'].astimezone(zone)
+        writer.writerow([utc.strftime('%Y-%m-%d %H:%M:%S'), local.strftime('%Y-%m-%d %H:%M:%S'),
+                         local.strftime('%A'), local.hour, f'V{visitor}', row['ip'],
                          kind, system, browser, city, region, country, network,
                          'yes' if is_cloud(network) else '', row['method'],
                          row['page'], row['status'], row['referrer'], row['user_agent']])

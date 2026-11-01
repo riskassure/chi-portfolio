@@ -36,6 +36,9 @@ If you want a longer history, download the CSV every couple of weeks and keep th
 | Column | Meaning |
 | --- | --- |
 | `time_utc` | When the request arrived, in UTC (Coordinated Universal Time, not your local time) |
+| `local_time` | The same moment in your own time zone (the admin page tells the server which time zone your browser is set to; daylight saving is handled) |
+| `weekday` | Day of the week in your time zone, e.g. `Friday` |
+| `hour` | Hour of the day in your time zone, 0 to 23 (`18` means 6:00 to 6:59 pm), handy for a pivot table of busy times |
 | `visitor` | `V1`, `V2`, ... One number per IP address plus browser, in order of first visit. A rough way to count people; see the limits below |
 | `ip` | The visitor's IP address |
 | `device` | `phone`, `tablet`, `computer` or `unknown`, guessed from the User-Agent |
@@ -100,7 +103,8 @@ told apart and will appear as visitors.
 ## One-time setup on PythonAnywhere
 
 After the code is published (option 15 with `backend/src/services/visitor_log.py,
-backend/src/routes/admin_visitors.py, backend/src/geoip_update.py, backend/src/app.py`, then
+backend/src/routes/admin_visitors.py, backend/src/geoip_update.py, backend/src/app.py,
+frontend/admin_app.js`, then
 option 14 with `admin_dashboard.html,admin_style.css` (option 14 paths are relative to `frontend/`), then options 3, 4, 5),
 open a **Bash console** on PythonAnywhere and run:
 
