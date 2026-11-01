@@ -15,6 +15,7 @@ Committing code does not publish it to the website.
 | [When the site is down](administration/backups/SITE_DOWN_RECOVERY.md) | What kind of outage it is, then: site won't start, bad database, domain/DNS, rebuilding on a new account; keeping recovery copies fresh and the disk from filling up |
 | [Renewing the Spotify sign-in](administration/SPOTIFY_RENEWAL.md) | When the music page stops updating: sign in on the laptop, copy the token to the server, test, delete the laptop copy |
 | [Changing the site's secrets](administration/ROTATING_SECRETS.md) | When and how to rotate the admin password, session secret, PythonAnywhere token, SSH key, Spotify, Google and Esri credentials |
+| [Visitor log](administration/VISITOR_LOG.md) | The admin page's visitor CSV download: columns, what location and device type can tell you, how your own visits are left out, setup |
 | [Automatic tests on GitHub (CI)](administration/CI_TESTS.md) | What runs on every PR, reading the green tick or red cross, fixing a failure |
 | [Content synchronization](administration/deployment/CONTENT_SYNC.md) | Detailed helper preparation, checks and publication |
 | [Deploy guard](administration/deployment/DEPLOY_GUARD.md) | Why options 14 and 15 refuse unless the laptop is on a clean `main` that matches GitHub, and the fix for each refusal |

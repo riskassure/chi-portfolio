@@ -358,6 +358,12 @@ key could be used for, but don't make misuse impossible; keep those restrictions
 Changing Esri referrers can require regenerating its key. Do not reset working
 credentials without understanding which environment uses them.
 
+## Visitor log
+
+The admin page's **Visitor log** buttons download a CSV of visits, without your own visits and
+robots. Columns, limits (location is approximate, names are never known) and the one-time
+PythonAnywhere setup: [Visitor log](administration/VISITOR_LOG.md).
+
 ## Backups, failures and recovery
 
 **Site down?** Start with [When the site is down](administration/backups/SITE_DOWN_RECOVERY.md):

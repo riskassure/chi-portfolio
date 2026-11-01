@@ -30,6 +30,12 @@
                 <a href="https://github.com/riskassure/chi-portfolio/tree/main/docs" target="_blank" rel="noopener">📚 Admin docs</a>
                 <a href="https://github.com/riskassure/chi-portfolio/blob/main/docs/ADMIN_RUNBOOK.md" target="_blank" rel="noopener">🛠️ Admin runbook</a>
             </div>
+            <div class="admin-docs-links">
+                <a href="/api/admin/visitor-log.csv" download>👥 Visitor log (pages, CSV)</a>
+                <a href="/api/admin/visitor-log.csv?all=1" download>📄 Visitor log (every request, CSV)</a>
+            </div>
+            <p class="admin-note">Leaves out your own visits and bots. Locations are approximate, from the IP address.
+                <a href="https://db-ip.com" target="_blank" rel="noopener">IP Geolocation by DB-IP</a></p>
             <button class="btn-logout" onclick="attemptLogout()">Terminate Session</button>
         </div>
 

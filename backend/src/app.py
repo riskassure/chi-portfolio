@@ -163,6 +163,7 @@ from routes.admin_math import math_bp
 from routes.music_spotify import spotify_bp
 from routes.google_photos import google_photos_bp
 from routes.travel import travel_bp
+from routes.admin_visitors import visitors_bp
 
 app.register_blueprint(music_bp)
 app.register_blueprint(pages_bp)
@@ -171,6 +172,7 @@ app.register_blueprint(math_bp)
 app.register_blueprint(spotify_bp)
 app.register_blueprint(google_photos_bp)
 app.register_blueprint(travel_bp)
+app.register_blueprint(visitors_bp)
 
 
 # ==========================================================================
