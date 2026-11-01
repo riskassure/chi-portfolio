@@ -112,6 +112,23 @@ class BuildCsvTests(unittest.TestCase):
         self.assertEqual(everything[1]['page'], '/style.css')
         self.assertEqual(everything[1]['real_browser'], '')
 
+    def test_visitor_text_that_looks_like_a_formula_is_written_as_text(self):
+        evil = '=HYPERLINK("http://x.example","click")'
+        lines = [line('8.8.8.8', '30/Oct/2026:01:00:00', 'GET /', referrer='=1+1', agent=PC + ' @SUM(A1)'),
+                 line('8.8.8.8', '30/Oct/2026:01:00:01', 'GET /?q=' + evil.replace('"', '')),
+                 line('8.8.8.8', '30/Oct/2026:01:00:02', 'GET /', referrer='+cmd'),
+                 line('8.8.8.8', '30/Oct/2026:01:00:03', 'GET /', referrer='-2'),
+                 line('8.8.8.8', '30/Oct/2026:01:00:04', 'GET /', referrer='@foo'),
+                 line('8.8.8.8', '30/Oct/2026:01:00:05', 'GET /', referrer='\tx')]
+        found = rows(visitor_log.build_csv(lines)[0])
+        self.assertEqual([r['referrer'] for r in found if r['referrer']],
+                         ["'=1+1", "'+cmd", "'-2", "'@foo", "'\tx"])
+        # Text that only contains a formula character later on is left alone.
+        self.assertTrue(found[0]['user_agent'].endswith('@SUM(A1)'))
+        self.assertEqual(found[0]['page'], '/')
+        self.assertEqual(visitor_log.safe_cell(200), 200)
+        self.assertEqual(visitor_log.safe_cell('=x'), "'=x")
+
     def test_every_request_mode_keeps_assets_but_still_drops_me_and_bots(self):
         lines = [line('8.8.8.8', '30/Oct/2026:01:00:00', 'GET /'),
                  line('8.8.8.8', '30/Oct/2026:01:00:01', 'GET /style.css'),

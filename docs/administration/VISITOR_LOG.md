@@ -118,6 +118,11 @@ To see all rows again, use **Data > Clear**. To work out how many real people vi
 filtering, copy the `visitor` column to a new sheet and use **Data > Remove Duplicates**. The
 number of rows left is the number of distinct visitors.
 
+Some cells may start with an apostrophe, such as `'=1+1` in the referrer. Visitors control
+the referrer, User-Agent and page address. A value starting with `=`, `+`, `-` or `@` could
+otherwise be run by Excel as a formula when you open the file, so the download adds the
+apostrophe to keep it as plain text. Excel hides the apostrophe in the cell itself.
+
 ## How your own visits are left out
 
 A row is treated as yours, and left out, when its IP address:
