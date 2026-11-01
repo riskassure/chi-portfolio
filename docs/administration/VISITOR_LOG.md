@@ -83,6 +83,41 @@ alphabet the text uses, so names like "São Paulo" or "Zürich" show correctly. 
 shows them garbled, like "SÃ£o Paulo". If you load the file into SQLite or Python instead, read it
 as `utf-8-sig`, which skips the marker.
 
+## Filtering out robots in Excel
+
+The download already leaves out robots that admit to being robots. The rest pretend to be ordinary
+browsers, so they are marked rather than removed, and you filter them out in Excel. In the
+pages file the columns sit at these letters: E = `visitor`, J = `city`, N = `cloud`,
+O = `real_browser`, S = `referrer`.
+
+1. **Turn on filters.** Click any cell in the table, then **Data > Filter**. Each heading gets a
+   small arrow button.
+2. **Hide cloud traffic.** Click the arrow on `cloud`, untick `yes` and leave `(Blanks)` ticked.
+   This removes visits from Amazon, Microsoft, Tencent, Alibaba and other data centres. Real
+   people almost never browse from those.
+3. **Keep real browsers.** Click the arrow on `real_browser` and tick only `yes`. That keeps
+   visits whose browser also loaded the page's style sheets, scripts and data, which most
+   robots skip. This is the strongest single filter. It also drops a few real people who
+   closed the page within a second, so treat what's left as a slight undercount.
+4. **Optional: data-centre cities.** If you still see Ashburn (Virginia), Boardman (Oregon),
+   Council Bluffs (Iowa), Santa Clara, Frankfurt, Amsterdam or Singapore with a network you don't
+   recognise, untick those cities on the `city` arrow. Big cloud companies have data centres there.
+5. **Optional: a "likely robot" helper column.** In the first empty column (U), type the heading
+   `likely_bot` in U1, then put this in U2 and double-click the cell's bottom-right corner to fill
+   it down:
+
+   ```
+   =AND(COUNTIF(E:E,E2)=1,S2="")
+   ```
+
+   It shows `TRUE` for a visitor who opened exactly one page and came from nowhere (no referrer),
+   which is how a lot of scanners behave. Filter `likely_bot` to `FALSE` to hide them. Expect it
+   to hide some real one-page visitors too, such as someone who typed your address in once.
+
+To see all rows again, use **Data > Clear**. To work out how many real people visited after
+filtering, copy the `visitor` column to a new sheet and use **Data > Remove Duplicates**. The
+number of rows left is the number of distinct visitors.
+
 ## How your own visits are left out
 
 A row is treated as yours, and left out, when its IP address:
