@@ -144,6 +144,16 @@ body {
     color: #ffffff;
 }
 
+.admin-note {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.admin-note a {
+    color: inherit;
+}
+
 .btn-logout {
     margin-top: 25px;
     padding: 10px 20px;
