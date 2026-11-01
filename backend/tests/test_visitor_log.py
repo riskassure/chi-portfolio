@@ -156,8 +156,10 @@ class GeoDownloadTests(unittest.TestCase):
     def test_falls_back_to_last_month_and_replaces_file(self):
         asked = []
 
-        def opener(url, timeout):
+        def opener(request, timeout):
+            url = request.full_url
             asked.append(url)
+            self.assertNotIn('Python-urllib', request.get_header('User-agent'))
             if '2026-11' in url:
                 raise OSError('404 Not Found')
             return io.BytesIO(gzip.compress(b'mmdb-bytes'))

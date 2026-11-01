@@ -16,11 +16,13 @@ import gzip
 import os
 import shutil
 import sys
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from services.visitor_log import GEO_FILE
 
 URL = 'https://download.db-ip.com/free/dbip-{level}-lite-{month}.mmdb.gz'
+# DB-IP refuses Python's default "Python-urllib" identity with 403 Forbidden.
+AGENT = 'curl/8.5.0 (chi-portfolio geoip_update.py)'
 
 
 def months(today):
@@ -36,7 +38,8 @@ def download(level, target=GEO_FILE, today=None, opener=urlopen):
     for month in months(today or date.today()):
         url = URL.format(level=level, month=month)
         try:
-            with opener(url, timeout=120) as response, gzip.open(response) as unpacked, \
+            request = Request(url, headers={'User-Agent': AGENT})
+            with opener(request, timeout=120) as response, gzip.open(response) as unpacked, \
                     open(partial, 'wb') as out:
                 shutil.copyfileobj(unpacked, out)
         except (OSError, EOFError) as error:
