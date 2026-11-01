@@ -64,7 +64,7 @@ class BuildCsvTests(unittest.TestCase):
         ]
         text, counts = visitor_log.build_csv(
             lines, my_address='5.5.5.5', ignore={'6.6.6.6'},
-            locate=lambda ip: ('Mountain View', 'California', 'United States'))
+            locate=lambda ip: ('Mountain View', 'California', 'United States', 'Google LLC'))
         found = rows(text)
         self.assertEqual(list(found[0]), visitor_log.COLUMNS)
         self.assertEqual([(r['ip'], r['page']) for r in found], [
@@ -75,6 +75,7 @@ class BuildCsvTests(unittest.TestCase):
                          ('2026-10-30 01:00:00', 'V1', 'phone', 'iOS'))
         self.assertEqual((first['city'], first['country'], first['referrer']),
                          ('Mountain View', 'United States', 'https://www.google.com/'))
+        self.assertEqual((first['network'], first['cloud']), ('Google LLC', 'yes'))
         self.assertEqual(counts['you'], 4)
         self.assertEqual(counts['bots'], 1)
         self.assertEqual(counts['kept'], 3)
@@ -86,7 +87,13 @@ class BuildCsvTests(unittest.TestCase):
                  line('9.9.9.9', '30/Oct/2026:01:00:03', 'GET /api/admin/math/types')]
         text, counts = visitor_log.build_csv(lines, pages_only=False)
         self.assertEqual([r['page'] for r in rows(text)], ['/', '/style.css'])
-        self.assertEqual(rows(text)[0]['city'], '')
+        self.assertEqual((rows(text)[0]['city'], rows(text)[0]['cloud']), ('', ''))
+
+    def test_cloud_networks(self):
+        for name in ('Amazon.com, Inc.', 'DigitalOcean, LLC', 'Hetzner Online GmbH', 'Microsoft Corporation'):
+            self.assertTrue(visitor_log.is_cloud(name), name)
+        for name in ('Comcast Cable Communications, LLC', 'Verizon Business', 'Google Fiber Inc.', ''):
+            self.assertFalse(visitor_log.is_cloud(name), name)
 
     def test_ignore_file_skips_comments_and_bad_lines(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -96,7 +103,8 @@ class BuildCsvTests(unittest.TestCase):
             self.assertEqual(visitor_log.ignored_addresses(Path(folder) / 'missing.txt'), set())
 
     def test_no_location_file_means_no_locator(self):
-        self.assertIsNone(visitor_log.open_locator(Path(tempfile.gettempdir()) / 'no-such.mmdb'))
+        missing = Path(tempfile.gettempdir()) / 'no-such.mmdb'
+        self.assertIsNone(visitor_log.open_locator(missing, missing))
 
 
 class LogFileTests(unittest.TestCase):
@@ -128,7 +136,8 @@ class RouteTests(unittest.TestCase):
                             + line('8.8.8.8', '30/Oct/2026:01:00:01', 'GET /style.css', agent=PHONE))
         for patcher in (patch.dict(os.environ, {'VISITOR_LOG_PATH': str(self.log)}),
                         patch.object(visitor_log, 'IGNORE_FILE', Path(folder.name) / 'none.txt'),
-                        patch.object(visitor_log, 'GEO_FILE', Path(folder.name) / 'none.mmdb')):
+                        patch.object(visitor_log, 'GEO_FILE', Path(folder.name) / 'none.mmdb'),
+                        patch.object(visitor_log, 'ASN_FILE', Path(folder.name) / 'none-asn.mmdb')):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.client = gateway.app.test_client()

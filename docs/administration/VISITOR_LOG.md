@@ -41,6 +41,8 @@ If you want a longer history, download the CSV every couple of weeks and keep th
 | `device` | `phone`, `tablet`, `computer` or `unknown`, guessed from the User-Agent |
 | `os`, `browser` | Operating system and browser, also from the User-Agent |
 | `city`, `region`, `country` | Approximate place, from the IP address (blank until the location file is installed, see below) |
+| `network` | Who owns the IP address: a home or phone provider such as "Comcast Cable" or "Verizon", or a company such as "Amazon.com" (blank until the network file is installed) |
+| `cloud` | `yes` when `network` is a cloud or hosting company (Amazon, Microsoft, DigitalOcean, Hetzner, ...). Real people rarely browse from those, so these rows are almost always robots pretending to be browsers. Filter on this column in Excel to hide them |
 | `method` | `GET` means "fetch this"; other methods send data to the server |
 | `page` | The address asked for. For math entries the `slug=` part says which entry |
 | `status` | 200 = worked, 304 = browser already had it, 404 = not found |
@@ -112,8 +114,8 @@ python geoip_update.py
 Then **Reload** the web app on the Web tab. The download works without the location file, just
 with blank location columns.
 
-`geoip_update.py` downloads the city-level file (about 130 MB of your disk space). If disk is
-tight, use `python geoip_update.py --country` instead (about 8 MB, country only). DB-IP
+`geoip_update.py` downloads the city-level file (about 130 MB of your disk space) and the network-owner file (about 10 MB). If disk is
+tight, use `python geoip_update.py --country` instead (about 8 MB, country only; the network file still comes too). DB-IP
 publishes a new file every month; addresses move slowly, so re-running it every few months is
 plenty. No reload is needed after an update.
 
