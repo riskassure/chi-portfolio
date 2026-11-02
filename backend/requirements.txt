@@ -4,11 +4,11 @@ waitress==3.0.2
 zxcvbn==4.5.0
 maxminddb==3.2.0
 # Time zone rules for zoneinfo where the system has none (Windows).
-tzdata==2026.4
+tzdata==2026.5
 # Transitive dependencies pinned to the verified environment.
 blinker==1.9.0
 click==8.5.0
 itsdangerous==2.2.0
 Jinja2==3.1.6
-MarkupSafe==3.0.3
-Werkzeug==3.1.8
+MarkupSafe==3.0.4
+Werkzeug==3.1.9
